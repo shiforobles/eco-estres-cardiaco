@@ -9,27 +9,29 @@ const WM = {
 };
 
 // Definición de los 17 segmentos AHA
+// Orientación estándar eco: visto desde el ápex, LATERAL a la derecha, SEPTAL a la izquierda.
+// Sentido horario desde 12h: Anterior → Anterolateral → Inferolateral → Inferior → Inferoseptal → Anteroseptal
 const SEGMENTS = [
-    // Basales (ring 0, 6 segmentos)
+    // Basales (ring 0) — horario desde 12h: Ant(0), AL(1), IL(2), Inf(3), IS(4), AS(5)
     { id:1,  name:'Basal Anterior',       ring:0, pos:0, territory:'DA' },
-    { id:2,  name:'Basal Anteroseptal',   ring:0, pos:1, territory:'DA' },
-    { id:3,  name:'Basal Inferoseptal',   ring:0, pos:2, territory:'CD' },
+    { id:6,  name:'Basal Anterolateral',  ring:0, pos:1, territory:'Cx' },
+    { id:5,  name:'Basal Inferolateral',  ring:0, pos:2, territory:'Cx' },
     { id:4,  name:'Basal Inferior',       ring:0, pos:3, territory:'CD' },
-    { id:5,  name:'Basal Inferolateral',  ring:0, pos:4, territory:'Cx' },
-    { id:6,  name:'Basal Anterolateral',  ring:0, pos:5, territory:'Cx' },
-    // Medios (ring 1, 6 segmentos)
+    { id:3,  name:'Basal Inferoseptal',   ring:0, pos:4, territory:'CD' },
+    { id:2,  name:'Basal Anteroseptal',   ring:0, pos:5, territory:'DA' },
+    // Medios (ring 1) — mismo orden horario
     { id:7,  name:'Mid Anterior',         ring:1, pos:0, territory:'DA' },
-    { id:8,  name:'Mid Anteroseptal',     ring:1, pos:1, territory:'DA' },
-    { id:9,  name:'Mid Inferoseptal',     ring:1, pos:2, territory:'CD' },
+    { id:12, name:'Mid Anterolateral',    ring:1, pos:1, territory:'Cx' },
+    { id:11, name:'Mid Inferolateral',    ring:1, pos:2, territory:'Cx' },
     { id:10, name:'Mid Inferior',         ring:1, pos:3, territory:'CD' },
-    { id:11, name:'Mid Inferolateral',    ring:1, pos:4, territory:'Cx' },
-    { id:12, name:'Mid Anterolateral',    ring:1, pos:5, territory:'Cx' },
-    // Apicales (ring 2, 4 segmentos)
+    { id:9,  name:'Mid Inferoseptal',     ring:1, pos:4, territory:'CD' },
+    { id:8,  name:'Mid Anteroseptal',     ring:1, pos:5, territory:'DA' },
+    // Apicales (ring 2, 4 seg a 90°) — horario: Ant(0), Lat(1), Inf(2), Sep(3)
     { id:13, name:'Apical Anterior',      ring:2, pos:0, territory:'DA' },
-    { id:14, name:'Apical Septal',        ring:2, pos:1, territory:'DA' },
+    { id:16, name:'Apical Lateral',       ring:2, pos:1, territory:'Cx' },
     { id:15, name:'Apical Inferior',      ring:2, pos:2, territory:'CD' },
-    { id:16, name:'Apical Lateral',       ring:2, pos:3, territory:'Cx' },
-    // Apex (ring 3, 1 segmento)
+    { id:14, name:'Apical Septal',        ring:2, pos:3, territory:'DA' },
+    // Apex (ring 3)
     { id:17, name:'Apex',                 ring:3, pos:0, territory:'DA' }
 ];
 
@@ -429,7 +431,9 @@ function makeBtns(segId, stateKey) {
 function buildSegmentsTable() {
     const tbody = document.getElementById('segments-tbody');
     tbody.innerHTML = '';
-    SEGMENTS.forEach(seg => {
+    // Siempre mostrar en orden 1-17 independientemente del orden visual del bull's eye
+    const sorted = [...SEGMENTS].sort((a, b) => a.id - b.id);
+    sorted.forEach(seg => {
         const badgeClass = seg.territory === 'DA' ? 'badge-da' : seg.territory === 'CD' ? 'badge-cd' : 'badge-cx';
         const tr = document.createElement('tr');
         tr.id = `seg-row-${seg.id}`;
@@ -610,6 +614,31 @@ function calcMCH() {
             gradEst > 30 && gradRep > 30 ? 'Obstrucción en reposo y estrés' :
             '— Sin obstrucción significativa';
     }
+}
+
+// ── CARGA RÁPIDA POR TERRITORIO ───────────────
+function setTerritoryScore(stateKey, territory, score) {
+    SEGMENTS.forEach(seg => {
+        if (seg.territory === territory) WM[stateKey][seg.id] = score;
+    });
+    renderBullsEye('svg-' + stateKey, stateKey);
+    buildSegmentsTable();
+    updateWMSI();
+}
+
+function setAllNormal(stateKey) {
+    SEGMENTS.forEach(seg => { WM[stateKey][seg.id] = 1; });
+    renderBullsEye('svg-' + stateKey, stateKey);
+    buildSegmentsTable();
+    updateWMSI();
+}
+
+function resetAllScores() {
+    SEGMENTS.forEach(seg => { WM.reposo[seg.id] = 0; WM.estres[seg.id] = 0; });
+    renderBullsEye('svg-reposo', 'reposo');
+    renderBullsEye('svg-estres', 'estres');
+    buildSegmentsTable();
+    updateWMSI();
 }
 
 // ── GENERADOR DE REPORTE ──────────────────────

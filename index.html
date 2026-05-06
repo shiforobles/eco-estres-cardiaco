@@ -404,8 +404,89 @@
         </div>
 
         <p style="font-size:0.78rem; color:var(--color-text-secondary); margin-bottom:1rem">
-            Haga clic en cada segmento del diagrama o use los botones de la tabla para asignar el score. Se actualiza automáticamente.
+            Carga rápida por territorio o haga clic directamente en cada segmento del diagrama / botones de la tabla.
         </p>
+
+        <!-- CARGA RÁPIDA POR TERRITORIO -->
+        <div class="territory-ctrl-box">
+            <div class="tc-title">⚡ Carga Rápida por Territorio</div>
+            <table class="tc-table">
+                <thead>
+                    <tr>
+                        <th></th><th></th>
+                        <th style="color:#9CA3AF">—</th>
+                        <th style="color:#16A34A">1 N</th>
+                        <th style="color:#CA8A04">2 HL</th>
+                        <th style="color:#EA580C">3 HM</th>
+                        <th style="color:#DC2626">4 AC</th>
+                        <th style="color:#9333EA">5 DC</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td rowspan="3">REPOSO</td>
+                        <td><span class="badge-da">DA</span></td>
+                        <td><button class="tc-btn" style="background:#9CA3AF;color:#111" onclick="setTerritoryScore('reposo','DA',0)">—</button></td>
+                        <td><button class="tc-btn" style="background:#22C55E;color:#111" onclick="setTerritoryScore('reposo','DA',1)">1</button></td>
+                        <td><button class="tc-btn" style="background:#FDE047;color:#111" onclick="setTerritoryScore('reposo','DA',2)">2</button></td>
+                        <td><button class="tc-btn" style="background:#FB923C;color:#111" onclick="setTerritoryScore('reposo','DA',3)">3</button></td>
+                        <td><button class="tc-btn" style="background:#EF4444;color:#fff" onclick="setTerritoryScore('reposo','DA',4)">4</button></td>
+                        <td><button class="tc-btn" style="background:#A855F7;color:#fff" onclick="setTerritoryScore('reposo','DA',5)">5</button></td>
+                    </tr>
+                    <tr>
+                        <td><span class="badge-cd">CD</span></td>
+                        <td><button class="tc-btn" style="background:#9CA3AF;color:#111" onclick="setTerritoryScore('reposo','CD',0)">—</button></td>
+                        <td><button class="tc-btn" style="background:#22C55E;color:#111" onclick="setTerritoryScore('reposo','CD',1)">1</button></td>
+                        <td><button class="tc-btn" style="background:#FDE047;color:#111" onclick="setTerritoryScore('reposo','CD',2)">2</button></td>
+                        <td><button class="tc-btn" style="background:#FB923C;color:#111" onclick="setTerritoryScore('reposo','CD',3)">3</button></td>
+                        <td><button class="tc-btn" style="background:#EF4444;color:#fff" onclick="setTerritoryScore('reposo','CD',4)">4</button></td>
+                        <td><button class="tc-btn" style="background:#A855F7;color:#fff" onclick="setTerritoryScore('reposo','CD',5)">5</button></td>
+                    </tr>
+                    <tr>
+                        <td><span class="badge-cx">Cx</span></td>
+                        <td><button class="tc-btn" style="background:#9CA3AF;color:#111" onclick="setTerritoryScore('reposo','Cx',0)">—</button></td>
+                        <td><button class="tc-btn" style="background:#22C55E;color:#111" onclick="setTerritoryScore('reposo','Cx',1)">1</button></td>
+                        <td><button class="tc-btn" style="background:#FDE047;color:#111" onclick="setTerritoryScore('reposo','Cx',2)">2</button></td>
+                        <td><button class="tc-btn" style="background:#FB923C;color:#111" onclick="setTerritoryScore('reposo','Cx',3)">3</button></td>
+                        <td><button class="tc-btn" style="background:#EF4444;color:#fff" onclick="setTerritoryScore('reposo','Cx',4)">4</button></td>
+                        <td><button class="tc-btn" style="background:#A855F7;color:#fff" onclick="setTerritoryScore('reposo','Cx',5)">5</button></td>
+                    </tr>
+                    <tr class="tc-sep">
+                        <td rowspan="3">ESTRÉS</td>
+                        <td><span class="badge-da">DA</span></td>
+                        <td><button class="tc-btn" style="background:#9CA3AF;color:#111" onclick="setTerritoryScore('estres','DA',0)">—</button></td>
+                        <td><button class="tc-btn" style="background:#22C55E;color:#111" onclick="setTerritoryScore('estres','DA',1)">1</button></td>
+                        <td><button class="tc-btn" style="background:#FDE047;color:#111" onclick="setTerritoryScore('estres','DA',2)">2</button></td>
+                        <td><button class="tc-btn" style="background:#FB923C;color:#111" onclick="setTerritoryScore('estres','DA',3)">3</button></td>
+                        <td><button class="tc-btn" style="background:#EF4444;color:#fff" onclick="setTerritoryScore('estres','DA',4)">4</button></td>
+                        <td><button class="tc-btn" style="background:#A855F7;color:#fff" onclick="setTerritoryScore('estres','DA',5)">5</button></td>
+                    </tr>
+                    <tr>
+                        <td><span class="badge-cd">CD</span></td>
+                        <td><button class="tc-btn" style="background:#9CA3AF;color:#111" onclick="setTerritoryScore('estres','CD',0)">—</button></td>
+                        <td><button class="tc-btn" style="background:#22C55E;color:#111" onclick="setTerritoryScore('estres','CD',1)">1</button></td>
+                        <td><button class="tc-btn" style="background:#FDE047;color:#111" onclick="setTerritoryScore('estres','CD',2)">2</button></td>
+                        <td><button class="tc-btn" style="background:#FB923C;color:#111" onclick="setTerritoryScore('estres','CD',3)">3</button></td>
+                        <td><button class="tc-btn" style="background:#EF4444;color:#fff" onclick="setTerritoryScore('estres','CD',4)">4</button></td>
+                        <td><button class="tc-btn" style="background:#A855F7;color:#fff" onclick="setTerritoryScore('estres','CD',5)">5</button></td>
+                    </tr>
+                    <tr>
+                        <td><span class="badge-cx">Cx</span></td>
+                        <td><button class="tc-btn" style="background:#9CA3AF;color:#111" onclick="setTerritoryScore('estres','Cx',0)">—</button></td>
+                        <td><button class="tc-btn" style="background:#22C55E;color:#111" onclick="setTerritoryScore('estres','Cx',1)">1</button></td>
+                        <td><button class="tc-btn" style="background:#FDE047;color:#111" onclick="setTerritoryScore('estres','Cx',2)">2</button></td>
+                        <td><button class="tc-btn" style="background:#FB923C;color:#111" onclick="setTerritoryScore('estres','Cx',3)">3</button></td>
+                        <td><button class="tc-btn" style="background:#EF4444;color:#fff" onclick="setTerritoryScore('estres','Cx',4)">4</button></td>
+                        <td><button class="tc-btn" style="background:#A855F7;color:#fff" onclick="setTerritoryScore('estres','Cx',5)">5</button></td>
+                    </tr>
+                </tbody>
+            </table>
+            <div class="tc-quick-btns">
+                <button class="tc-quick-btn" onclick="setAllNormal('reposo')">✓ Todo Normal — Reposo</button>
+                <button class="tc-quick-btn" onclick="setAllNormal('estres')">✓ Todo Normal — Estrés</button>
+                <button class="tc-quick-btn danger" onclick="resetAllScores()">✕ Limpiar todo</button>
+            </div>
+        </div>
 
         <div class="bulls-eye-container">
             <div class="bulls-eye-wrapper">

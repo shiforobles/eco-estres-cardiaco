@@ -4,10 +4,10 @@
    ======================================== */
 
 :root {
-    --color-primary: #4F46E5;
-    --color-primary-dark: #3730A3;
-    --color-primary-light: #818CF8;
-    --color-primary-bg: #EEF2FF;
+    --color-primary: #059669;
+    --color-primary-dark: #047857;
+    --color-primary-light: #34D399;
+    --color-primary-bg: #ECFDF5;
 
     --color-success: #059669;
     --color-success-bg: #D1FAE5;
@@ -62,10 +62,10 @@
 }
 
 [data-theme="dark"] {
-    --color-primary: #818CF8;
-    --color-primary-dark: #6366F1;
-    --color-primary-light: #312E81;
-    --color-primary-bg: #1E1B4B;
+    --color-primary: #34D399;
+    --color-primary-dark: #059669;
+    --color-primary-light: #064E3B;
+    --color-primary-bg: #022c22;
 
     --color-bg-main: #0F172A;
     --color-bg-card: #1E293B;
@@ -191,7 +191,7 @@ textarea {
 input:focus, select:focus, textarea:focus {
     outline: none;
     border-color: var(--color-primary);
-    box-shadow: 0 0 0 3px rgba(79,70,229,0.12);
+    box-shadow: 0 0 0 3px rgba(5,150,105,0.12);
 }
 textarea { resize: vertical; min-height: 2.5rem; }
 
@@ -274,7 +274,7 @@ textarea { resize: vertical; min-height: 2.5rem; }
     border-radius: var(--radius-md);
     padding: 0.875rem 1rem;
     margin-top: 0.75rem;
-    border: 1px solid rgba(79,70,229,0.15);
+    border: 1px solid rgba(5,150,105,0.15);
 }
 .calc-row {
     display: flex;
@@ -282,7 +282,7 @@ textarea { resize: vertical; min-height: 2.5rem; }
     align-items: center;
     padding: 0.3rem 0;
     font-size: var(--font-size-sm);
-    border-bottom: 1px solid rgba(79,70,229,0.08);
+    border-bottom: 1px solid rgba(5,150,105,0.08);
 }
 .calc-row:last-child { border-bottom: none; }
 .calc-value {
@@ -539,6 +539,82 @@ details[open] summary::after { content: ' ▲'; }
     max-height: 600px;
     overflow-y: auto;
 }
+
+/* ── TERRITORY CONTROLS ── */
+.territory-ctrl-box {
+    background: var(--color-primary-bg);
+    border: 1px solid rgba(5,150,105,0.2);
+    border-radius: var(--radius-md);
+    padding: 0.875rem 1rem;
+    margin-bottom: 1.25rem;
+}
+.tc-title {
+    font-size: var(--font-size-sm);
+    font-weight: 700;
+    color: var(--color-primary-dark);
+    margin-bottom: 0.6rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+[data-theme="dark"] .tc-title { color: var(--color-primary); }
+.tc-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--font-size-xs);
+}
+.tc-table th {
+    padding: 0.25rem 0.4rem;
+    color: var(--color-text-secondary);
+    font-weight: 600;
+    text-align: center;
+    white-space: nowrap;
+}
+.tc-table td {
+    padding: 0.2rem 0.3rem;
+    vertical-align: middle;
+    text-align: center;
+}
+.tc-table td:first-child {
+    font-weight: 700;
+    font-size: 0.68rem;
+    letter-spacing: 0.04em;
+    color: var(--color-text-secondary);
+    text-align: left;
+    white-space: nowrap;
+    padding-right: 0.5rem;
+}
+.tc-table td:nth-child(2) { text-align: left; }
+.tc-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.65rem;
+    font-weight: 700;
+    cursor: pointer;
+    border: 1.5px solid rgba(0,0,0,0.08);
+    transition: transform 0.1s, filter 0.1s;
+}
+.tc-btn:hover { transform: scale(1.12); filter: brightness(0.9); }
+.tc-btn:active { transform: scale(0.95); }
+.tc-sep td { padding-top: 0.5rem; border-top: 1px dashed var(--color-border); }
+.tc-quick-btns { display: flex; gap: 0.5rem; margin-top: 0.6rem; flex-wrap: wrap; }
+.tc-quick-btn {
+    padding: 0.3rem 0.75rem;
+    border: 1.5px solid var(--color-primary);
+    border-radius: var(--radius-md);
+    background: transparent;
+    color: var(--color-primary);
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+.tc-quick-btn:hover { background: var(--color-primary); color: white; }
+.tc-quick-btn.danger { border-color: var(--color-error); color: var(--color-error); }
+.tc-quick-btn.danger:hover { background: var(--color-error); color: white; }
 
 /* ── RESPONSIVE ── */
 @media (max-width: 640px) {
