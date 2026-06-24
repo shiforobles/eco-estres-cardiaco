@@ -858,6 +858,10 @@ function copiarReporte() {
 
 function limpiarFormulario() {
     if (!confirm('¿Confirma iniciar un nuevo estudio? Se borrarán todos los datos.')) return;
+    resetFormulario();
+}
+
+function resetFormulario() {
     document.querySelectorAll('input[type="text"], input[type="number"], textarea').forEach(el => {
         el.value = '';
     });
@@ -873,5 +877,271 @@ function limpiarFormulario() {
     document.getElementById('reporte-output').style.display = 'none';
     document.getElementById('resultado-banner').style.display = 'none';
     setProtocol('ejercicio');
+}
+
+// ── PRESETS ───────────────────────────────────
+function setVal(id, val) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (el.tagName === 'SELECT') {
+        for (let i = 0; i < el.options.length; i++) {
+            if (el.options[i].value === val) { el.selectedIndex = i; break; }
+        }
+    } else if (el.type === 'checkbox') {
+        el.checked = !!val;
+    } else {
+        el.value = val;
+    }
+}
+
+function setWM(scores) {
+    // scores = { reposo: {segId: score, ...}, estres: {segId: score, ...} }
+    if (scores.reposo) Object.entries(scores.reposo).forEach(([id, sc]) => { WM.reposo[parseInt(id)] = sc; });
+    if (scores.estres) Object.entries(scores.estres).forEach(([id, sc]) => { WM.estres[parseInt(id)] = sc; });
+    renderBullsEye('svg-reposo', 'reposo');
+    renderBullsEye('svg-estres', 'estres');
+    buildSegmentsTable();
+    updateWMSI();
+}
+
+function allSegments(score) {
+    const o = {};
+    for (let i = 1; i <= 17; i++) o[i] = score;
+    return o;
+}
+
+function applyPreset(name) {
+    resetFormulario();
+
+    const P = PRESETS[name];
+    if (!P) return;
+
+    // Datos del paciente
+    if (P.edad) setVal('edad', P.edad);
+    if (P.sexo) setVal('sexo', P.sexo);
+    if (P.peso) { setVal('peso', P.peso); setVal('dob_peso', P.peso); setVal('dip_peso', P.peso); }
+    if (P.altura) setVal('altura', P.altura);
+    calcBSA();
+
+    if (P.fc_reposo) setVal('fc_reposo', P.fc_reposo);
+    if (P.ta_reposo) setVal('ta_reposo', P.ta_reposo);
+    if (P.ventana) setVal('ventana', P.ventana);
+    if (P.indicacion) setVal('indicacion', P.indicacion);
+
+    // Antecedentes
+    if (P.antecedentes) P.antecedentes.forEach(a => setVal('ant_' + a, true));
+
+    // Protocolo
+    if (P.protocolo) {
+        setProtocol(P.protocolo);
+        if (P.protocolo === 'ejercicio') {
+            if (P.ej_modalidad) setVal('ej_modalidad', P.ej_modalidad);
+            if (P.ej_etapa) setVal('ej_etapa', P.ej_etapa);
+            if (P.ej_duracion) setVal('ej_duracion', P.ej_duracion);
+            if (P.ej_mets) setVal('ej_mets', P.ej_mets);
+            if (P.ej_fc_pico) setVal('ej_fc_pico', P.ej_fc_pico);
+            if (P.ej_ta_pico) setVal('ej_ta_pico', P.ej_ta_pico);
+            if (P.ej_motivo_fin) setVal('ej_motivo_fin', P.ej_motivo_fin);
+            calcEjercicio();
+        } else if (P.protocolo === 'dobutamina') {
+            if (P.dob_dosis_max) setVal('dob_dosis_max', P.dob_dosis_max);
+            if (P.dob_fc_pico) setVal('dob_fc_pico', P.dob_fc_pico);
+            if (P.dob_atropina) setVal('dob_atropina', P.dob_atropina);
+            if (P.dob_ta_pico) setVal('dob_ta_pico', P.dob_ta_pico);
+            if (P.dob_motivo_fin) setVal('dob_motivo_fin', P.dob_motivo_fin);
+            calcDobutamina();
+        }
+    }
+
+    // FEy
+    if (P.fevi_reposo) setVal('fevi_reposo', P.fevi_reposo);
+    if (P.fevi_pico) setVal('fevi_pico', P.fevi_pico);
+    if (P.fevi_recup) setVal('fevi_recup', P.fevi_recup);
+    calcFEVI();
+
+    // Wall motion
+    if (P.wm) setWM(P.wm);
+
+    // Estrés diastólico
+    if (P.e_prima_rep) setVal('e_prima_rep', P.e_prima_rep);
+    if (P.e_onda_rep) setVal('e_onda_rep', P.e_onda_rep);
+    if (P.e_prima_est) setVal('e_prima_est', P.e_prima_est);
+    if (P.e_onda_est) setVal('e_onda_est', P.e_onda_est);
+    calcDiastolico();
+
+    // Resultado
+    if (P.resultado) setVal('resultado_estudio', P.resultado);
+    if (P.territorio) setVal('territorio_afectado', P.territorio);
+    if (P.extension) setVal('extension_isquemia', P.extension);
+    if (P.hallazgos) P.hallazgos.forEach(h => setVal('hal_' + h, true));
+    updateResultBanner();
+
+    // MCH fields
+    if (P.mch_grad_reposo) setVal('mch_grad_reposo', P.mch_grad_reposo);
+    if (P.mch_grad_estres) setVal('mch_grad_estres', P.mch_grad_estres);
+    if (P.mch_sam) setVal('mch_sam', P.mch_sam);
+    if (P.mch_patologia) setVal('mch_patologia', P.mch_patologia);
+    if (P.mch_grad_reposo) calcMCH();
+
+    // EAo fields
+    if (P.eao_grad_reposo) setVal('eao_grad_reposo', P.eao_grad_reposo);
+    if (P.eao_ava_reposo) setVal('eao_ava_reposo', P.eao_ava_reposo);
+    if (P.eao_grad_dob) setVal('eao_grad_dob', P.eao_grad_dob);
+    if (P.eao_ava_dob) setVal('eao_ava_dob', P.eao_ava_dob);
+    if (P.eao_reserva_flujo) setVal('eao_reserva_flujo', P.eao_reserva_flujo);
+    if (P.eao_grad_reposo) calcEAo();
+
+    onEdadChange();
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
+
+const PRESETS = {
+
+    negativo_normal: {
+        edad: 52, sexo: 'M', peso: 78, altura: 172, fc_reposo: 72, ta_reposo: '130/80',
+        ventana: 'buena', indicacion: 'diagnostico_isquemia',
+        antecedentes: ['hta', 'dislipemia'],
+        protocolo: 'ejercicio',
+        ej_modalidad: 'treadmill_bruce', ej_etapa: 'III', ej_duracion: '9:12', ej_mets: '10.1',
+        ej_fc_pico: '156', ej_ta_pico: '185/85', ej_motivo_fin: 'fc_maxima',
+        fevi_reposo: 62, fevi_pico: 68, fevi_recup: 64,
+        e_prima_rep: '9', e_onda_rep: '72', e_prima_est: '12', e_onda_est: '95',
+        wm: { reposo: allSegments(1), estres: allSegments(1) },
+        resultado: 'negativo', territorio: 'ninguno'
+    },
+
+    negativo_submax: {
+        edad: 68, sexo: 'F', peso: 65, altura: 158, fc_reposo: 64, ta_reposo: '145/88',
+        ventana: 'regular', indicacion: 'diagnostico_isquemia',
+        antecedentes: ['hta', 'dm', 'betabloq'],
+        protocolo: 'ejercicio',
+        ej_modalidad: 'treadmill_bruce_mod', ej_etapa: 'II', ej_duracion: '5:40', ej_mets: '5.2',
+        ej_fc_pico: '108', ej_ta_pico: '170/92', ej_motivo_fin: 'agotamiento',
+        fevi_reposo: 58, fevi_pico: 62,
+        wm: { reposo: allSegments(1), estres: allSegments(1) },
+        resultado: 'no_concluyente', territorio: 'ninguno'
+    },
+
+    isquemia_da: {
+        edad: 58, sexo: 'M', peso: 82, altura: 175, fc_reposo: 68, ta_reposo: '138/82',
+        ventana: 'buena', indicacion: 'diagnostico_isquemia',
+        antecedentes: ['hta', 'tabaquismo', 'dislipemia'],
+        protocolo: 'ejercicio',
+        ej_modalidad: 'treadmill_bruce', ej_etapa: 'II', ej_duracion: '6:30', ej_mets: '7.0',
+        ej_fc_pico: '148', ej_ta_pico: '178/88', ej_motivo_fin: 'isquemia',
+        fevi_reposo: 58, fevi_pico: 52,
+        wm: {
+            reposo: allSegments(1),
+            estres: { ...allSegments(1), 1:3, 2:3, 7:3, 8:2, 13:3, 14:2, 17:2 }
+        },
+        resultado: 'positivo', territorio: 'da', extension: 'extensa',
+        hallazgos: ['angina', 'st_dep']
+    },
+
+    isquemia_cd: {
+        edad: 63, sexo: 'M', peso: 88, altura: 170, fc_reposo: 74, ta_reposo: '142/86',
+        ventana: 'buena', indicacion: 'diagnostico_isquemia',
+        antecedentes: ['hta', 'dm', 'isquemia'],
+        protocolo: 'dobutamina',
+        dob_dosis_max: '40', dob_fc_pico: '142', dob_atropina: '0.5',
+        dob_ta_pico: '168/92', dob_motivo_fin: 'isquemia',
+        fevi_reposo: 56, fevi_pico: 50,
+        wm: {
+            reposo: allSegments(1),
+            estres: { ...allSegments(1), 3:2, 4:3, 9:2, 10:3, 15:2 }
+        },
+        resultado: 'positivo', territorio: 'cd', extension: 'moderada',
+        hallazgos: ['st_dep']
+    },
+
+    isquemia_multi: {
+        edad: 66, sexo: 'M', peso: 90, altura: 168, fc_reposo: 76, ta_reposo: '150/92',
+        ventana: 'regular', indicacion: 'estratificacion_riesgo',
+        antecedentes: ['hta', 'dm', 'tabaquismo', 'dislipemia', 'isquemia'],
+        protocolo: 'dobutamina',
+        dob_dosis_max: '30', dob_fc_pico: '136', dob_atropina: '1.0',
+        dob_ta_pico: '148/88', dob_motivo_fin: 'isquemia',
+        fevi_reposo: 50, fevi_pico: 42,
+        wm: {
+            reposo: { ...allSegments(1), 4:2, 10:2 },
+            estres: { ...allSegments(1), 1:3, 2:2, 4:3, 7:2, 8:2, 10:3, 13:2, 15:2, 17:2 }
+        },
+        resultado: 'positivo', territorio: 'da_cd', extension: 'extensa',
+        hallazgos: ['angina', 'st_dep', 'hipotension']
+    },
+
+    viabilidad_bifasica: {
+        edad: 60, sexo: 'M', peso: 75, altura: 170, fc_reposo: 80, ta_reposo: '118/72',
+        ventana: 'buena', indicacion: 'viabilidad',
+        antecedentes: ['isquemia', 'iam', 'crm'],
+        protocolo: 'dobutamina',
+        dob_dosis_max: '40', dob_fc_pico: '130', dob_atropina: 'no',
+        dob_ta_pico: '138/78', dob_motivo_fin: 'fc_target',
+        fevi_reposo: 35, fevi_pico: 42, fevi_recup: 38,
+        wm: {
+            reposo: { ...allSegments(1), 1:4, 2:4, 7:3, 8:3, 13:3, 14:3, 17:3 },
+            estres: { ...allSegments(1), 1:2, 2:2, 7:3, 8:3, 13:2, 14:2, 17:2 }
+        },
+        resultado: 'viabilidad_positiva', territorio: 'da', extension: 'extensa'
+    },
+
+    cicatriz: {
+        edad: 65, sexo: 'M', peso: 80, altura: 172, fc_reposo: 78, ta_reposo: '122/76',
+        ventana: 'buena', indicacion: 'viabilidad',
+        antecedentes: ['isquemia', 'iam'],
+        protocolo: 'dobutamina',
+        dob_dosis_max: '40', dob_fc_pico: '135', dob_atropina: '0.5',
+        dob_ta_pico: '142/80', dob_motivo_fin: 'fc_target',
+        fevi_reposo: 32, fevi_pico: 34, fevi_recup: 32,
+        wm: {
+            reposo: { ...allSegments(1), 1:4, 2:4, 7:4, 8:4, 13:4, 14:4, 17:4 },
+            estres: { ...allSegments(1), 1:4, 2:4, 7:4, 8:4, 13:4, 14:4, 17:4 }
+        },
+        resultado: 'viabilidad_negativa', territorio: 'da', extension: 'extensa'
+    },
+
+    diastolico_pos: {
+        edad: 55, sexo: 'F', peso: 68, altura: 160, fc_reposo: 70, ta_reposo: '140/88',
+        ventana: 'buena', indicacion: 'diastolico',
+        antecedentes: ['hta'],
+        protocolo: 'ejercicio',
+        ej_modalidad: 'bicicleta_supina', ej_etapa: 'II', ej_duracion: '7:00', ej_mets: '6.5',
+        ej_fc_pico: '145', ej_ta_pico: '195/95', ej_motivo_fin: 'sintomas',
+        fevi_reposo: 60, fevi_pico: 65,
+        e_prima_rep: '7', e_onda_rep: '65', e_prima_est: '6', e_onda_est: '110',
+        wm: { reposo: allSegments(1), estres: allSegments(1) },
+        resultado: 'diastolico_positivo', territorio: 'ninguno',
+        hallazgos: ['disnea', 'hipertensiva']
+    },
+
+    mch_latente: {
+        edad: 42, sexo: 'M', peso: 75, altura: 176, fc_reposo: 62, ta_reposo: '120/78',
+        ventana: 'buena', indicacion: 'mch',
+        protocolo: 'ejercicio',
+        ej_modalidad: 'treadmill_bruce', ej_etapa: 'III', ej_duracion: '8:45', ej_mets: '9.5',
+        ej_fc_pico: '162', ej_ta_pico: '165/80', ej_motivo_fin: 'sintomas',
+        fevi_reposo: 68, fevi_pico: 75,
+        wm: { reposo: allSegments(1), estres: allSegments(1) },
+        mch_grad_reposo: '18', mch_grad_estres: '72', mch_sam: 'inducido', mch_patologia: 'mch',
+        resultado: 'positivo', territorio: 'ninguno',
+        hallazgos: ['disnea']
+    },
+
+    eao_bajo_flujo: {
+        edad: 72, sexo: 'M', peso: 70, altura: 166, fc_reposo: 82, ta_reposo: '110/68',
+        ventana: 'regular', indicacion: 'estenosis_ao',
+        antecedentes: ['hta', 'isquemia', 'valv'],
+        protocolo: 'dobutamina',
+        dob_dosis_max: '20', dob_fc_pico: '100', dob_atropina: 'no',
+        dob_ta_pico: '125/72', dob_motivo_fin: 'criterio_medico',
+        fevi_reposo: 30, fevi_pico: 38,
+        wm: {
+            reposo: { ...allSegments(2), 5:1, 6:1, 11:1, 12:1, 16:1 },
+            estres: { ...allSegments(1), 1:2, 7:2 }
+        },
+        eao_grad_reposo: '22', eao_ava_reposo: '0.75',
+        eao_grad_dob: '45', eao_ava_dob: '0.82', eao_reserva_flujo: 'presente',
+        resultado: 'positivo', territorio: 'ninguno'
+    }
+};
+

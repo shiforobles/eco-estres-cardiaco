@@ -134,6 +134,28 @@
     </section>
 
     <!-- ══════════════════════════════════════
+         PRESETS DE CARGA RÁPIDA
+         ══════════════════════════════════════ -->
+    <section class="card preset-section">
+        <h2 class="section-title">Carga Rápida — Presets</h2>
+        <div class="preset-buttons">
+            <button type="button" class="preset-btn preset-btn-green" onclick="applyPreset('negativo_normal')" title="Estudio negativo, ejercicio, FEy 60%, todos los segmentos normales">Negativo Normal</button>
+            <button type="button" class="preset-btn preset-btn-green" onclick="applyPreset('negativo_submax')" title="Estudio no concluyente por FC submáxima">Submáximo (NC)</button>
+            <div class="preset-sep"></div>
+            <button type="button" class="preset-btn preset-btn-red" onclick="applyPreset('isquemia_da')" title="Isquemia inducible en territorio DA">Isquemia DA</button>
+            <button type="button" class="preset-btn preset-btn-red" onclick="applyPreset('isquemia_cd')" title="Isquemia en territorio Coronaria Derecha">Isquemia CD</button>
+            <button type="button" class="preset-btn preset-btn-red" onclick="applyPreset('isquemia_multi')" title="Isquemia multivaso (DA+CD)">Multivaso</button>
+            <div class="preset-sep"></div>
+            <button type="button" class="preset-btn preset-btn-yellow" onclick="applyPreset('viabilidad_bifasica')" title="Respuesta bifásica — viabilidad + isquemia">Viabilidad Bifásica</button>
+            <button type="button" class="preset-btn preset-btn-yellow" onclick="applyPreset('cicatriz')" title="Necrosis/cicatriz sin viabilidad">Cicatriz (No Viable)</button>
+            <div class="preset-sep"></div>
+            <button type="button" class="preset-btn preset-btn-purple" onclick="applyPreset('diastolico_pos')" title="Disfunción diastólica inducible">Diastólico (+)</button>
+            <button type="button" class="preset-btn preset-btn-purple" onclick="applyPreset('mch_latente')" title="MCH con obstrucción latente inducida">MCH Latente</button>
+            <button type="button" class="preset-btn preset-btn-purple" onclick="applyPreset('eao_bajo_flujo')" title="EAo verdadera — bajo flujo/bajo gradiente">EAo Bajo Flujo</button>
+        </div>
+    </section>
+
+    <!-- ══════════════════════════════════════
          SECCIÓN 3: PROTOCOLO DE ESTRÉS
          ══════════════════════════════════════ -->
     <section class="card card-stress">
@@ -205,6 +227,7 @@
                     <option value="criterio_medico">Criterio Médico</option>
                 </select>
             </div>
+            <div class="pearl-container" data-pearl="ejercicio"></div>
         </div>
 
         <!-- DOBUTAMINA -->
@@ -272,6 +295,7 @@
                     <option value="criterio_medico">Criterio Médico</option>
                 </select>
             </div>
+            <div class="pearl-container" data-pearl="dobutamina"></div>
             <div class="info-banner info-banner-warning" style="margin-top:0.75rem">
                 <strong>Contraindicaciones:</strong> IAM reciente (&lt;3d), angina inestable, arritmias ventriculares complejas, HTA severa no controlada (>200/120), estenosis aórtica severa sintomática. &nbsp;|&nbsp; <strong>Antídoto:</strong> Metoprolol 1–5 mg EV o Esmolol.
             </div>
@@ -326,6 +350,7 @@
                     </select>
                 </div>
             </div>
+            <div class="pearl-container" data-pearl="dipiridamol"></div>
             <div class="info-banner info-banner-warning" style="margin-top:0.75rem">
                 <strong>Contraindicado en:</strong> Asma / EPOC activo, BAV 2°–3° sin marcapasos, hipotensión sistólica &lt;90 mmHg, estenosis carotídea bilateral severa, teofilina en las últimas 24 h. &nbsp;|&nbsp; <strong>Antídoto:</strong> Aminofilina 125–250 mg EV lento.
             </div>
@@ -352,6 +377,7 @@
                     <textarea id="nc_descripcion" rows="3" placeholder="Descripción del apremio no convencional utilizado, dosis, duración..."></textarea>
                 </div>
             </div>
+            <div class="pearl-container" data-pearl="noconvencional"></div>
         </div>
     </section>
 
@@ -393,6 +419,7 @@
          ══════════════════════════════════════ -->
     <section class="card">
         <h2 class="section-title">Motilidad Parietal Segmentaria — Modelo AHA 17 Segmentos</h2>
+        <div class="pearl-container" data-pearl="motilidad"></div>
 
         <div class="wall-motion-legend">
             <span class="wm-dot wm-0">0</span>&nbsp;No evaluado &nbsp;
@@ -524,6 +551,7 @@
          ══════════════════════════════════════ -->
     <section class="card">
         <h2 class="section-title">Estrés Diastólico</h2>
+        <div class="pearl-container" data-pearl="diastolico"></div>
         <p class="module-description">
             Evalúa la presión de llenado inducida por el ejercicio. E/e' &gt;14 con estrés sugiere disfunción diastólica inducible. Criterio positivo: E/e' &gt;14 + PSAP &gt;50 mmHg o e' &lt;7 cm/s con ejercicio.
         </p>
@@ -565,6 +593,7 @@
          ══════════════════════════════════════ -->
     <section class="card card-result">
         <h2 class="section-title">Interpretación y Resultado</h2>
+        <div class="pearl-container" data-pearl="errores"></div>
         <div class="grid">
             <div class="form-group">
                 <label for="resultado_estudio">Resultado del Estudio</label>
@@ -639,6 +668,7 @@
             <!-- VIABILIDAD -->
             <div id="panel-viabilidad" class="special-panel" style="padding-top:0.5rem">
                 <h3 class="subsection-title">Viabilidad Miocárdica — Dobutamina Baja Dosis</h3>
+                <div class="pearl-container" data-pearl="viabilidad"></div>
                 <p class="module-description">Dosis bajas (2.5–10 mcg/kg/min) evalúan reserva contráctil. La respuesta bifásica (mejora a baja dosis → deterioro a alta dosis) identifica miocardio hibernado viable con isquemia superpuesta. (Dr. Jorge Lax)</p>
                 <div class="grid">
                     <div class="form-group">
@@ -672,6 +702,7 @@
             <!-- ESTENOSIS AÓRTICA -->
             <div id="panel-estenosis_ao" class="special-panel" style="display:none; padding-top:0.5rem">
                 <h3 class="subsection-title">Estenosis Aórtica — Bajo Flujo / Bajo Gradiente (Dr. Salvador Spina)</h3>
+                <div class="pearl-container" data-pearl="estenosis_ao"></div>
                 <p class="module-description">Dobutamina baja dosis diferencia estenosis aórtica verdadera severa de pseudoestenosis en pacientes con FEy deprimida. EAo verdadera: gradiente aumenta ≥40 mmHg, AVA no cambia. Pseudoestenosis: AVA aumenta &gt;1 cm², gradiente no alcanza ≥40 mmHg.</p>
                 <div class="grid">
                     <div class="form-group">
@@ -709,6 +740,7 @@
             <!-- CFR -->
             <div id="panel-cfr" class="special-panel" style="display:none; padding-top:0.5rem">
                 <h3 class="subsection-title">Reserva de Flujo Coronario — CFR (Dr. Jorge Lowenstein)</h3>
+                <div class="pearl-container" data-pearl="cfr"></div>
                 <p class="module-description">El CFR se mide con Doppler pulsado en la arteria DA distal. Relación velocidades diastólicas estrés/reposo. CFR ≥2.0 = normal. CFR &lt;2.0 = reducida (estenosis o disfunción microvascular).</p>
                 <div class="grid">
                     <div class="form-group">
@@ -736,6 +768,7 @@
             <!-- STRAIN -->
             <div id="panel-strain" class="special-panel" style="display:none; padding-top:0.5rem">
                 <h3 class="subsection-title">Strain Longitudinal Global (GLS) con Estrés (Dra. Rosina Arbucci)</h3>
+                <div class="pearl-container" data-pearl="strain"></div>
                 <p class="module-description">GLS normal en reposo ≤ −20%. Reserva de strain (ΔGLS) ≥2% indica contractilidad normal. La ausencia de mejoría o el empeoramiento del GLS con estrés sugiere disfunción subclínica o isquemia inducible.</p>
                 <div class="grid">
                     <div class="form-group">
@@ -760,6 +793,7 @@
             <!-- MCH / CHAGAS -->
             <div id="panel-mch" class="special-panel" style="display:none; padding-top:0.5rem">
                 <h3 class="subsection-title">MCH y Enfermedad de Chagas (Dr. Rodrigo Ibáñez / Dr. Miguel Amor)</h3>
+                <div class="pearl-container" data-pearl="mch"></div>
                 <p class="module-description">En MCH: el estrés puede inducir/incrementar la obstrucción del TSVI (obstrucción latente si gradiente &gt;30 mmHg con estrés). En Chagas: evalúa isquemia, disfunción segmentaria y reserva contráctil.</p>
                 <div class="grid">
                     <div class="form-group">
@@ -814,6 +848,7 @@
     </section>
 
 </div>
+<script src="pearls.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
