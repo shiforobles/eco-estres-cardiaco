@@ -1468,6 +1468,14 @@ function motivoNoConcluyente(H) {
 
 // ── Botón "Generar informe" ───────────────────
 function generarInforme() {
+    // Si report-templates.js no cargó (caché vieja del index.html, archivo faltante),
+    // el botón fallaría mudo. Mejor decirlo.
+    if (typeof NARRATIVA === 'undefined') {
+        alert('No se cargaron las plantillas del informe (report-templates.js).\n\n' +
+              'Suele ser la caché del navegador: recargá con Cmd+Shift+R.\n' +
+              'Si sigue igual, verificá que report-templates.js esté en la misma carpeta que index.html.');
+        return;
+    }
     if (currentProtocol !== 'ejercicio') {
         alert('El informe narrativo está redactado para el protocolo de ejercicio. Para dobutamina o dipiridamol, usá "Planilla de datos".');
         return;
@@ -1709,8 +1717,44 @@ function imprimirReporte() {
 
 function copiarReporte() {
     const txt = document.getElementById('reporte-output').textContent;
-    if (!txt) { alert('Primero genere el reporte.'); return; }
-    navigator.clipboard.writeText(txt).then(() => alert('Reporte copiado al portapapeles.'));
+    if (!txt) { alert('Primero generá el informe.'); return; }
+
+    // navigator.clipboard NO existe si la página se abrió con doble clic (file://):
+    // no es un contexto seguro. Sin este respaldo el botón no hacía nada ni avisaba.
+    const respaldo = () => {
+        const ta = document.createElement('textarea');
+        ta.value = txt;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        let ok = false;
+        try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+        ta.remove();
+        if (ok) showNotice('Informe copiado al portapapeles.', 'ok');
+        else {
+            // Última salida: dejarlo seleccionado para que copie con Ctrl/Cmd+C
+            seleccionarInforme();
+            showNotice('No se pudo copiar solo. El informe quedó seleccionado: copiá con Cmd+C.', 'warn');
+        }
+    };
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(txt)
+            .then(() => showNotice('Informe copiado al portapapeles.', 'ok'))
+            .catch(respaldo);
+    } else {
+        respaldo();
+    }
+}
+
+function seleccionarInforme() {
+    const out = document.getElementById('reporte-output');
+    const rango = document.createRange();
+    rango.selectNodeContents(out);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(rango);
 }
 
 function limpiarFormulario() {

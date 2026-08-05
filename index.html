@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="styles.css?v=1.2">
 </head>
 <body>
 <div class="container">
@@ -1059,8 +1059,30 @@
     </section>
 
 </div>
-<script src="pearls.js"></script>
-<script src="report-templates.js"></script>
-<script src="app.js"></script>
+<script src="pearls.js?v=1.2"></script>
+<script src="report-templates.js?v=1.2"></script>
+<script src="app.js?v=1.2"></script>
+<script>
+// Control de versión: si el navegador sirvió una mezcla de archivos viejos y nuevos,
+// los botones fallan en silencio. Esto lo convierte en un aviso visible.
+(function () {
+    var APP_VERSION = '1.2';
+    var faltan = ['generarInforme', 'recolectarHallazgos', 'calcEjercicio'].filter(function (f) {
+        return typeof window[f] !== 'function';
+    });
+    if (typeof NARRATIVA === 'undefined') faltan.push('report-templates.js');
+    if (!faltan.length) return;
+    if (document.getElementById('aviso-version')) return;
+    var aviso = document.createElement('div');
+    aviso.className = 'draft-banner';
+    aviso.id = 'aviso-version';
+    aviso.style.background = '#FEE2E2';
+    aviso.style.borderColor = '#DC2626';
+    aviso.innerHTML = '<span class="draft-banner-text">⚠️ <strong>La app cargó a medias</strong> ' +
+        '(versión esperada ' + APP_VERSION + '). Es caché del navegador: recargá con ' +
+        '<strong>Cmd+Shift+R</strong>. Hasta entonces los botones pueden no responder.</span>';
+    document.body.insertBefore(aviso, document.body.firstChild);
+})();
+</script>
 </body>
 </html>
