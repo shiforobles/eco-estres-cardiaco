@@ -15,7 +15,12 @@ const PEARLS_DATA = {
             { icon: '🔑', text: 'La <strong>respuesta hipotensora</strong> (caída >10 mmHg de sistólica) durante ejercicio sugiere isquemia extensa o disfunción VI severa.' },
             { icon: '💡', text: 'Capacidad funcional <strong>&lt;5 METs</strong> es factor pronóstico independiente de mortalidad, aun sin isquemia.' },
             { icon: '💡', text: 'El <strong>doble producto</strong> (FC × TAS) >25.000 indica adecuada carga hemodinámica al miocardio.' },
-            { icon: '⚠️', text: 'La isquemia que aparece a <strong>baja carga</strong> (etapa I-II Bruce, &lt;6 METs) implica peor pronóstico que la de alta carga.' }
+            { icon: '⚠️', text: 'La isquemia que aparece a <strong>baja carga</strong> (etapa I-II Bruce, &lt;6 METs) implica peor pronóstico que la de alta carga.' },
+            { icon: '🚲', text: '<strong>Rampa habitual en bicicleta:</strong> 25 W iniciales con incrementos de 25 W cada 2 min (15 W si el paciente es añoso, muy sintomático o desacondicionado). Cadencia 60 rpm sostenida.' },
+            { icon: '🚲', text: '<strong>Filmar en cada etapa,</strong> no sólo en el pico: la bicicleta permite comparar cargas intermedias y definir el <strong>umbral isquémico</strong> (carga, FC y doble producto en que aparece la alteración).' },
+            { icon: '🚲', text: 'El problema técnico de la bicicleta es el <strong>desplazamiento del corazón con la hiperpnea</strong>. Semi-supino con rotación izquierda ~20-30°, brazo izquierdo fuera del campo y adquirir al final de la espiración.' },
+            { icon: '🚲', text: 'Si el paciente <strong>no puede sostener la cadencia</strong>, la etapa no cuenta: es fatiga muscular periférica, no punto final cardiovascular. Consignarlo como motivo de terminación.' },
+            { icon: '💡', text: 'La <strong>caída de la FC al 1.er minuto de recuperación ≤12 lpm</strong> (HRR₁) predice mortalidad de manera independiente de la isquemia. Registrarla siempre.' }
         ]
     },
 

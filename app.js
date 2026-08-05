@@ -59,7 +59,7 @@ document.addEventListener('DOMContentLoaded', () => {
     renderBullsEye('svg-estres', 'estres');
     updateWMSI();
 
-    // Sincronizar peso dobutamina con peso principal
+    // Sincronizar peso dobutamina/dipiridamol con peso principal
     document.getElementById('peso').addEventListener('input', () => {
         const p = document.getElementById('peso').value;
         if (p) document.getElementById('dob_peso').value = p;
@@ -67,6 +67,24 @@ document.addEventListener('DOMContentLoaded', () => {
         calcDobutamina();
         calcDipiridamol();
     });
+
+    // Recalcular lo derivado al cambiar datos que lo alimentan
+    ['sexo', 'ant_betabloq', 'fevi_reposo', 'fevi_pico'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('change', calcEjercicio);
+    });
+
+    // Fecha del estudio: por defecto hoy
+    setFechaHoy();
+    initFirma();
+
+    calcEjercicio();
+    document.querySelectorAll('.chk-pre').forEach(el => el.addEventListener('change', updateChecklistBadge));
+    updateChecklistBadge();
+    renderHistorial();
+
+    // Autosave / recuperación del estudio en curso (al final, con todo ya construido)
+    setupAutosave();
 });
 
 // ── TEMA ──────────────────────────────────────
@@ -81,6 +99,32 @@ function toggleTheme() {
     document.documentElement.setAttribute('data-theme', next);
     document.getElementById('theme-icon').textContent = next === 'dark' ? '☀️' : '🌙';
     localStorage.setItem('eco-estres-theme', next);
+}
+
+// ── FIRMA DEL INFORME ─────────────────────────
+// Es configuración del operador, no un dato del estudio: vive en localStorage,
+// fuera del borrador y fuera del repositorio.
+const FIRMA_KEY = 'eco-estres-firma';
+
+function initFirma() {
+    const el = document.getElementById('firma_informe');
+    if (!el) return;
+    try { el.value = localStorage.getItem(FIRMA_KEY) || ''; } catch (e) { /* noop */ }
+    el.addEventListener('input', () => {
+        try { localStorage.setItem(FIRMA_KEY, el.value); } catch (e) { /* noop */ }
+    });
+}
+
+function firmaInforme() {
+    return v('firma_informe') || (typeof NARRATIVA !== 'undefined' ? NARRATIVA.firma : '') || '';
+}
+
+// ── FECHA DEL ESTUDIO ─────────────────────────
+function setFechaHoy() {
+    const el = document.getElementById('fecha_estudio');
+    if (!el || el.value) return;
+    const d = new Date();
+    el.value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 // ── BSA ───────────────────────────────────────
@@ -109,35 +153,174 @@ function setProtocol(proto) {
     });
     document.querySelectorAll('.protocol-panel').forEach(p => p.style.display = 'none');
     document.getElementById('panel-' + proto).style.display = 'block';
+    scheduleSave();
 }
 
-// ── CALCULADORA EJERCICIO ─────────────────────
-function calcEjercicio() {
-    const edad = parseInt(document.getElementById('edad').value) || 0;
-    const fcPico = parseInt(document.getElementById('ej_fc_pico').value) || 0;
+// ── HELPERS HEMODINÁMICOS ─────────────────────
+function num(id) {
+    const el = document.getElementById(id);
+    const n = parseFloat(el ? el.value : '');
+    return isNaN(n) ? 0 : n;
+}
+// Extrae la sistólica de un texto tipo "185/90" (protocolos farmacológicos)
+function sistolica(txt) {
+    if (!txt) return 0;
+    const m = String(txt).match(/(\d{2,3})/);
+    return m ? parseInt(m[1]) : 0;
+}
+// TA de una fila del registro hemodinámico como texto "130/80"
+function taFila(fila) {
+    const s = num('esf_' + fila + '_tas'), d = num('esf_' + fila + '_tad');
+    if (!s && !d) return '';
+    return s + '/' + (d || '—');
+}
+// METs predichos por edad y sexo (nomogramas de población referida)
+function metsPredichos(edad, sexo) {
+    if (!(edad > 0)) return null;
+    return sexo === 'F' ? 14.7 - 0.13 * edad : 18 - 0.15 * edad;
+}
+function categoriaMETs(mets) {
+    if (!(mets > 0)) return null;
+    if (mets < 5)  return 'capacidad funcional reducida';
+    if (mets < 7)  return 'capacidad funcional regular';
+    if (mets < 10) return 'buena capacidad funcional';
+    return 'excelente capacidad funcional';
+}
 
+// ── CALCULADORA EJERCICIO (post-esfuerzo) ─────
+function calcEjercicio() {
+    const edad = parseInt(v('edad')) || 0;
+    const sexo = document.getElementById('sexo').value;
+    const fcPico  = num('esf_max_fc');
+    const fcRec   = num('esf_rec_fc');
+    const tasBasal = num('esf_basal_tas');
+    const tasPico  = num('esf_max_tas');
+    const fcImg = num('ej_fc_img');
+    const set = (id, txt, color) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.textContent = txt;
+        el.style.color = color || '';
+    };
+
+    // Doble producto por fila
+    ['basal', 'max', 'rec'].forEach(f => {
+        const fc = num('esf_' + f + '_fc'), tas = num('esf_' + f + '_tas');
+        const cel = document.getElementById('esf_' + f + '_dp');
+        if (cel) cel.textContent = (fc > 0 && tas > 0) ? (fc * tas).toLocaleString('es-AR') : '—';
+    });
+
+    // FC predicha y adecuación
     if (edad > 0) {
         const fcMax = 220 - edad;
         const fc85 = Math.round(fcMax * 0.85);
-        document.getElementById('fc_max_predicha').textContent = fcMax + ' lpm';
-        document.getElementById('fc_85').textContent = fc85 + ' lpm';
-
+        set('fc_max_predicha', fcMax + ' lpm');
+        set('fc_85', fc85 + ' lpm');
         if (fcPico > 0) {
             const pct = Math.round((fcPico / fcMax) * 100);
-            document.getElementById('pct_fc').textContent = pct + '%';
-            document.getElementById('pct_fc').style.color = pct >= 85 ? 'var(--color-success)' : 'var(--color-error)';
-            document.getElementById('resp_cronotrop').textContent = pct >= 85 ? '✓ Adecuada' : '✗ Inadecuada / Incompetencia cronotrópica';
-            document.getElementById('resp_cronotrop').style.color = pct >= 85 ? 'var(--color-success)' : 'var(--color-error)';
+            const ok = pct >= 85;
+            set('pct_fc', pct + ' %', ok ? 'var(--color-success)' : 'var(--color-error)');
+            const bb = document.getElementById('ant_betabloq').checked;
+            set('resp_cronotrop',
+                ok ? '✓ Adecuada (≥85%)'
+                   : '✗ Sub-máxima — reduce la sensibilidad del estudio' + (bb ? ' (bajo betabloqueante)' : ''),
+                ok ? 'var(--color-success)' : 'var(--color-error)');
         } else {
-            document.getElementById('pct_fc').textContent = '—';
-            document.getElementById('resp_cronotrop').textContent = '—';
+            set('pct_fc', '—'); set('resp_cronotrop', '—');
         }
     } else {
-        document.getElementById('fc_max_predicha').textContent = '—';
-        document.getElementById('fc_85').textContent = '—';
-        document.getElementById('pct_fc').textContent = '—';
-        document.getElementById('resp_cronotrop').textContent = '—';
+        ['fc_max_predicha', 'fc_85', 'pct_fc', 'resp_cronotrop'].forEach(id => set(id, '—'));
     }
+
+    // Doble producto en el máximo esfuerzo
+    if (fcPico > 0 && tasPico > 0) {
+        const dp = fcPico * tasPico;
+        set('doble_producto', `${dp.toLocaleString('es-AR')} — ${dp >= 25000 ? '✓ Carga hemodinámica adecuada' : '⚠ <25.000: carga submáxima'}`,
+            dp >= 25000 ? 'var(--color-success)' : 'var(--color-warning)');
+    } else set('doble_producto', '—');
+
+    // Respuesta tensional
+    if (tasBasal > 0 && tasPico > 0) {
+        const d = tasPico - tasBasal;
+        let txt, col;
+        if (d <= -10) { txt = `${d} mmHg — ⚠ RESPUESTA HIPOTENSIVA (marcador de alto riesgo)`; col = 'var(--color-error)'; }
+        else if (tasPico >= 210) { txt = `+${d} mmHg (pico ${tasPico}) — ⚠ Respuesta hipertensiva`; col = 'var(--color-warning)'; }
+        else if (d < 20) { txt = `+${d} mmHg — ⚠ Respuesta tensional plana (<20 mmHg)`; col = 'var(--color-warning)'; }
+        else { txt = `+${d} mmHg — ✓ Normotensiva`; col = 'var(--color-success)'; }
+        set('resp_tensional', txt, col);
+    } else set('resp_tensional', '—');
+
+    // HRR al primer minuto
+    if (fcPico > 0 && fcRec > 0) {
+        const hrr = fcPico - fcRec;
+        set('hrr1', `${hrr} lpm — ${hrr > 12 ? '✓ Normal (>12 lpm)' : '⚠ Anormal (≤12 lpm): marcador pronóstico adverso'}`,
+            hrr > 12 ? 'var(--color-success)' : 'var(--color-warning)');
+    } else set('hrr1', '—');
+
+    // Capacidad funcional (METs cargados a mano)
+    const mets = num('ej_mets');
+    if (mets > 0) {
+        const pred = metsPredichos(edad, sexo);
+        const pctMets = pred ? Math.round((mets / pred) * 100) : null;
+        set('cap_funcional', `${mets.toFixed(1)} METs${pctMets ? ` · ${pctMets} % del predicho` : ''} — ${categoriaMETs(mets)}`,
+            mets < 5 ? 'var(--color-error)' : mets < 7 ? 'var(--color-warning)' : 'var(--color-success)');
+    } else set('cap_funcional', '—');
+
+    // % de FC pico al adquirir la primera imagen post-esfuerzo
+    const aviso = document.getElementById('aviso-adquisicion');
+    if (fcPico > 0 && fcImg > 0) {
+        const pctAdq = Math.round((fcImg / fcPico) * 100);
+        const ok = pctAdq >= 85;
+        set('pct_fc_adq', `${pctAdq} % (${fcImg} de ${fcPico} lpm)`, ok ? 'var(--color-success)' : 'var(--color-error)');
+        if (aviso) {
+            if (ok) aviso.style.display = 'none';
+            else {
+                aviso.style.display = 'block';
+                aviso.innerHTML = `<strong>⚠ Adquisición tardía.</strong> La primera imagen post-esfuerzo se tomó con el ` +
+                    `${pctAdq} % de la FC pico${num('ej_seg_img') ? ', a los ' + num('ej_seg_img') + ' segundos' : ''}. ` +
+                    `Por debajo del 85 % la isquemia puede haberse resuelto: <strong>la sensibilidad del estudio está reducida</strong> ` +
+                    `y así debe constar en el informe.`;
+            }
+        }
+    } else {
+        set('pct_fc_adq', '—');
+        if (aviso) aviso.style.display = 'none';
+    }
+
+    sugerirCategorizacion();
+}
+
+// ── SUGERENCIA DE CATEGORIZACIÓN DE RIESGO ────
+// Sugiere, no impone: el desplegable lo decide el operador.
+function sugerirCategorizacion() {
+    const el = document.getElementById('categorizacion-sugerida');
+    if (!el) return;
+    const c = contarMotilidad();
+    const tasBasal = num('esf_basal_tas'), tasPico = num('esf_max_tas');
+    const hipotension = tasBasal > 0 && tasPico > 0 && (tasPico - tasBasal) <= -10;
+    const feyRep = num('fevi_reposo'), feyEst = num('fevi_pico');
+    const caidaFey = feyRep > 0 && feyEst > 0 && feyEst < feyRep;
+
+    if (document.getElementById('ventana').value === 'limitada') {
+        el.textContent = 'Estudio no concluyente: la categorización de riesgo no es aplicable';
+        el.className = 'hint-sugerida';
+        return;
+    }
+
+    const motivos = [];
+    if (c.territorios.length > 1) motivos.push('isquemia multiterritorial');
+    if (c.isquemicos >= 5) motivos.push('isquemia extensa');
+    if (hipotension) motivos.push('respuesta hipotensiva');
+    if (caidaFey) motivos.push('caída de la FEy');
+
+    let sug;
+    if (motivos.length) sug = 'alto';
+    else if (c.isquemicos > 0) sug = 'intermedio';
+    else if (c.evalEst > 0) sug = 'bajo';
+    else { el.textContent = ''; return; }
+
+    el.textContent = `Sugerido: ${sug}${motivos.length ? ' — ' + motivos.join(', ') : ''}`;
+    el.className = 'hint-sugerida hint-' + sug;
 }
 
 // ── CALCULADORA DOBUTAMINA ────────────────────
@@ -317,6 +500,7 @@ function renderBullsEye(svgId, stateKey) {
             path.setAttribute('fill', SCORE_COLORS[WM[stateKey][seg.id]]);
             updateWMSI();
             updateSegTableRow(seg.id);
+            scheduleSave();
         });
 
         // Tooltip
@@ -406,18 +590,102 @@ function updateWMSI() {
     } else {
         globalResp.textContent = '';
     }
+
+    updateMotilidadResumen(wmsiRep, wmsiEst);
+}
+
+// ── RESUMEN DE MOTILIDAD (calidad, extensión, territorios) ──
+function interpWMSI(w) {
+    if (w === null) return '—';
+    const v = parseFloat(w);
+    if (v <= 1.0)  return `${w} — Normal`;
+    if (v <= 1.6)  return `${w} — Alteración leve-moderada`;
+    return `${w} — Alteración extensa (peor pronóstico)`;
+}
+
+function contarMotilidad() {
+    let evalRep = 0, evalEst = 0, isquemicos = 0, viables = 0, cicatriz = 0, sinPar = 0;
+    const terrIsq = new Set();
+    SEGMENTS.forEach(s => {
+        const r = WM.reposo[s.id], e = WM.estres[s.id];
+        if (r > 0) evalRep++;
+        if (e > 0) evalEst++;
+        const c = classifyResponse(r, e);
+        if (c.key === 'isquemia' || c.key === 'isquemia_necrosis') { isquemicos++; terrIsq.add(s.territory); }
+        if (c.key === 'viable') viables++;
+        if (c.key === 'cicatriz') cicatriz++;
+        if (c.key === 'parcial') sinPar++;
+    });
+    return { evalRep, evalEst, isquemicos, viables, cicatriz, sinPar, territorios: [...terrIsq] };
+}
+
+function updateMotilidadResumen(wmsiRep, wmsiEst) {
+    const c = contarMotilidad();
+    const elSeg = document.getElementById('seg-evaluados');
+    if (!elSeg) return;
+
+    const noEvalEst = 17 - c.evalEst;
+    let txt = `Reposo ${c.evalRep}/17 · Estrés ${c.evalEst}/17`;
+    let color = 'var(--color-success)';
+    if (c.evalRep === 0 && c.evalEst === 0) { txt = '— (sin cargar)'; color = 'var(--color-text-secondary)'; }
+    else if (noEvalEst > 2 || (17 - c.evalRep) > 2) {
+        txt += ' — ⚠ >2 segmentos no visualizados: estudio subóptimo, considerar contraste';
+        color = 'var(--color-warning)';
+    } else if (c.sinPar > 0) {
+        txt += ` — ⚠ ${c.sinPar} segmento(s) sin par reposo/estrés`;
+        color = 'var(--color-warning)';
+    } else {
+        txt += ' — ✓ Estudio completo';
+    }
+    elSeg.textContent = txt;
+    elSeg.style.color = color;
+
+    document.getElementById('wmsi-rep-interp').textContent = interpWMSI(wmsiRep);
+    document.getElementById('wmsi-est-interp').textContent = interpWMSI(wmsiEst);
+
+    const elIsq = document.getElementById('seg-isquemicos');
+    if (c.isquemicos === 0) {
+        elIsq.textContent = c.evalEst > 0 ? '0 — sin isquemia inducible' : '—';
+        elIsq.style.color = '';
+    } else {
+        const ext = c.isquemicos <= 2 ? 'leve' : c.isquemicos <= 4 ? 'moderada' : 'extensa';
+        elIsq.textContent = `${c.isquemicos} segmento(s) — extensión ${ext}` +
+            (c.viables ? ` · ${c.viables} con mejoría/viabilidad` : '') +
+            (c.cicatriz ? ` · ${c.cicatriz} sin cambio (cicatriz)` : '');
+        elIsq.style.color = 'var(--color-error)';
+    }
+
+    document.getElementById('territorios-sugeridos').textContent =
+        c.territorios.length ? c.territorios.join(' + ') : '—';
 }
 
 // ── TABLA SEGMENTOS ───────────────────────────
+// Clasificación de la respuesta de UN segmento entre reposo y pico.
+// Devuelve { key, label } — 'key' se usa para contar isquemia/viabilidad.
+// Score 0 = NO EVALUADO: nunca debe interpretarse como normal ni como cambio.
+function classifyResponse(scoreRep, scoreEst) {
+    if (scoreRep === 0 && scoreEst === 0) return { key: 'na',        label: '—' };
+    if (scoreRep === 0 || scoreEst === 0)  return { key: 'parcial',  label: 'Sin par reposo/estrés' };
+    if (scoreRep === 1 && scoreEst === 1)  return { key: 'normal',   label: 'Normal' };
+    if (scoreRep === 1 && scoreEst > 1)    return { key: 'isquemia', label: 'Isquemia inducible' };
+    if (scoreRep > 1 && scoreEst === 1)    return { key: 'viable',   label: 'Normalización (viabilidad)' };
+    if (scoreRep > 1 && scoreEst < scoreRep) return { key: 'viable', label: 'Mejoría (viabilidad probable)' };
+    if (scoreRep > 1 && scoreEst > scoreRep) return { key: 'isquemia_necrosis', label: 'Isquemia sobre necrosis' };
+    return { key: 'cicatriz', label: 'Sin cambio (necrosis / cicatriz)' };
+}
+
+const RESP_CLASS = {
+    na: '', parcial: 'response-partial', normal: 'response-normal',
+    isquemia: 'response-ischemia', isquemia_necrosis: 'response-ischemia',
+    viable: 'response-viability', cicatriz: 'response-scar'
+};
+
 function getResponse(scoreRep, scoreEst) {
-    if (scoreRep === 0 && scoreEst === 0) return '<span style="color:var(--color-text-secondary)">—</span>';
-    if (scoreRep <= 1 && scoreEst <= 1) return '<span class="response-normal">Normal</span>';
-    if (scoreRep <= 1 && scoreEst > 1) return '<span class="response-ischemia">Isquemia</span>';
-    if (scoreRep > 1 && scoreEst < scoreRep && scoreEst <= 1) return '<span class="response-viability">Viabilidad</span>';
-    if (scoreRep > 1 && scoreEst < scoreRep) return '<span class="response-viability">Mejoría</span>';
-    if (scoreRep > 1 && scoreEst > scoreRep) return '<span class="response-ischemia">Isq. s/ necrosis</span>';
-    if (scoreRep > 1 && scoreEst === scoreRep) return '<span class="response-scar">Cicatriz</span>';
-    return '<span style="color:var(--color-text-secondary)">—</span>';
+    const r = classifyResponse(scoreRep, scoreEst);
+    const short = { na: '—', parcial: '⚠ Sin par', normal: 'Normal', isquemia: 'Isquemia',
+        isquemia_necrosis: 'Isq. s/ necrosis', viable: 'Viabilidad', cicatriz: 'Cicatriz' }[r.key];
+    if (r.key === 'na') return '<span style="color:var(--color-text-secondary)">—</span>';
+    return `<span class="${RESP_CLASS[r.key]}" title="${r.label}">${short}</span>`;
 }
 
 function makeBtns(segId, stateKey) {
@@ -457,6 +725,7 @@ function setScore(segId, stateKey, score) {
     const svgId = stateKey === 'reposo' ? 'svg-reposo' : 'svg-estres';
     const path = document.querySelector(`#${svgId} path[data-id="${segId}"]`);
     if (path) path.setAttribute('fill', SCORE_COLORS[score]);
+    scheduleSave();
 }
 
 function updateSegTableRow(segId) {
@@ -470,41 +739,44 @@ function updateSegTableRow(segId) {
 
 // ── ESTRÉS DIASTÓLICO ─────────────────────────
 function calcDiastolico() {
-    const ePrimeRep = parseFloat(document.getElementById('e_prima_rep').value);
-    const eOndaRep = parseFloat(document.getElementById('e_onda_rep').value);
-    const ePrimeEst = parseFloat(document.getElementById('e_prima_est').value);
-    const eOndaEst = parseFloat(document.getElementById('e_onda_est').value);
+    // E/e' promedio si hay septal y lateral; si sólo hay uno, se usa ese.
+    const eeDe = (fase) => {
+        const E = num('e_onda_' + fase);
+        const sep = num('e_prima_' + fase), lat = num('e_prima_lat_' + fase);
+        const eprima = (sep > 0 && lat > 0) ? (sep + lat) / 2 : (sep > 0 ? sep : lat);
+        if (!(E > 0) || !(eprima > 0)) return null;
+        return { valor: E / eprima, promedio: sep > 0 && lat > 0, eprima };
+    };
+    const rep = eeDe('rep'), est = eeDe('est');
 
-    if (ePrimeRep > 0 && eOndaRep > 0) {
-        const eeRep = (eOndaRep / ePrimeRep).toFixed(1);
-        document.getElementById('ee_reposo').value = eeRep;
-        const interpRep = parseFloat(eeRep) > 14 ? '↑ Elevado (DD probable)' : parseFloat(eeRep) > 8 ? 'Normal-alto' : '✓ Normal';
-        document.getElementById('diast_rep_interp').textContent = `E/e' ${eeRep} — ${interpRep}`;
-    }
+    const interp = (x) => x > 14 ? '↑ Elevado' : x > 8 ? 'Normal-alto' : '✓ Normal';
+    const set = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };
 
-    if (ePrimeEst > 0 && eOndaEst > 0) {
-        const eeEst = (eOndaEst / ePrimeEst).toFixed(1);
-        document.getElementById('ee_estres').value = eeEst;
-        const interpEst = parseFloat(eeEst) > 14 ? '↑ Elevado — PAD aumentada con estrés' : parseFloat(eeEst) > 8 ? 'Normal-alto' : '✓ Normal';
-        document.getElementById('diast_est_interp').textContent = `E/e' ${eeEst} — ${interpEst}`;
-    }
+    document.getElementById('ee_reposo').value = rep ? rep.valor.toFixed(1) : '';
+    document.getElementById('ee_estres').value = est ? est.valor.toFixed(1) : '';
+    set('diast_rep_interp', rep ? `E/e' ${rep.valor.toFixed(1)}${rep.promedio ? ' (promedio)' : ' (septal)'} — ${interp(rep.valor)}` : '—');
+    set('diast_est_interp', est ? `E/e' ${est.valor.toFixed(1)}${est.promedio ? ' (promedio)' : ' (septal)'} — ${interp(est.valor)}` : '—');
 
-    const eeRepVal = ePrimeRep > 0 && eOndaRep > 0 ? eOndaRep / ePrimeRep : 0;
-    const eeEstVal = ePrimeEst > 0 && eOndaEst > 0 ? eOndaEst / ePrimeEst : 0;
+    // Respuesta de e' al esfuerzo: lo esperable es que suba
+    if (rep && est) {
+        const d = est.eprima - rep.eprima;
+        set('diast_eprima_resp', `e' ${rep.eprima.toFixed(1)} → ${est.eprima.toFixed(1)} cm/s ` +
+            (d > 0 ? `(+${d.toFixed(1)}) — ✓ incremento presente` : `(${d.toFixed(1)}) — ⚠ sin el incremento esperado`));
+    } else set('diast_eprima_resp', '—');
 
-    if (eeRepVal > 0 && eeEstVal > 0) {
-        let resp;
-        if (eeEstVal > 14) {
-            resp = '⚠ POSITIVO: PAD elevada con estrés (E/e\' >14)';
-        } else if (eeEstVal > eeRepVal * 1.2) {
-            resp = '↑ Aumento de PAD con estrés (sugestivo)';
-        } else {
-            resp = '✓ Respuesta diastólica normal al estrés';
-        }
-        document.getElementById('diast_respuesta').textContent = resp;
-    } else {
-        document.getElementById('diast_respuesta').textContent = '—';
-    }
+    // Criterio ASE: E/e' promedio >14 con esfuerzo Y VRT >2,8 m/s
+    const vrtEst = num('vrt_est');
+    if (est) {
+        const eeAlto = est.valor > 14;
+        const vrtAlto = vrtEst > 2.8;
+        let txt;
+        if (eeAlto && vrtAlto) txt = '⚠ POSITIVO — E/e\' >14 y VRT >2,8 m/s con el esfuerzo';
+        else if (eeAlto && !vrtEst) txt = 'E/e\' >14 con el esfuerzo; falta la VRT para completar el criterio';
+        else if (eeAlto) txt = 'Indeterminado — E/e\' >14 pero VRT ≤2,8 m/s';
+        else if (vrtAlto) txt = 'Indeterminado — VRT >2,8 m/s pero E/e\' ≤14';
+        else txt = '✓ Negativo — sin aumento de las presiones de llenado con el esfuerzo';
+        set('diast_respuesta', txt);
+    } else set('diast_respuesta', '—');
 }
 
 // ── RESULTADO BANNER ──────────────────────────
@@ -537,6 +809,7 @@ function setSpecialTab(tab) {
     });
     document.querySelectorAll('.special-panel').forEach(p => p.style.display = 'none');
     document.getElementById('panel-' + tab).style.display = 'block';
+    scheduleSave();
 }
 
 // CFR
@@ -624,6 +897,7 @@ function setTerritoryScore(stateKey, territory, score) {
     renderBullsEye('svg-' + stateKey, stateKey);
     buildSegmentsTable();
     updateWMSI();
+    scheduleSave();
 }
 
 function setAllNormal(stateKey) {
@@ -631,6 +905,7 @@ function setAllNormal(stateKey) {
     renderBullsEye('svg-' + stateKey, stateKey);
     buildSegmentsTable();
     updateWMSI();
+    scheduleSave();
 }
 
 function resetAllScores() {
@@ -639,11 +914,16 @@ function resetAllScores() {
     renderBullsEye('svg-estres', 'estres');
     buildSegmentsTable();
     updateWMSI();
+    scheduleSave();
 }
 
 // ── GENERADOR DE REPORTE ──────────────────────
 function generarReporte() {
-    const hoy = new Date().toLocaleDateString('es-AR', { day:'2-digit', month:'2-digit', year:'numeric' });
+    // Fecha del estudio (editable); si está vacía se usa la de hoy
+    const fEst = v('fecha_estudio');
+    const hoy = fEst
+        ? new Date(fEst + 'T12:00:00').toLocaleDateString('es-AR', { day:'2-digit', month:'2-digit', year:'numeric' })
+        : new Date().toLocaleDateString('es-AR', { day:'2-digit', month:'2-digit', year:'numeric' });
     const id = v('paciente_id');
     const nombre = v('paciente_nombre');
     const edad = v('edad');
@@ -651,15 +931,20 @@ function generarReporte() {
     const peso = v('peso');
     const altura = v('altura');
     const sc = document.getElementById('sc_display').value;
-    const ventana = document.getElementById('ventana').options[document.getElementById('ventana').selectedIndex].text;
+    const ventana = textoSelect('ventana');
     const contraste = document.getElementById('contraste_usado').value !== 'no' ? 'Sí' : 'No';
 
-    const fcRep = v('fc_reposo');
-    const taRep = v('ta_reposo');
+    // Basal: cada protocolo tiene el suyo (el de ejercicio vive en el registro hemodinámico)
+    const fcRep = currentProtocol === 'ejercicio' ? (num('esf_basal_fc') || '')
+                : currentProtocol === 'dobutamina' ? v('dob_fc_reposo')
+                : currentProtocol === 'dipiridamol' ? v('dip_fc_reposo') : '';
+    const taRep = currentProtocol === 'ejercicio' ? taFila('basal')
+                : currentProtocol === 'dobutamina' ? v('dob_ta_reposo')
+                : currentProtocol === 'dipiridamol' ? v('dip_ta_reposo') : '';
 
     // Indicación
     const indEl = document.getElementById('indicacion');
-    const indicacion = indEl.value ? indEl.options[indEl.selectedIndex].text : '—';
+    const indicacion = indEl.value ? textoSelect('indicacion') : '—';
     const indLibre = v('indicacion_libre');
 
     // Antecedentes
@@ -672,26 +957,28 @@ function generarReporte() {
     // Protocolo
     let protoTxt = '';
     if (currentProtocol === 'ejercicio') {
-        const modal = document.getElementById('ej_modalidad').options[document.getElementById('ej_modalidad').selectedIndex].text;
-        const fcPico = v('ej_fc_pico');
-        const fcMax = document.getElementById('fc_max_predicha').textContent;
-        const pct = document.getElementById('pct_fc').textContent;
-        const cronotrop = document.getElementById('resp_cronotrop').textContent;
-        const mets = v('ej_mets');
-        const dur = v('ej_duracion');
-        const etapa = v('ej_etapa') || '—';
-        const taPico = v('ej_ta_pico');
-        const motivoEl = document.getElementById('ej_motivo_fin');
-        const motivo = motivoEl.options[motivoEl.selectedIndex].text;
-        protoTxt = `PROTOCOLO: ESTRÉS CON EJERCICIO
-Modalidad: ${modal}
-FC Reposo: ${fcRep || '—'} lpm  |  TA Reposo: ${taRep || '—'} mmHg
-FC Máxima Predicha: ${fcMax}  |  Target 85%: ${document.getElementById('fc_85').textContent}
-FC Pico Alcanzada: ${fcPico ? fcPico + ' lpm' : '—'}  |  % FC Máxima: ${pct}
-Respuesta Cronotrópica: ${cronotrop}
-METs: ${mets || '—'}  |  Duración: ${dur || '—'}  |  Etapa: ${etapa}
-TA Pico: ${taPico || '—'} mmHg
-Motivo de terminación: ${motivo}`;
+        const tx = id => document.getElementById(id).textContent;
+        const fila = (rot, f) => `${rot.padEnd(24)} TA ${(taFila(f) || '—').padEnd(10)} FC ${String(num('esf_' + f + '_fc') || '—').padEnd(6)} ` +
+            `DP ${document.getElementById('esf_' + f + '_dp').textContent.padEnd(9)} ${v('esf_' + f + '_sint')}`.trimEnd();
+
+        protoTxt = `PROTOCOLO: EJERCICIO EN CICLOERGÓMETRO — POST-ESFUERZO
+Carga alcanzada: ${v('ej_carga') || '—'}  |  Duración: ${v('ej_duracion') || '—'}
+Causa de detención: ${textoSelect('ej_causa_detencion')}
+
+REGISTRO HEMODINÁMICO
+${fila('Basal', 'basal')}
+${fila('Máximo esfuerzo', 'max')}
+${fila('Recuperación (1er min)', 'rec')}
+
+FC Máxima Predicha: ${tx('fc_max_predicha')}  |  Objetivo 85%: ${tx('fc_85')}  |  Alcanzado: ${tx('pct_fc')}
+Respuesta cronotrópica: ${tx('resp_cronotrop')}
+Respuesta tensional: ${tx('resp_tensional')}
+Doble producto máximo: ${tx('doble_producto')}
+Recuperación de FC al 1er min: ${tx('hrr1')}
+Capacidad funcional: ${tx('cap_funcional')}
+
+ADQUISICIÓN POST-ESFUERZO
+Primera imagen a los ${v('ej_seg_img') || '—'} segundos, con FC de ${v('ej_fc_img') || '—'} lpm (${tx('pct_fc_adq')})`;
 
     } else if (currentProtocol === 'dobutamina') {
         const dosisMax = v('dob_dosis_max');
@@ -701,7 +988,7 @@ Motivo de terminación: ${motivo}`;
         const atrop = document.getElementById('dob_atropina').value;
         const taPico = v('dob_ta_pico');
         const motivoEl = document.getElementById('dob_motivo_fin');
-        const motivo = motivoEl.options[motivoEl.selectedIndex].text;
+        const motivo = textoSelect('dob_motivo_fin');
         protoTxt = `PROTOCOLO: DOBUTAMINA
 Dosis Máxima: ${dosisMax} mcg/kg/min  |  Atropina: ${atrop === 'no' ? 'No' : atrop + ' mg'}
 FC Reposo: ${fcRep || '—'} lpm  |  TA Reposo: ${taRep || '—'} mmHg
@@ -711,12 +998,12 @@ TA Pico: ${taPico || '—'} mmHg
 Motivo de terminación: ${motivo}`;
 
     } else if (currentProtocol === 'dipiridamol') {
-        const protoDip = document.getElementById('dip_protocolo').options[document.getElementById('dip_protocolo').selectedIndex].text;
+        const protoDip = textoSelect('dip_protocolo');
         const dosisTxt = document.getElementById('dip_dosis_total').textContent;
         const aminoEl = document.getElementById('dip_aminofilina');
-        const amino = aminoEl.value !== 'no' ? aminoEl.options[aminoEl.selectedIndex].text : 'No utilizada';
+        const amino = aminoEl.value !== 'no' ? textoSelect('dip_aminofilina') : 'No utilizada';
         const motivoEl = document.getElementById('dip_motivo_fin');
-        const motivo = motivoEl.options[motivoEl.selectedIndex].text;
+        const motivo = textoSelect('dip_motivo_fin');
         protoTxt = `PROTOCOLO: DIPIRIDAMOL
 Protocolo: ${protoDip}
 Dosis Total Administrada: ${dosisTxt}
@@ -727,7 +1014,7 @@ Motivo de terminación: ${motivo}`;
 
     } else {
         const ncEl = document.getElementById('nc_tipo');
-        const tipo = ncEl.options[ncEl.selectedIndex].text;
+        const tipo = textoSelect('nc_tipo');
         protoTxt = `PROTOCOLO: NO CONVENCIONAL
 Tipo de apremio: ${tipo}
 ${v('nc_descripcion') ? 'Descripción: ' + v('nc_descripcion') : ''}`;
@@ -739,18 +1026,50 @@ ${v('nc_descripcion') ? 'Descripción: ' + v('nc_descripcion') : ''}`;
     const feviRecup = v('fevi_recup');
     const deltaFevi = document.getElementById('delta_fevi').value;
 
-    // Wall motion
+    // Wall motion — sólo segmentos alterados o con respuesta relevante
     let wmLines = '';
-    SEGMENTS.forEach(seg => {
+    const ordenados = [...SEGMENTS].sort((a, b) => a.id - b.id);
+    ordenados.forEach(seg => {
         const scRep = WM.reposo[seg.id];
         const scEst = WM.estres[seg.id];
-        if (scRep > 0 || scEst > 0) {
-            const resp = getResponseText(scRep, scEst);
-            wmLines += `  ${String(seg.id).padStart(2)}. ${seg.name.padEnd(22)} [${seg.territory}]   Reposo: ${SCORE_LABELS[scRep] || '—'.padEnd(9)}  Estrés: ${SCORE_LABELS[scEst] || '—'.padEnd(9)}  → ${resp}\n`;
-        }
+        if (scRep === 0 && scEst === 0) return;
+        if (scRep === 1 && scEst === 1) return;   // normal en ambas: no se lista
+        const resp = getResponseText(scRep, scEst);
+        wmLines += `  ${String(seg.id).padStart(2)}. ${seg.name.padEnd(22)} [${seg.territory}]  ` +
+            `Reposo: ${SCORE_LABELS[scRep].padEnd(10)} Pico: ${SCORE_LABELS[scEst].padEnd(10)} → ${resp}\n`;
     });
     const wmsiRep = calcWMSI('reposo') || '—';
     const wmsiEst = calcWMSI('estres') || '—';
+    const cnt = contarMotilidad();
+    const calidadTxt = (cnt.evalRep || cnt.evalEst)
+        ? `Segmentos evaluados: reposo ${cnt.evalRep}/17, pico ${cnt.evalEst}/17` +
+          ((17 - cnt.evalEst) > 2 || (17 - cnt.evalRep) > 2 ? ' — más de 2 segmentos no visualizados: valorar con cautela.' : '.')
+        : 'Motilidad segmentaria no cargada.';
+    const extensionTxt = cnt.isquemicos > 0
+        ? `Isquemia inducible en ${cnt.isquemicos} segmento(s) — territorio ${cnt.territorios.join(' + ')}.`
+        : (cnt.evalEst > 0 ? 'Sin isquemia inducible en los segmentos evaluados.' : '');
+
+    // Motilidad en recuperación
+    const recEl = document.getElementById('mot_recup');
+    const recTxt = recEl.value
+        ? `Recuperación: ${textoSelect('mot_recup')}` +
+          (v('mot_recup_tiempo') ? ` (${v('mot_recup_tiempo')})` : '')
+        : '';
+
+    // ECG
+    const ecgBasalEl = document.getElementById('ecg_basal');
+    const ecgTipoEl = document.getElementById('ecg_st_tipo');
+    const ecgLineas = [`ECG basal: ${textoSelect('ecg_basal')}`];
+    if (ecgTipoEl.value) {
+        ecgLineas.push(`Cambios del ST: ${textoSelect('ecg_st_tipo')}` +
+            (v('ecg_st_mm') ? ` de ${v('ecg_st_mm')} mm` : '') +
+            (v('ecg_st_deriv') ? ` en ${v('ecg_st_deriv')}` : ''));
+    } else {
+        ecgLineas.push('Sin cambios significativos del ST durante el estudio.');
+    }
+    if (v('ecg_st_aparicion')) ecgLineas.push(`Aparición: ${v('ecg_st_aparicion')}`);
+    if (v('ecg_st_resolucion')) ecgLineas.push(`Resolución en recuperación: ${v('ecg_st_resolucion')}`);
+    if (v('ecg_arritmias')) ecgLineas.push(`Arritmias: ${v('ecg_arritmias')}`);
 
     // Diastólico
     const eeRep = document.getElementById('ee_reposo').value;
@@ -759,11 +1078,11 @@ ${v('nc_descripcion') ? 'Descripción: ' + v('nc_descripcion') : ''}`;
 
     // Resultado
     const resultEl = document.getElementById('resultado_estudio');
-    const resultado = resultEl.value ? resultEl.options[resultEl.selectedIndex].text : '—';
+    const resultado = resultEl.value ? textoSelect('resultado_estudio') : '—';
     const territorioEl = document.getElementById('territorio_afectado');
-    const territorio = territorioEl.options[territorioEl.selectedIndex].text;
+    const territorio = textoSelect('territorio_afectado');
     const extensionEl = document.getElementById('extension_isquemia');
-    const extension = extensionEl.value ? extensionEl.options[extensionEl.selectedIndex].text : '—';
+    const extension = extensionEl.value ? textoSelect('extension_isquemia') : '—';
 
     // Hallazgos
     const hals = [];
@@ -807,12 +1126,16 @@ FUNCIÓN VENTRICULAR IZQUIERDA
 FEy en Reposo: ${feviRep ? feviRep + '%' : '—'}  |  FEy Pico: ${feviPico ? feviPico + '%' : '—'}  |  FEy Recuperación: ${feviRecup ? feviRecup + '%' : '—'}
 ${deltaFevi ? 'Variación FEy: ' + deltaFevi : ''}
 
+ECG DURANTE EL ESTRÉS
+${ecgLineas.join('\n')}
+
 MOTILIDAD PARIETAL SEGMENTARIA — MODELO AHA 17 SEGMENTOS
 ${sep}
-${wmLines || '  (No se registraron alteraciones segmentarias)\n'}
+${wmLines || '  Motilidad normal en todos los segmentos evaluados, en reposo y en el pico.\n'}
 ${sep}
   WMSI Reposo: ${wmsiRep}   |   WMSI Pico Estrés: ${wmsiEst}
-
+  ${calidadTxt}
+${extensionTxt ? '  ' + extensionTxt + '\n' : ''}${recTxt ? '  ' + recTxt + '\n' : ''}
 ${eeRep || eeEst ? `ESTRÉS DIASTÓLICO
 E/e' Reposo: ${eeRep || '—'}   |   E/e' Estrés: ${eeEst || '—'}
 Respuesta: ${diastResp}\n` : ''}
@@ -826,8 +1149,13 @@ ${conclusion ? 'CONCLUSIÓN\n' + conclusion : ''}
 
 ${sep}
 Fecha de realización: ${hoy}
-Eco Estrés Cardíaco v1.0 — Calculadora Clínica
+Eco Estrés Cardíaco v1.1 — Calculadora Clínica
 `;
+
+    // Limpieza tipográfica: sin espacios colgando ni bloques de líneas vacías
+    rep = rep.replace(/[ \t]+$/gm, '').replace(/\n{3,}/g, '\n\n');
+
+    validarEstudio();
 
     const out = document.getElementById('reporte-output');
     out.style.display = 'block';
@@ -835,19 +1163,548 @@ Eco Estrés Cardíaco v1.0 — Calculadora Clínica
     out.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
+// ══════════════════════════════════════════════
+//  MOTOR NARRATIVO
+//  Tres capas: recolectar hechos → elegir rama → rellenar plantillas.
+//  El texto vive en report-templates.js; acá no se redacta nada.
+// ══════════════════════════════════════════════
+
+// ── Capa 1: recolector de hechos ──────────────
+// Devuelve un objeto plano, sin una sola palabra de informe.
+function recolectarHallazgos() {
+    const H = {};
+    const edad = parseInt(v('edad')) || 0;
+
+    H.edad = edad;
+    H.sexo = document.getElementById('sexo').value;
+    H.carga = v('ej_carga');
+    H.duracion = v('ej_duracion');
+    H.causaDetencion = document.getElementById('ej_causa_detencion').value;
+    H.causaDetencionTxt = CAUSA_PROSA[H.causaDetencion] || textoSelect('ej_causa_detencion').toLowerCase();
+    H.ventana = document.getElementById('ventana').value;
+    H.ventanaTxt = textoSelect('ventana').toLowerCase();
+    H.betabloqueante = document.getElementById('ant_betabloq').checked;
+
+    // Hemodinamia
+    H.fcBasal = num('esf_basal_fc');
+    H.fcPico  = num('esf_max_fc');
+    H.fcRec   = num('esf_rec_fc');
+    H.tasBasal = num('esf_basal_tas');
+    H.tasPico  = num('esf_max_tas');
+    H.taBasal = taFila('basal');
+    H.taPico  = taFila('max');
+    H.dobleProducto = (H.fcPico > 0 && H.tasPico > 0) ? H.fcPico * H.tasPico : 0;
+    H.fcMaxPredicha = edad > 0 ? 220 - edad : 0;
+    H.pctFCmax = (H.fcMaxPredicha > 0 && H.fcPico > 0) ? Math.round(H.fcPico / H.fcMaxPredicha * 100) : 0;
+    H.fcSuboptima = H.pctFCmax > 0 && H.pctFCmax < 85;
+    H.hrr1 = (H.fcPico > 0 && H.fcRec > 0) ? H.fcPico - H.fcRec : null;
+
+    const deltaTAS = (H.tasBasal > 0 && H.tasPico > 0) ? H.tasPico - H.tasBasal : null;
+    H.hipotension  = deltaTAS !== null && deltaTAS <= -10;
+    H.hipertension = H.tasPico >= 210 && !H.hipotension;
+
+    // Adquisición post-esfuerzo
+    H.segImagen = num('ej_seg_img');
+    H.fcImagen  = num('ej_fc_img');
+    H.pctFCadq  = (H.fcPico > 0 && H.fcImagen > 0) ? Math.round(H.fcImagen / H.fcPico * 100) : 0;
+    H.adquisicionTardia = H.pctFCadq > 0 && H.pctFCadq < 85;
+
+    // Capacidad funcional
+    H.mets = num('ej_mets');
+    H.capacidadFuncional = categoriaMETs(H.mets);
+
+    // Función ventricular
+    H.feyReposo = num('fevi_reposo');
+    H.feyEstres = num('fevi_pico');
+    H.caidaFey = H.feyReposo > 0 && H.feyEstres > 0 && H.feyEstres < H.feyReposo;
+
+    // Diastólico
+    H.eeReposo = v('ee_reposo');
+    H.eeEstres = v('ee_estres');
+    H.vrtReposo = v('vrt_rep');
+    H.vrtEstres = v('vrt_est');
+    const eeEstNum = parseFloat(H.eeEstres) || 0;
+    H.diastolicoPositivo = eeEstNum > 14 && num('vrt_est') > 2.8;
+
+    // ECG
+    H.stTipo = document.getElementById('ecg_st_tipo').value;
+    H.stMm = v('ecg_st_mm');
+    H.stDeriv = v('ecg_st_deriv');
+
+    // Síntomas del máximo esfuerzo
+    H.sintomasEsfuerzo = v('esf_max_sint');
+
+    // ── Motilidad ──
+    const isquemicos = [], secuelas = [];
+    SEGMENTS.forEach(s => {
+        const r = WM.reposo[s.id], e = WM.estres[s.id];
+        const c = classifyResponse(r, e);
+        if (c.key === 'isquemia' || c.key === 'isquemia_necrosis') isquemicos.push({ ...s, scoreEstres: e });
+        if (c.key === 'cicatriz') secuelas.push({ ...s, scoreReposo: r });
+    });
+    isquemicos.sort((a, b) => a.id - b.id);
+    secuelas.sort((a, b) => a.id - b.id);
+
+    H.isquemicos = isquemicos;
+    H.secuelas = secuelas;
+    H.territoriosIsquemia = territoriosDe(isquemicos);
+    H.territoriosSecuela = territoriosDe(secuelas);
+
+    const cnt = contarMotilidad();
+    H.segEvaluados = Math.min(cnt.evalRep, cnt.evalEst);
+    H.wmsiReposo = calcWMSI('reposo');
+    H.wmsiEstres = calcWMSI('estres');
+    H.wmsiSubio = H.wmsiReposo !== null && H.wmsiEstres !== null &&
+                  parseFloat(H.wmsiEstres) > parseFloat(H.wmsiReposo);
+
+    H.categorizacion = document.getElementById('categorizacion').value
+        ? textoSelect('categorizacion').toLowerCase() : '';
+
+    return H;
+}
+
+// El ápex (17) tiene irrigación variable: sólo se le asigna vaso si viene
+// acompañado de otros segmentos del mismo territorio.
+function territoriosDe(segs) {
+    const t = new Set();
+    segs.forEach(s => { if (s.id !== 17) t.add(s.territory); });
+    if (!t.size && segs.some(s => s.id === 17)) return [];   // ápex aislado: sin vaso
+    return [...t];
+}
+
+// ── Capa 2: selector de rama ──────────────────
+function elegirRama(H) {
+    if (H.ventana === 'limitada') return 'noConcluyente';
+    if (H.isquemicos.length && H.hipotension) return 'hipotensiva';
+    if (H.isquemicos.length) return H.territoriosIsquemia.length > 1 ? 'positivaMulti' : 'positivaUnico';
+    if (H.secuelas.length) return 'secuela';
+    if (H.diastolicoPositivo) return 'diastolico';
+    return 'negativa';
+}
+
+// ── Utilidades de prosa ───────────────────────
+function listarEnProsa(items) {
+    if (!items.length) return '';
+    if (items.length === 1) return items[0];
+    return items.slice(0, -1).join(', ') + ' y ' + items[items.length - 1];
+}
+
+function segmentosEnProsa(segs) {
+    return listarEnProsa(segs.map(s => SEG_PROSA[s.id] || s.name.toLowerCase()));
+}
+
+function territoriosEnProsa(terrs) {
+    return listarEnProsa(terrs.map(t => TERRITORIO_PROSA[t] || t));
+}
+
+// "de los segmentos X, Y" / "del segmento X", según cuántos sean
+function deSegmentos(segs) {
+    if (!segs.length) return '';
+    return (segs.length === 1 ? 'del segmento ' : 'de los segmentos ') + segmentosEnProsa(segs);
+}
+
+// "el territorio de la arteria X" cuando hay vaso; "la región apical" cuando no
+function territorioFrase(terrs) {
+    return terrs.length ? 'territorio de ' + territoriosEnProsa(terrs) : 'la región apical';
+}
+
+// Grado predominante (el peor) de un conjunto de segmentos
+function gradoEnProsa(segs, campo) {
+    if (!segs.length) return 'alteración de la motilidad';
+    const peor = Math.max(...segs.map(s => s[campo] || 0));
+    return GRADO_PROSA[peor] || 'alteración de la motilidad';
+}
+
+// Frase de acompañamiento: cambios del ST y/o síntomas
+function acompanamientoEnProsa(H) {
+    const partes = [];
+    if (H.stTipo) {
+        const tipo = H.stTipo === 'supra' ? 'supradesnivel del ST' : 'infradesnivel del ST';
+        partes.push(tipo + (H.stMm ? ` de ${H.stMm} mm` : '') + (H.stDeriv ? ` en ${H.stDeriv}` : ''));
+    }
+    if (H.sintomasEsfuerzo) partes.push(H.sintomasEsfuerzo.toLowerCase());
+    if (!partes.length) return '';
+    return ` Se acompañó de ${listarEnProsa(partes)} al doble producto alcanzado.`;
+}
+
+// Rellena {{marcadores}} y borra los que quedaron vacíos
+function rellenar(plantilla, datos) {
+    return plantilla.replace(/\{\{(\w+)\}\}/g, (_, k) => (datos[k] !== undefined && datos[k] !== null) ? String(datos[k]) : '');
+}
+
+// ── Capa 3: armado del informe ────────────────
+function construirNarrativa(H) {
+    const T = NARRATIVA;
+    const rama = elegirRama(H);
+    const nada = '—';
+    const parrafos = [];
+
+    // ── MÉTODO ──
+    const metodo = [rellenar(T.metodo, {
+        carga: H.carga ? ' hasta ' + H.carga : '',
+        fcPico: H.fcPico || nada,
+        pctFCmax: H.pctFCmax || nada,
+        dobleProducto: H.dobleProducto ? H.dobleProducto.toLocaleString('es-AR') : nada,
+        causaDetencion: H.causaDetencionTxt
+    })];
+
+    if (H.hipotension) {
+        metodo.push(rellenar(T.respuestaHipotensiva, { taBasal: H.taBasal || nada, taPico: H.taPico || nada }));
+    } else if (H.hipertension) {
+        metodo.push(rellenar(T.respuestaHipertensiva, { taPico: H.taPico || nada, taBasal: H.taBasal || nada }));
+    } else if (H.fcSuboptima) {
+        metodo.push(rellenar(T.respuestaFCSubóptima, {
+            fcPico: H.fcPico || nada, pctFCmax: H.pctFCmax || nada,
+            betabloqueante: H.betabloqueante ? ' (bajo tratamiento betabloqueante)' : ''
+        }));
+    } else if (H.pctFCmax >= 85) {
+        metodo.push(T.respuestaNormal);
+    }
+    parrafos.push(metodo.join(' '));
+
+    // ── CALIDAD ──
+    const datosCalidad = {
+        ventana: H.ventanaTxt,
+        segImagen: H.segImagen || nada,
+        fcImagen: H.fcImagen || nada,
+        pctFCadq: H.pctFCadq || nada,
+        segEvaluados: H.segEvaluados,
+        coletillaAdq: H.pctFCadq ? (H.adquisicionTardia ? T.coletillaAdqTardia : T.coletillaAdqUtil) : ''
+    };
+    parrafos.push(rellenar(H.ventana === 'limitada' ? T.calidadLimitada : T.calidad, datosCalidad));
+
+    // ── REPOSO ──
+    const datosReposo = {
+        fey: H.feyReposo || nada,
+        ee: H.eeReposo || nada,
+        vrt: H.vrtReposo || nada,
+        gradoSecuela: gradoEnProsa(H.secuelas, 'scoreReposo'),
+        segmentosSecuela: segmentosEnProsa(H.secuelas),
+        deSegmentosSecuela: deSegmentos(H.secuelas),
+        segmentosSecuelaArt: H.secuelas.length === 1 ? 'El segmento' : 'Los segmentos',
+        territorioSecuela: territoriosEnProsa(H.territoriosSecuela),
+        territorioSecuelaFrase: territorioFrase(H.territoriosSecuela)
+    };
+    let plantillaReposo;
+    if (H.secuelas.length) plantillaReposo = T.reposoSecuela;
+    else if (rama === 'diastolico') plantillaReposo = T.reposoDiastolico;
+    else if (rama === 'negativa') plantillaReposo = T.reposoNormalLargo;
+    else plantillaReposo = T.reposoNormalCorto;
+    parrafos.push(rellenar(plantillaReposo, datosReposo));
+
+    // ── ESFUERZO ──
+    const acompanamiento = acompanamientoEnProsa(H);
+    const datosEsfuerzo = {
+        grado: gradoEnProsa(H.isquemicos, 'scoreEstres'),
+        segmentos: segmentosEnProsa(H.isquemicos),
+        deSegmentos: deSegmentos(H.isquemicos),
+        territorio: territoriosEnProsa(H.territoriosIsquemia),
+        territorioFrase: territorioFrase(H.territoriosIsquemia),
+        territorios: territoriosEnProsa(H.territoriosIsquemia),
+        wmsiReposo: H.wmsiReposo || nada,
+        wmsiEstres: H.wmsiEstres || nada,
+        acompanamiento: acompanamiento,
+        caidaFey: H.caidaFey ? `, con caída de la FEy de ${H.feyReposo} % a ${H.feyEstres} % post-esfuerzo` : '',
+        hallazgos: H.isquemicos.length
+            ? `nuevas alteraciones de la motilidad en los segmentos ${segmentosEnProsa(H.isquemicos)}`
+            : 'los hallazgos descritos',
+        feyReposo: H.feyReposo || nada,
+        feyEstres: H.feyEstres || nada,
+        eeEstres: H.eeEstres || nada,
+        vrtEstres: H.vrtEstres || nada
+    };
+    const plantillaEsfuerzo = {
+        noConcluyente: T.esfuerzoNoConcluyente,
+        hipotensiva:   T.esfuerzoHipotensiva,
+        positivaMulti: T.esfuerzoPositivoMulti,
+        positivaUnico: T.esfuerzoPositivoUnico,
+        secuela:       T.esfuerzoSecuela,
+        diastolico:    T.esfuerzoDiastolico,
+        negativa:      H.hipertension ? T.esfuerzoHipertensiva
+                     : H.fcSuboptima ? T.esfuerzoFCSuboptima
+                     : T.esfuerzoNegativo
+    }[rama];
+    let parrafoEsfuerzo = rellenar(plantillaEsfuerzo, datosEsfuerzo);
+
+    // Secuela previa + isquemia nueva en otro territorio: se suma el párrafo de secuela
+    if (H.secuelas.length && H.isquemicos.length) {
+        parrafoEsfuerzo += ' ' + rellenar(T.parrafoSecuelaAgregado, datosReposo);
+    }
+    parrafos.push(parrafoEsfuerzo);
+
+    // ── CONCLUSIÓN ──
+    // Con FC subóptima la conclusión negativa arranca corta: la limitación es el foco
+    const claveConclusion = (rama === 'negativa' && H.fcSuboptima) ? 'negativaCorta' : rama;
+    let conclusion = rellenar(T.conclusiones[claveConclusion], {
+        capacidadFuncional: H.capacidadFuncional || 'adecuada tolerancia al esfuerzo',
+        territorioFrase: territorioFrase(H.territoriosIsquemia),
+        territorioSecuelaFrase: territorioFrase(H.territoriosSecuela),
+        motivoNoConcluyente: motivoNoConcluyente(H),
+        sugerenciaNoConcluyente: 'repetir el estudio con contraste o un método alternativo de perfusión'
+    });
+
+    // Modificadores: se insertan antes del punto final
+    const extras = [];
+    if (H.hipertension && rama !== 'noConcluyente') extras.push(T.modificadores.hipertensiva);
+    if (H.fcSuboptima && rama === 'negativa') extras.push(T.modificadores.fcSuboptima);
+    if (H.adquisicionTardia && rama !== 'noConcluyente')
+        extras.push(rellenar(T.modificadores.adquisicionTardia, { segImagen: H.segImagen, pctFCadq: H.pctFCadq }));
+    if (H.caidaFey && rama !== 'positivaMulti' && rama !== 'hipotensiva') extras.push(T.modificadores.caidaFey);
+
+    if (extras.length) conclusion = conclusion.replace(/\.$/, '') + extras.join('') + '.';
+    if (H.categorizacion) conclusion += ' ' + rellenar(T.categorizacion, { categorizacion: H.categorizacion });
+    parrafos.push(conclusion);
+
+    return { rama, texto: parrafos.join('\n\n') };
+}
+
+function motivoNoConcluyente(H) {
+    const m = [];
+    if (H.ventana === 'limitada') m.push('ventana acústica limitada');
+    if (H.adquisicionTardia) m.push('adquisición post-esfuerzo tardía');
+    if (H.fcSuboptima) m.push('no haberse alcanzado la FC objetivo');
+    return listarEnProsa(m) || 'limitaciones técnicas del estudio';
+}
+
+// ── Botón "Generar informe" ───────────────────
+function generarInforme() {
+    if (currentProtocol !== 'ejercicio') {
+        alert('El informe narrativo está redactado para el protocolo de ejercicio. Para dobutamina o dipiridamol, usá "Planilla de datos".');
+        return;
+    }
+    const H = recolectarHallazgos();
+    const { rama, texto } = construirNarrativa(H);
+
+    const fEst = v('fecha_estudio');
+    const fecha = fEst
+        ? new Date(fEst + 'T12:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+        : new Date().toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+    const encabezado = [
+        'ECOCARDIOGRAMA DE ESTRÉS CON EJERCICIO',
+        `${v('paciente_nombre') || v('paciente_id') || 'Paciente s/ identificar'}` +
+            `${v('paciente_id') && v('paciente_nombre') ? ' · HC ' + v('paciente_id') : ''}` +
+            ` · ${v('edad') || '—'} años · ${document.getElementById('sexo').value === 'M' ? 'masculino' : 'femenino'}` +
+            ` · ${fecha}`
+    ].join('\n');
+
+    const firma = firmaInforme();
+    const informe = `${encabezado}\n\n${texto}\n${firma ? '\n' + firma + '\n' : ''}`;
+
+    validarEstudio(rama);
+
+    const out = document.getElementById('reporte-output');
+    out.style.display = 'block';
+    out.textContent = informe;
+    out.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    scheduleSave();
+}
+
+// ── VALIDACIÓN DEL ESTUDIO ────────────────────
+// No bloquea la generación del informe: avisa qué falta o qué es incoherente.
+function validarEstudio(rama) {
+    const av = [];   // { nivel: 'error'|'warn'|'info', txt }
+    const cnt = contarMotilidad();
+    const edad = parseInt(v('edad')) || 0;
+    const fcPico = num('esf_max_fc');
+    const resultado = document.getElementById('resultado_estudio').value;
+
+    if (!v('paciente_id') && !v('paciente_nombre')) av.push({ nivel: 'warn', txt: 'Falta identificar al paciente (HC/ID o nombre).' });
+    if (!edad) av.push({ nivel: 'error', txt: 'Falta la edad: sin ella no se calcula la FC máxima predicha ni la adecuación del estudio.' });
+    if (!v('peso')) av.push({ nivel: 'warn', txt: 'Falta el peso: no se pueden estimar los METs de la bicicleta.' });
+    if (!document.getElementById('indicacion').value) av.push({ nivel: 'warn', txt: 'Falta la indicación del estudio.' });
+    if (!v('fevi_reposo')) av.push({ nivel: 'warn', txt: 'Falta la FEy en reposo.' });
+
+    if (cnt.evalRep === 0 || cnt.evalEst === 0) {
+        av.push({ nivel: 'error', txt: 'Motilidad segmentaria incompleta: falta cargar reposo y/o pico. El informe se genera sin análisis segmentario.' });
+    } else {
+        if (cnt.sinPar > 0) av.push({ nivel: 'error', txt: `${cnt.sinPar} segmento(s) cargado(s) en una sola fase: no se puede definir su respuesta. Completar o dejar ambos en "no evaluado".` });
+        if ((17 - cnt.evalEst) > 2 || (17 - cnt.evalRep) > 2) av.push({ nivel: 'warn', txt: 'Más de 2 segmentos no visualizados: estudio subóptimo (ASE). Considerar contraste ecocardiográfico y consignarlo como limitación.' });
+    }
+
+    if (currentProtocol === 'ejercicio') {
+        if (!fcPico) av.push({ nivel: 'error', txt: 'Falta la FC pico: es el dato que define si el estudio es concluyente.' });
+        else if (edad) {
+            const pct = Math.round(fcPico / (220 - edad) * 100);
+            if (pct < 85 && resultado === 'negativo') {
+                av.push({ nivel: 'error', txt: `FC pico ${pct}% de la máxima predicha (<85%) con resultado NEGATIVO: por criterio debe informarse como NO CONCLUYENTE (o negativo submáximo).` });
+            }
+        }
+        if (!num('esf_max_tas')) av.push({ nivel: 'warn', txt: 'Falta la TA sistólica del máximo esfuerzo: sin ella no hay doble producto ni respuesta tensional.' });
+        if (!num('esf_rec_fc')) av.push({ nivel: 'info', txt: 'Sin FC al 1.er minuto de recuperación: se pierde el HRR₁, marcador pronóstico independiente.' });
+        if (!num('ej_fc_img')) av.push({ nivel: 'error', txt: 'Falta la FC al adquirir la primera imagen post-esfuerzo: sin ese dato no se puede afirmar que la adquisición fue oportuna.' });
+        else if (fcPico > 0 && (num('ej_fc_img') / fcPico) < 0.85)
+            av.push({ nivel: 'warn', txt: 'Imagen post-esfuerzo adquirida con <85% de la FC pico: la sensibilidad está reducida y debe constar en el informe.' });
+        if (!v('ej_carga')) av.push({ nivel: 'info', txt: 'Sin carga alcanzada cargada (discos/kg).' });
+    }
+
+    if (!resultado) av.push({ nivel: 'error', txt: 'Falta seleccionar el RESULTADO del estudio.' });
+    if (resultado === 'positivo' && cnt.isquemicos === 0)
+        av.push({ nivel: 'warn', txt: 'Resultado POSITIVO pero ningún segmento muestra isquemia inducible en la tabla. Verificar la carga de motilidad.' });
+    if (resultado === 'negativo' && cnt.isquemicos > 0)
+        av.push({ nivel: 'warn', txt: `Resultado NEGATIVO pero hay ${cnt.isquemicos} segmento(s) con deterioro en el pico. Revisar.` });
+
+    const terrSel = document.getElementById('territorio_afectado').value;
+    if (cnt.territorios.length && terrSel === 'ninguno')
+        av.push({ nivel: 'warn', txt: `La tabla sugiere compromiso de ${cnt.territorios.join(' + ')} y el territorio informado es "Ninguno".` });
+
+    if (rama) {
+        const esperado = { negativa: 'negativo', positivaUnico: 'positivo', positivaMulti: 'positivo',
+                           hipotensiva: 'positivo', noConcluyente: 'no_concluyente',
+                           diastolico: 'diastolico_positivo', secuela: 'negativo' }[rama];
+        if (resultado && esperado && resultado !== esperado)
+            av.push({ nivel: 'warn', txt: `El informe narrativo salió por la rama "${rama}" pero el resultado elegido a mano es otro. Verificá cuál corresponde.` });
+    }
+
+    const preFaltantes = Array.from(document.querySelectorAll('.chk-pre')).filter(c => !c.checked).length;
+    if (preFaltantes > 0) av.push({ nivel: 'info', txt: `Checklist pre-estudio: ${preFaltantes} ítem(s) sin tildar.` });
+
+    const panel = document.getElementById('validacion-panel');
+    if (!av.length) {
+        panel.style.display = 'block';
+        panel.className = 'validacion-panel val-ok';
+        panel.innerHTML = '<strong>✓ Control de completitud:</strong> sin observaciones.';
+        return true;
+    }
+    const orden = { error: 0, warn: 1, info: 2 };
+    av.sort((a, b) => orden[a.nivel] - orden[b.nivel]);
+    const icono = { error: '⛔', warn: '⚠️', info: 'ℹ️' };
+    panel.style.display = 'block';
+    panel.className = 'validacion-panel' + (av.some(a => a.nivel === 'error') ? ' val-error' : ' val-warn');
+    panel.innerHTML = '<strong>Control de completitud del informe</strong><ul>' +
+        av.map(a => `<li class="val-${a.nivel}">${icono[a.nivel]} ${a.txt}</li>`).join('') + '</ul>';
+    return !av.some(a => a.nivel === 'error');
+}
+
+// ── CHECKLIST PRE-ESTUDIO ─────────────────────
+function updateChecklistBadge() {
+    const todos = document.querySelectorAll('.chk-pre');
+    const ok = Array.from(todos).filter(c => c.checked).length;
+    const badge = document.getElementById('checklist-badge');
+    if (!badge) return;
+    badge.textContent = `${ok} / ${todos.length}`;
+    badge.style.background = ok === todos.length ? 'var(--color-success-bg)' : '';
+    badge.style.color = ok === todos.length ? 'var(--color-success)' : '';
+}
+
+// ══════════════════════════════════════════════
+//  HISTORIAL LOCAL DE ESTUDIOS
+// ══════════════════════════════════════════════
+const HIST_KEY = 'eco-estres-historial';
+const HIST_MAX = 50;
+
+function leerHistorial() {
+    try { return JSON.parse(localStorage.getItem(HIST_KEY)) || []; }
+    catch (e) { return []; }
+}
+
+function guardarEnHistorial() {
+    const reporte = document.getElementById('reporte-output').textContent;
+    if (!reporte) { alert('Primero genere el reporte.'); return; }
+    const lista = leerHistorial();
+    const resEl = document.getElementById('resultado_estudio');
+    lista.unshift({
+        ts: Date.now(),
+        id: v('paciente_id') || 's/ID',
+        nombre: v('paciente_nombre') || '',
+        resultado: resEl.value ? textoSelect('resultado_estudio') : '—',
+        protocolo: currentProtocol,
+        reporte,
+        estudio: {
+            fields: captureFields(),
+            wm: { reposo: { ...WM.reposo }, estres: { ...WM.estres } },
+            protocol: currentProtocol,
+            specialTab: currentSpecialTab,
+            dobStages: captureDobStages(),
+        }
+    });
+    try {
+        localStorage.setItem(HIST_KEY, JSON.stringify(lista.slice(0, HIST_MAX)));
+        renderHistorial();
+        showNotice('Estudio guardado en el historial de esta computadora.', 'ok');
+    } catch (e) {
+        alert('No se pudo guardar en el historial (almacenamiento lleno).');
+    }
+}
+
+function renderHistorial() {
+    const cont = document.getElementById('historial-lista');
+    if (!cont) return;
+    const lista = leerHistorial();
+    document.getElementById('historial-badge').textContent = lista.length;
+    if (!lista.length) {
+        cont.innerHTML = '<p class="module-description">Todavía no hay estudios guardados.</p>';
+        return;
+    }
+    cont.innerHTML = lista.map((h, i) => {
+        const f = new Date(h.ts).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+        return `<div class="hist-item">
+            <div class="hist-info">
+                <strong>${h.id}</strong>${h.nombre ? ' — ' + h.nombre : ''}
+                <span class="hist-meta">${f} · ${h.resultado}</span>
+            </div>
+            <div class="hist-actions">
+                <button class="btn btn-secondary btn-sm" onclick="verReporteHistorial(${i})">Ver informe</button>
+                <button class="btn btn-secondary btn-sm" onclick="cargarDelHistorial(${i})">Cargar</button>
+                <button class="btn btn-danger btn-sm" onclick="borrarDelHistorial(${i})">✕</button>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function verReporteHistorial(i) {
+    const h = leerHistorial()[i];
+    if (!h) return;
+    const out = document.getElementById('reporte-output');
+    out.style.display = 'block';
+    out.textContent = h.reporte;
+    out.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function cargarDelHistorial(i) {
+    const h = leerHistorial()[i];
+    if (!h) return;
+    if (!confirm(`¿Cargar el estudio de ${h.id}? Se reemplazan los datos actuales del formulario.`)) return;
+    resetFormulario();
+    aplicarEstudio(h.estudio);
+    showNotice('Estudio cargado desde el historial.', 'ok');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function borrarDelHistorial(i) {
+    const lista = leerHistorial();
+    if (!lista[i]) return;
+    if (!confirm(`¿Borrar del historial el estudio de ${lista[i].id}?`)) return;
+    lista.splice(i, 1);
+    localStorage.setItem(HIST_KEY, JSON.stringify(lista));
+    renderHistorial();
+}
+
 function getResponseText(scRep, scEst) {
-    if (scRep <= 1 && scEst <= 1) return 'Normal';
-    if (scRep <= 1 && scEst > 1) return 'ISQUEMIA INDUCIBLE';
-    if (scRep > 1 && scEst < scRep && scEst <= 1) return 'VIABILIDAD';
-    if (scRep > 1 && scEst < scRep) return 'Mejoría (viabilidad probable)';
-    if (scRep > 1 && scEst > scRep) return 'Isquemia sobre necrosis';
-    if (scRep > 1 && scEst === scRep) return 'Necrosis / Cicatriz';
-    return '—';
+    const r = classifyResponse(scRep, scEst);
+    return r.key === 'isquemia' ? 'ISQUEMIA INDUCIBLE'
+         : r.key === 'viable' && scEst === 1 ? 'VIABILIDAD (normalización)'
+         : r.label;
 }
 
 function v(id) {
     const el = document.getElementById(id);
     return el ? el.value.trim() : '';
+}
+
+// Texto visible de un <select>. Un select con un valor que ya no existe queda en
+// selectedIndex −1: leer options[-1].text tira TypeError y mata al generador de informe.
+function textoSelect(id) {
+    const el = document.getElementById(id);
+    if (!el || el.selectedIndex < 0) return '—';
+    return el.options[el.selectedIndex].text;
+}
+
+// Imprime siempre sobre un informe generado (evita imprimir una hoja vacía)
+function imprimirReporte() {
+    const out = document.getElementById('reporte-output');
+    if (!out.textContent.trim()) generarReporte();
+    setTimeout(() => window.print(), 150);
 }
 
 function copiarReporte() {
@@ -859,10 +1716,12 @@ function copiarReporte() {
 function limpiarFormulario() {
     if (!confirm('¿Confirma iniciar un nuevo estudio? Se borrarán todos los datos.')) return;
     resetFormulario();
+    clearDraft();   // descartar el borrador guardado del estudio anterior
 }
 
 function resetFormulario() {
     document.querySelectorAll('input[type="text"], input[type="number"], textarea').forEach(el => {
+        if (CAMPOS_NO_ESTUDIO.includes(el.id)) return;   // la firma sobrevive al cambio de paciente
         el.value = '';
     });
     document.querySelectorAll('input[type="checkbox"]').forEach(el => el.checked = false);
@@ -876,7 +1735,13 @@ function resetFormulario() {
 
     document.getElementById('reporte-output').style.display = 'none';
     document.getElementById('resultado-banner').style.display = 'none';
+    document.getElementById('validacion-panel').style.display = 'none';
+    setFechaHoy();
     setProtocol('ejercicio');
+    setSpecialTab('viabilidad');
+    updateChecklistBadge();
+    calcEjercicio();
+    document.getElementById('aviso-adquisicion').style.display = 'none';
 }
 
 // ── PRESETS ───────────────────────────────────
@@ -923,8 +1788,8 @@ function applyPreset(name) {
     if (P.altura) setVal('altura', P.altura);
     calcBSA();
 
-    if (P.fc_reposo) setVal('fc_reposo', P.fc_reposo);
-    if (P.ta_reposo) setVal('ta_reposo', P.ta_reposo);
+    ['esf_basal_tas','esf_basal_tad','esf_basal_fc','esf_max_tas','esf_max_tad','esf_max_fc',
+     'esf_rec_tas','esf_rec_tad','esf_rec_fc','esf_max_sint'].forEach(k => { if (P[k]) setVal(k, P[k]); });
     if (P.ventana) setVal('ventana', P.ventana);
     if (P.indicacion) setVal('indicacion', P.indicacion);
 
@@ -935,15 +1800,11 @@ function applyPreset(name) {
     if (P.protocolo) {
         setProtocol(P.protocolo);
         if (P.protocolo === 'ejercicio') {
-            if (P.ej_modalidad) setVal('ej_modalidad', P.ej_modalidad);
-            if (P.ej_etapa) setVal('ej_etapa', P.ej_etapa);
-            if (P.ej_duracion) setVal('ej_duracion', P.ej_duracion);
-            if (P.ej_mets) setVal('ej_mets', P.ej_mets);
-            if (P.ej_fc_pico) setVal('ej_fc_pico', P.ej_fc_pico);
-            if (P.ej_ta_pico) setVal('ej_ta_pico', P.ej_ta_pico);
-            if (P.ej_motivo_fin) setVal('ej_motivo_fin', P.ej_motivo_fin);
+            ['ej_carga','ej_duracion','ej_mets','ej_seg_img','ej_fc_img','ej_causa_detencion']
+                .forEach(k => { if (P[k]) setVal(k, P[k]); });
             calcEjercicio();
         } else if (P.protocolo === 'dobutamina') {
+            ['dob_fc_reposo','dob_ta_reposo'].forEach(k => { if (P[k]) setVal(k, P[k]); });
             if (P.dob_dosis_max) setVal('dob_dosis_max', P.dob_dosis_max);
             if (P.dob_fc_pico) setVal('dob_fc_pico', P.dob_fc_pico);
             if (P.dob_atropina) setVal('dob_atropina', P.dob_atropina);
@@ -993,17 +1854,283 @@ function applyPreset(name) {
 
     onEdadChange();
     window.scrollTo({ top: 0, behavior: 'smooth' });
+    scheduleSave();
+}
+
+// ══════════════════════════════════════════════
+//  AUTOSAVE / RECUPERACIÓN DEL ESTUDIO EN CURSO
+// ══════════════════════════════════════════════
+const DRAFT_KEY = 'eco-estres-draft';
+const DRAFT_PENDIENTE_KEY = 'eco-estres-draft-pendiente';
+const DRAFT_VERSION = 2;
+const DRAFT_DEBOUNCE_MS = 600;
+
+// El autosave NUNCA se suspende. Mientras el aviso de recuperación está en pantalla
+// escribe en una clave separada, así lo que se carga en ese rato queda a salvo sin
+// pisar el borrador anterior. Al decidir, la clave elegida pasa a ser la definitiva.
+let autosaveEnabled = true;
+let draftKeyActual = DRAFT_KEY;    // dónde escribe el autosave ahora mismo
+let draftOfrecidoKey = null;       // qué clave está ofreciendo el aviso
+let saveTimer = null;
+
+// ── Captura de estado ─────────────────────────
+const CAMPOS_NO_ESTUDIO = ['firma_informe'];   // configuración del operador, no datos del paciente
+
+function captureFields() {
+    const data = {};
+    document.querySelectorAll('input[id], textarea[id], select[id]').forEach(el => {
+        if (CAMPOS_NO_ESTUDIO.includes(el.id)) return;
+        data[el.id] = el.type === 'checkbox' ? el.checked : el.value;
+    });
+    return data;
+}
+
+// Casillas FC/TA/síntomas de la tabla de dobutamina (se crean al vuelo, sin ID).
+// Se guardan por posición: una fila por cada <tr>, valores en orden de columna.
+function captureDobStages() {
+    const tbody = document.getElementById('dob-etapas');
+    if (!tbody) return [];
+    return Array.from(tbody.querySelectorAll('tr')).map(tr =>
+        Array.from(tr.querySelectorAll('input')).map(inp => inp.value)
+    );
+}
+
+// ── Guardado ──────────────────────────────────
+function saveDraft() {
+    try {
+        const draft = {
+            version: DRAFT_VERSION,
+            savedAt: new Date().toISOString(),
+            fields: captureFields(),
+            wm: { reposo: { ...WM.reposo }, estres: { ...WM.estres } },
+            protocol: currentProtocol,
+            specialTab: currentSpecialTab,
+            dobStages: captureDobStages(),
+            // El informe ya redactado también se guarda: si se cierra el navegador
+            // después de generarlo, vuelve tal cual y no hay que rehacerlo.
+            reporte: document.getElementById('reporte-output').textContent || ''
+        };
+        localStorage.setItem(draftKeyActual, JSON.stringify(draft));
+    } catch (e) {
+        console.warn('No se pudo guardar el borrador:', e);
+    }
+}
+
+function scheduleSave() {
+    if (!autosaveEnabled) return;
+    if (saveTimer) clearTimeout(saveTimer);
+    saveTimer = setTimeout(saveDraft, DRAFT_DEBOUNCE_MS);
+}
+
+function readDraft(key) {
+    try {
+        const raw = localStorage.getItem(key || DRAFT_KEY);
+        if (!raw) return null;
+        const d = JSON.parse(raw);
+        if (!d || d.version !== DRAFT_VERSION) return null; // versión incompatible: se ignora
+        return d;
+    } catch (e) {
+        return null;
+    }
+}
+
+function clearDraft() {
+    [DRAFT_KEY, DRAFT_PENDIENTE_KEY].forEach(k => {
+        try { localStorage.removeItem(k); } catch (e) { /* noop */ }
+    });
+    draftKeyActual = DRAFT_KEY;
+}
+
+// ── Restauración ──────────────────────────────
+function restoreFields(fields) {
+    if (!fields) return;
+    Object.entries(fields).forEach(([id, val]) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        if (el.type === 'checkbox') { el.checked = !!val; return; }
+        // Un select con un valor que ya no existe queda en selectedIndex −1 (en blanco)
+        // y hace explotar al generador de informe. Si el valor no está, se deja el actual.
+        if (el.tagName === 'SELECT' && val !== '' &&
+            !Array.from(el.options).some(o => o.value === val)) return;
+        el.value = val;
+    });
+}
+
+// ¿Hay algo cargado que valga la pena no pisar?
+function formularioTieneDatos() {
+    const conTexto = ['paciente_id', 'paciente_nombre', 'edad', 'peso', 'altura'].some(id => v(id));
+    const conMotilidad = SEGMENTS.some(s => WM.reposo[s.id] > 0 || WM.estres[s.id] > 0);
+    return conTexto || conMotilidad;
+}
+
+// Restauración DEFENSIVA de las etapas de dobutamina: solo rellena si la
+// estructura guardada coincide con la actual (misma cantidad de filas y de
+// casillas por fila). Si no coincide, omite y avisa en vez de meter datos corridos.
+function restoreDobStages(saved) {
+    if (!Array.isArray(saved) || saved.length === 0) return;
+    const tbody = document.getElementById('dob-etapas');
+    if (!tbody) return;
+    const rows = Array.from(tbody.querySelectorAll('tr'));
+
+    let structuraOk = rows.length === saved.length;
+    if (structuraOk) {
+        structuraOk = rows.every((tr, ri) =>
+            tr.querySelectorAll('input').length === saved[ri].length
+        );
+    }
+    if (!structuraOk) {
+        showNotice('No se pudieron restaurar las etapas de dobutamina (la tabla cambió). El resto del estudio sí se recuperó.', 'warn');
+        return;
+    }
+    rows.forEach((tr, ri) => {
+        tr.querySelectorAll('input').forEach((inp, ci) => { inp.value = saved[ri][ci]; });
+    });
+}
+
+// Aplica un estudio completo (borrador o entrada del historial) al formulario
+function aplicarEstudio(d) {
+    if (!d) return;
+
+    restoreFields(d.fields);
+
+    // Pestañas activas
+    if (d.protocol) setProtocol(d.protocol);
+    if (d.specialTab) setSpecialTab(d.specialTab);
+
+    // Bull's eye: recargar puntajes en memoria y redibujar con las funciones de la app
+    SEGMENTS.forEach(s => {
+        WM.reposo[s.id] = d.wm && d.wm.reposo && d.wm.reposo[s.id] != null ? d.wm.reposo[s.id] : 0;
+        WM.estres[s.id] = d.wm && d.wm.estres && d.wm.estres[s.id] != null ? d.wm.estres[s.id] : 0;
+    });
+    renderBullsEye('svg-reposo', 'reposo');
+    renderBullsEye('svg-estres', 'estres');
+    buildSegmentsTable();
+    updateWMSI();
+
+    // Recalcular todo lo derivado (no se guarda: se regenera)
+    calcBSA(); calcEjercicio(); calcDobutamina(); calcDipiridamol();
+    calcFEVI(); calcDiastolico(); calcCFR(); calcStrain(); calcEAo(); calcMCH();
+    updateResultBanner(); updateChecklistBadge();
+
+    // La planilla de dobutamina se restaura DESPUÉS de que calcDobutamina rearmó la tabla
+    restoreDobStages(d.dobStages);
+
+    // Informe ya redactado
+    const out = document.getElementById('reporte-output');
+    if (d.reporte) {
+        out.textContent = d.reporte;
+        out.style.display = 'block';
+    } else {
+        out.textContent = '';
+        out.style.display = 'none';
+    }
+}
+
+
+// ── Aviso de recuperación (sin auto-relleno) ──
+function showRecoveryBanner(draft, cuantos) {
+    let whenTxt = 'fecha desconocida';
+    if (draft.savedAt) {
+        const d = new Date(draft.savedAt);
+        if (!isNaN(d)) whenTxt = d.toLocaleString('es-AR',
+            { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    }
+    const quien = draft.fields && (draft.fields.paciente_id || draft.fields.paciente_nombre);
+    const bar = document.createElement('div');
+    bar.className = 'draft-banner';
+    bar.id = 'draft-recovery-banner';
+    bar.innerHTML = `
+        <span class="draft-banner-text">📋 Hay un estudio sin terminar${quien ? ' (' + quien + ')' : ''},
+            guardado el ${whenTxt}.${cuantos > 1 ? ' Se ofrece el más reciente de 2 borradores.' : ''}
+            <em>Mientras tanto podés cargar normalmente: lo que escribas ya se está guardando aparte.</em></span>
+        <span class="draft-banner-actions">
+            <button class="btn btn-primary btn-sm" id="draft-recover">Recuperar</button>
+            <button class="btn btn-secondary btn-sm" id="draft-discard">Descartar</button>
+        </span>`;
+    document.body.insertBefore(bar, document.body.firstChild);
+
+    document.getElementById('draft-recover').addEventListener('click', () => {
+        if (formularioTieneDatos() &&
+            !confirm('Ya cargaste datos en este formulario. Recuperar el estudio anterior los reemplaza. ¿Continuar?')) return;
+        const guardado = readDraft(draftOfrecidoKey);
+        resolverBorrador();
+        aplicarEstudio(guardado);
+        bar.remove();
+        saveDraft();
+        showNotice('Estudio recuperado.', 'ok');
+    });
+    document.getElementById('draft-discard').addEventListener('click', () => {
+        // Descartar borra el borrador VIEJO y conserva lo que haya en pantalla:
+        // si estuviste cargando mientras el aviso estaba visible, no se pierde nada.
+        resolverBorrador();
+        bar.remove();
+        saveDraft();
+    });
+}
+
+// Cierra la etapa de decisión: a partir de acá hay un solo borrador, el de siempre.
+function resolverBorrador() {
+    [DRAFT_KEY, DRAFT_PENDIENTE_KEY].forEach(k => {
+        try { localStorage.removeItem(k); } catch (e) { /* noop */ }
+    });
+    draftKeyActual = DRAFT_KEY;
+    draftOfrecidoKey = null;
+}
+
+// ── Notificación breve (toast) ────────────────
+function showNotice(msg, type) {
+    const n = document.createElement('div');
+    n.className = 'draft-notice' + (type === 'warn' ? ' draft-notice-warn' : type === 'ok' ? ' draft-notice-ok' : '');
+    n.textContent = msg;
+    document.body.appendChild(n);
+    requestAnimationFrame(() => n.classList.add('show'));
+    setTimeout(() => { n.classList.remove('show'); setTimeout(() => n.remove(), 400); }, 4500);
+}
+
+// ── Init del autosave ─────────────────────────
+function setupAutosave() {
+    // Desactivar el autocompletado/restauración nativa del navegador: así la ÚNICA
+    // forma de recuperar datos del estudio anterior es el botón "Recuperar", y nunca
+    // aparecen campos del paciente previo sin pasar por el aviso.
+    document.querySelectorAll('input, textarea, select').forEach(el => {
+        el.setAttribute('autocomplete', 'off');
+    });
+
+    // Un solo "escucha" general cubre todos los campos, incluso los que se crean al vuelo
+    document.addEventListener('input', scheduleSave, true);
+    document.addEventListener('change', scheduleSave, true);
+
+    // Borradores presentes. Puede haber dos si el navegador se cerró con el aviso abierto.
+    const candidatos = [DRAFT_KEY, DRAFT_PENDIENTE_KEY]
+        .map(k => ({ key: k, draft: readDraft(k) }))
+        .filter(c => c.draft);
+
+    autosaveEnabled = true;   // siempre activo, desde el primer momento
+
+    if (!candidatos.length) {
+        draftKeyActual = DRAFT_KEY;
+        return;
+    }
+
+    candidatos.sort((a, b) => new Date(b.draft.savedAt) - new Date(a.draft.savedAt));
+    draftOfrecidoKey = candidatos[0].key;
+    // Se escribe en la clave que NO se está ofreciendo, para no pisar lo que hay que recuperar
+    draftKeyActual = draftOfrecidoKey === DRAFT_KEY ? DRAFT_PENDIENTE_KEY : DRAFT_KEY;
+    showRecoveryBanner(candidatos[0].draft, candidatos.length);
 }
 
 const PRESETS = {
 
     negativo_normal: {
-        edad: 52, sexo: 'M', peso: 78, altura: 172, fc_reposo: 72, ta_reposo: '130/80',
+        edad: 52, sexo: 'M', peso: 78, altura: 172,
         ventana: 'buena', indicacion: 'diagnostico_isquemia',
         antecedentes: ['hta', 'dislipemia'],
         protocolo: 'ejercicio',
-        ej_modalidad: 'treadmill_bruce', ej_etapa: 'III', ej_duracion: '9:12', ej_mets: '10.1',
-        ej_fc_pico: '156', ej_ta_pico: '185/85', ej_motivo_fin: 'fc_maxima',
+        esf_basal_tas: '130', esf_basal_tad: '80', esf_basal_fc: '72',
+        esf_max_tas: '185', esf_max_tad: '85', esf_max_fc: '156',
+        esf_rec_tas: '150', esf_rec_tad: '82', esf_rec_fc: '132',
+        ej_carga: '4 discos / 6 kg', ej_duracion: '12:00', ej_mets: '9.5',
+        ej_causa_detencion: 'fc_objetivo', ej_seg_img: '45', ej_fc_img: '148',
         fevi_reposo: 62, fevi_pico: 68, fevi_recup: 64,
         e_prima_rep: '9', e_onda_rep: '72', e_prima_est: '12', e_onda_est: '95',
         wm: { reposo: allSegments(1), estres: allSegments(1) },
@@ -1011,24 +2138,30 @@ const PRESETS = {
     },
 
     negativo_submax: {
-        edad: 68, sexo: 'F', peso: 65, altura: 158, fc_reposo: 64, ta_reposo: '145/88',
+        edad: 68, sexo: 'F', peso: 65, altura: 158,
         ventana: 'regular', indicacion: 'diagnostico_isquemia',
         antecedentes: ['hta', 'dm', 'betabloq'],
         protocolo: 'ejercicio',
-        ej_modalidad: 'treadmill_bruce_mod', ej_etapa: 'II', ej_duracion: '5:40', ej_mets: '5.2',
-        ej_fc_pico: '108', ej_ta_pico: '170/92', ej_motivo_fin: 'agotamiento',
+        esf_basal_tas: '145', esf_basal_tad: '88', esf_basal_fc: '64',
+        esf_max_tas: '170', esf_max_tad: '92', esf_max_fc: '108',
+        esf_rec_tas: '155', esf_rec_tad: '85', esf_rec_fc: '94',
+        ej_carga: '2 discos / 3 kg', ej_duracion: '5:40', ej_mets: '5.2',
+        ej_causa_detencion: 'fatiga', ej_seg_img: '50', ej_fc_img: '100',
         fevi_reposo: 58, fevi_pico: 62,
         wm: { reposo: allSegments(1), estres: allSegments(1) },
         resultado: 'no_concluyente', territorio: 'ninguno'
     },
 
     isquemia_da: {
-        edad: 58, sexo: 'M', peso: 82, altura: 175, fc_reposo: 68, ta_reposo: '138/82',
+        edad: 58, sexo: 'M', peso: 82, altura: 175,
         ventana: 'buena', indicacion: 'diagnostico_isquemia',
         antecedentes: ['hta', 'tabaquismo', 'dislipemia'],
         protocolo: 'ejercicio',
-        ej_modalidad: 'treadmill_bruce', ej_etapa: 'II', ej_duracion: '6:30', ej_mets: '7.0',
-        ej_fc_pico: '148', ej_ta_pico: '178/88', ej_motivo_fin: 'isquemia',
+        esf_basal_tas: '138', esf_basal_tad: '82', esf_basal_fc: '68',
+        esf_max_tas: '178', esf_max_tad: '88', esf_max_fc: '148', esf_max_sint: 'Angina típica',
+        esf_rec_tas: '160', esf_rec_tad: '85', esf_rec_fc: '141',
+        ej_carga: '3 discos / 4,5 kg', ej_duracion: '8:00', ej_mets: '7.2',
+        ej_causa_detencion: 'angina', ej_seg_img: '40', ej_fc_img: '140',
         fevi_reposo: 58, fevi_pico: 52,
         wm: {
             reposo: allSegments(1),
@@ -1039,7 +2172,7 @@ const PRESETS = {
     },
 
     isquemia_cd: {
-        edad: 63, sexo: 'M', peso: 88, altura: 170, fc_reposo: 74, ta_reposo: '142/86',
+        edad: 63, sexo: 'M', peso: 88, altura: 170, dob_fc_reposo: '74', dob_ta_reposo: '142/86',
         ventana: 'buena', indicacion: 'diagnostico_isquemia',
         antecedentes: ['hta', 'dm', 'isquemia'],
         protocolo: 'dobutamina',
@@ -1055,7 +2188,7 @@ const PRESETS = {
     },
 
     isquemia_multi: {
-        edad: 66, sexo: 'M', peso: 90, altura: 168, fc_reposo: 76, ta_reposo: '150/92',
+        edad: 66, sexo: 'M', peso: 90, altura: 168, dob_fc_reposo: '76', dob_ta_reposo: '150/92',
         ventana: 'regular', indicacion: 'estratificacion_riesgo',
         antecedentes: ['hta', 'dm', 'tabaquismo', 'dislipemia', 'isquemia'],
         protocolo: 'dobutamina',
@@ -1071,7 +2204,7 @@ const PRESETS = {
     },
 
     viabilidad_bifasica: {
-        edad: 60, sexo: 'M', peso: 75, altura: 170, fc_reposo: 80, ta_reposo: '118/72',
+        edad: 60, sexo: 'M', peso: 75, altura: 170, dob_fc_reposo: '80', dob_ta_reposo: '118/72',
         ventana: 'buena', indicacion: 'viabilidad',
         antecedentes: ['isquemia', 'iam', 'crm'],
         protocolo: 'dobutamina',
@@ -1086,7 +2219,7 @@ const PRESETS = {
     },
 
     cicatriz: {
-        edad: 65, sexo: 'M', peso: 80, altura: 172, fc_reposo: 78, ta_reposo: '122/76',
+        edad: 65, sexo: 'M', peso: 80, altura: 172, dob_fc_reposo: '78', dob_ta_reposo: '122/76',
         ventana: 'buena', indicacion: 'viabilidad',
         antecedentes: ['isquemia', 'iam'],
         protocolo: 'dobutamina',
@@ -1101,12 +2234,16 @@ const PRESETS = {
     },
 
     diastolico_pos: {
-        edad: 55, sexo: 'F', peso: 68, altura: 160, fc_reposo: 70, ta_reposo: '140/88',
+        edad: 55, sexo: 'F', peso: 68, altura: 160,
         ventana: 'buena', indicacion: 'diastolico',
         antecedentes: ['hta'],
         protocolo: 'ejercicio',
-        ej_modalidad: 'bicicleta_supina', ej_etapa: 'II', ej_duracion: '7:00', ej_mets: '6.5',
-        ej_fc_pico: '145', ej_ta_pico: '195/95', ej_motivo_fin: 'sintomas',
+        esf_basal_tas: '140', esf_basal_tad: '88', esf_basal_fc: '70',
+        esf_max_tas: '195', esf_max_tad: '95', esf_max_fc: '145', esf_max_sint: 'Disnea',
+        esf_rec_tas: '170', esf_rec_tad: '90', esf_rec_fc: '128',
+        ej_carga: '2 discos / 3 kg', ej_duracion: '7:00', ej_mets: '6.5',
+        ej_causa_detencion: 'fatiga', ej_seg_img: '45', ej_fc_img: '138',
+        e_prima_lat_rep: '9', e_prima_lat_est: '8', vrt_rep: '2.4', vrt_est: '3.1',
         fevi_reposo: 60, fevi_pico: 65,
         e_prima_rep: '7', e_onda_rep: '65', e_prima_est: '6', e_onda_est: '110',
         wm: { reposo: allSegments(1), estres: allSegments(1) },
@@ -1115,11 +2252,14 @@ const PRESETS = {
     },
 
     mch_latente: {
-        edad: 42, sexo: 'M', peso: 75, altura: 176, fc_reposo: 62, ta_reposo: '120/78',
+        edad: 42, sexo: 'M', peso: 75, altura: 176,
         ventana: 'buena', indicacion: 'mch',
         protocolo: 'ejercicio',
-        ej_modalidad: 'treadmill_bruce', ej_etapa: 'III', ej_duracion: '8:45', ej_mets: '9.5',
-        ej_fc_pico: '162', ej_ta_pico: '165/80', ej_motivo_fin: 'sintomas',
+        esf_basal_tas: '120', esf_basal_tad: '78', esf_basal_fc: '62',
+        esf_max_tas: '165', esf_max_tad: '80', esf_max_fc: '162', esf_max_sint: 'Disnea',
+        esf_rec_tas: '140', esf_rec_tad: '78', esf_rec_fc: '140',
+        ej_carga: '5 discos / 7,5 kg', ej_duracion: '8:45', ej_mets: '9.5',
+        ej_causa_detencion: 'fatiga', ej_seg_img: '40', ej_fc_img: '150',
         fevi_reposo: 68, fevi_pico: 75,
         wm: { reposo: allSegments(1), estres: allSegments(1) },
         mch_grad_reposo: '18', mch_grad_estres: '72', mch_sam: 'inducido', mch_patologia: 'mch',
@@ -1128,7 +2268,7 @@ const PRESETS = {
     },
 
     eao_bajo_flujo: {
-        edad: 72, sexo: 'M', peso: 70, altura: 166, fc_reposo: 82, ta_reposo: '110/68',
+        edad: 72, sexo: 'M', peso: 70, altura: 166, dob_fc_reposo: '82', dob_ta_reposo: '110/68',
         ventana: 'regular', indicacion: 'estenosis_ao',
         antecedentes: ['hta', 'isquemia', 'valv'],
         protocolo: 'dobutamina',
