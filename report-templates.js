@@ -20,12 +20,24 @@ const NARRATIVA = {
     // Frase de respuestas hemodinámicas: una sola de estas, según el caso
     respuestaNormal:      'La respuesta tensional fue normotensiva y la respuesta cronotrópica adecuada.',
     respuestaHipertensiva:'Durante el esfuerzo presentó respuesta hipertensiva, con TA pico de {{taPico}} mmHg partiendo de {{taBasal}} mmHg basal.',
+    // Si el basal ya era hipertensivo, el dato es del paciente y no sólo de la prueba
+    respuestaHipertensivaBasalAlta:'Durante el esfuerzo presentó respuesta hipertensiva, con TA pico de {{taPico}} mmHg, ' +
+                          'partiendo de cifras basales ya elevadas ({{taBasal}} mmHg).',
     respuestaHipotensiva: 'Durante el esfuerzo presentó descenso tensional, de {{taBasal}} mmHg basales a {{taPico}} mmHg en el pico, motivo por el cual se detuvo la prueba.',
     respuestaFCSubóptima: 'Alcanzó {{fcPico}} lpm, correspondiente al {{pctFCmax}} % de la FC máxima predicha, sin lograr el objetivo del 85 %{{betabloqueante}}.',
 
     // ── CALIDAD ───────────────────────────────────────────────────────
     calidad:          'La ventana acústica fue {{ventana}}. Las imágenes post-esfuerzo se adquirieron a los {{segImagen}} segundos ' +
                       'del fin del ejercicio, con una FC de {{fcImagen}} lpm ({{pctFCadq}} % de la FC pico){{coletillaAdq}}.',
+    // Sin los datos de adquisición cargados, la frase se omite entera:
+    // un informe con rayitas se lee como algo a medio hacer.
+    calidadSola:       'La ventana acústica fue {{ventana}}.',
+    calidadSoloSegundos:'La ventana acústica fue {{ventana}}. Las imágenes post-esfuerzo se adquirieron a los ' +
+                      '{{segImagen}} segundos del fin del ejercicio.',
+    calidadLimitadaSola:'La ventana acústica fue limitada, con adecuada visualización de solo {{segEvaluados}} de los 17 segmentos.',
+    // Si igual se pudieron evaluar los 17, "solo 17 de los 17" se contradice solo
+    calidadLimitadaSinConteo:'La ventana acústica fue limitada.',
+
     coletillaAdqUtil: ', dentro de la ventana útil para la detección de isquemia',
     coletillaAdqTardia: ', por debajo del rango óptimo para la detección de isquemia',
     calidadLimitada:  'La ventana acústica fue limitada, con adecuada visualización de solo {{segEvaluados}} de los 17 segmentos. ' +
@@ -137,6 +149,12 @@ const NARRATIVA = {
 
         fcSuboptima: ' al doble producto alcanzado, con la limitación de no haberse alcanzado la FC objetivo, lo que reduce la sensibilidad ' +
                      'del estudio. De persistir la sospecha clínica, considerar apremio farmacológico',
+
+        // Versión oración, para engancharse después de un núcleo que ya cerró con punto
+        // (secuela, diastólico). Un estudio sin isquemia y con FC insuficiente no es
+        // un negativo pleno, cualquiera sea la rama por la que haya salido.
+        fcSuboptimaOracion: ' El estudio se realizó con la limitación de no haberse alcanzado la FC objetivo, ' +
+                     'lo que reduce su sensibilidad; de persistir la sospecha clínica, considerar apremio farmacológico.',
 
         // Esta frase NO está en el Word: la redacté siguiendo el criterio de la versión 9.
         adquisicionTardia: ', con la limitación de una adquisición post-esfuerzo tardía ({{segImagen}} segundos, FC al adquirir ' +

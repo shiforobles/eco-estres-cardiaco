@@ -1236,7 +1236,10 @@ function recolectarHallazgos() {
     H.fcPico  = num('esf_max_fc');
     H.fcRec   = num('esf_rec_fc');
     H.tasBasal = num('esf_basal_tas');
+    H.tadBasal = num('esf_basal_tad');
     H.tasPico  = num('esf_max_tas');
+    // 140/90 ya es hipertensión: el dato es del paciente, no sólo de la prueba
+    H.basalElevada = H.tasBasal >= 140 || H.tadBasal >= 90;
     H.taBasal = taFila('basal');
     H.taPico  = taFila('max');
     H.dobleProducto = (H.fcPico > 0 && H.tasPico > 0) ? H.fcPico * H.tasPico : 0;
@@ -1425,7 +1428,8 @@ function construirNarrativa(H) {
     if (H.hipotension) {
         metodo.push(rellenar(T.respuestaHipotensiva, { taBasal: H.taBasal || nada, taPico: H.taPico || nada }));
     } else if (H.hipertension) {
-        metodo.push(rellenar(T.respuestaHipertensiva, { taPico: H.taPico || nada, taBasal: H.taBasal || nada }));
+        metodo.push(rellenar(H.basalElevada ? T.respuestaHipertensivaBasalAlta : T.respuestaHipertensiva,
+            { taPico: H.taPico || nada, taBasal: H.taBasal || nada }));
     } else if (H.fcSuboptima) {
         metodo.push(rellenar(T.respuestaFCSubóptima, {
             fcPico: H.fcPico || nada, pctFCmax: H.pctFCmax || nada,
@@ -1445,7 +1449,17 @@ function construirNarrativa(H) {
         segEvaluados: H.segEvaluados,
         coletillaAdq: H.pctFCadq ? (H.adquisicionTardia ? T.coletillaAdqTardia : T.coletillaAdqUtil) : ''
     };
-    parrafos.push(rellenar(H.ventana === 'limitada' ? T.calidadLimitada : T.calidad, datosCalidad));
+    const hayAdquisicion = H.segImagen > 0 || H.fcImagen > 0;
+    let plantillaCalidad;
+    if (H.ventana === 'limitada') {
+        if (H.fcImagen > 0) plantillaCalidad = T.calidadLimitada;
+        else plantillaCalidad = H.segEvaluados >= 17 ? T.calidadLimitadaSinConteo : T.calidadLimitadaSola;
+    } else if (H.fcImagen > 0) {
+        plantillaCalidad = T.calidad;
+    } else {
+        plantillaCalidad = hayAdquisicion ? T.calidadSoloSegundos : T.calidadSola;
+    }
+    parrafos.push(rellenar(plantillaCalidad, datosCalidad));
 
     // ── Datos del trastorno de conducción, comunes a los tres bloques ──
     const cond = H.conduccionProsa || {};
@@ -1545,9 +1559,14 @@ function construirNarrativa(H) {
     });
 
     // Modificadores: se insertan antes del punto final
-    const extras = [];
+    const extras = [];            // coletillas: se enganchan antes del punto final
+    const oracionesFinales = [];  // oraciones completas: van después
     if (H.hipertension && rama !== 'noConcluyente') extras.push(T.modificadores.hipertensiva);
     if (H.fcSuboptima && rama === 'negativa') extras.push(T.modificadores.fcSuboptima);
+    // En un positivo la isquemia ya quedó demostrada y la FC insuficiente no lo invalida;
+    // en un estudio sin isquemia, sí: no es un negativo pleno.
+    const sinIsquemiaDemostrada = ['secuela', 'diastolico'].includes(rama);
+    if (H.fcSuboptima && sinIsquemiaDemostrada) oracionesFinales.push(T.modificadores.fcSuboptimaOracion);
     if (H.adquisicionTardia && rama !== 'noConcluyente')
         extras.push(rellenar(T.modificadores.adquisicionTardia, { segImagen: H.segImagen, pctFCadq: H.pctFCadq }));
     if (H.caidaFey && rama !== 'positivaMulti' && rama !== 'hipotensiva') extras.push(T.modificadores.caidaFey);
@@ -1559,6 +1578,7 @@ function construirNarrativa(H) {
     }
 
     if (extras.length) conclusion = conclusion.replace(/\.$/, '') + extras.join('') + '.';
+    if (oracionesFinales.length) conclusion += oracionesFinales.join('');
     if (H.categorizacion) conclusion += ' ' + rellenar(T.categorizacion, { categorizacion: H.categorizacion });
     parrafos.push(conclusion);
 
@@ -1670,6 +1690,9 @@ function validarEstudio(rama) {
         if (resultado && esperado && resultado !== esperado)
             av.push({ nivel: 'warn', txt: `El informe narrativo salió por la rama "${rama}" pero el resultado elegido a mano es otro. Verificá cuál corresponde.` });
     }
+
+    if (document.getElementById('ventana').value === 'limitada' && cnt.evalRep >= 17 && cnt.evalEst >= 17)
+        av.push({ nivel: 'warn', txt: 'Marcaste ventana limitada pero evaluaste los 17 segmentos. El informe sale por la rama NO CONCLUYENTE: verificá si la ventana fue realmente limitada.' });
 
     const conduccion = document.getElementById('ecg_conduccion').value;
     if (conduccion && conduccion !== 'ninguno') {
