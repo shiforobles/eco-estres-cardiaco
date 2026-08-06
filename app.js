@@ -74,6 +74,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (el) el.addEventListener('change', calcEjercicio);
     });
 
+    // Cambiar el trastorno de conducción reclasifica los segmentos septales:
+    // hay que rehacer el resumen de motilidad y el aviso del WMSI.
+    ['change', 'input'].forEach(ev =>
+        document.getElementById('ecg_conduccion').addEventListener(ev, updateWMSI));
+
     // Fecha del estudio: por defecto hoy
     setFechaHoy();
     initFirma();
@@ -657,6 +662,28 @@ function updateMotilidadResumen(wmsiRep, wmsiEst) {
 
     document.getElementById('territorios-sugeridos').textContent =
         c.territorios.length ? c.territorios.join(' + ') : '—';
+
+    avisarWMSIConduccion();
+}
+
+// Aviso de pantalla: con trastorno de conducción los segmentos septales inflan el WMSI
+// sin que haya isquemia ni necrosis. No se escribe en el informe, es para el operador.
+function avisarWMSIConduccion() {
+    const aviso = document.getElementById('aviso-conduccion');
+    if (!aviso) return;
+    const sel = document.getElementById('ecg_conduccion');
+    const conduccion = sel ? sel.value : 'ninguno';
+    if (!conduccion || conduccion === 'ninguno') { aviso.style.display = 'none'; return; }
+
+    const alterados = SEGMENTOS_SEPTALES.filter(id => WM.reposo[id] > 1 || WM.estres[id] > 1);
+    if (!alterados.length) { aviso.style.display = 'none'; return; }
+
+    const nombre = (CONDUCCION_PROSA[conduccion] || {}).trastorno || 'el trastorno de conducción';
+    aviso.style.display = 'block';
+    aviso.innerHTML = `<strong>⚠ WMSI sobreestimado.</strong> ${alterados.length} segmento(s) septal(es) ` +
+        `(${alterados.join(', ')}) están alterados por ${nombre}, no por isquemia ni necrosis. ` +
+        `El WMSI que muestra la tabla los incluye y queda inflado. ` +
+        `<strong>En el informe quedan excluidos</strong>: no se describen como secuela ni se atribuyen a un territorio coronario.`;
 }
 
 // ── TABLA SEGMENTOS ───────────────────────────
@@ -1169,6 +1196,11 @@ Eco Estrés Cardíaco v1.1 — Calculadora Clínica
 //  El texto vive en report-templates.js; acá no se redacta nada.
 // ══════════════════════════════════════════════
 
+// Segmentos septales afectados por la activación eléctrica anómala.
+// El apical septal (14) queda FUERA a propósito: la asincronía del BCRI es
+// sobre todo basal y media, y excluirlo perdería isquemia apical de la DA.
+const SEGMENTOS_SEPTALES = [2, 3, 8, 9];
+
 // ── Capa 1: recolector de hechos ──────────────
 // Devuelve un objeto plano, sin una sola palabra de informe.
 function recolectarHallazgos() {
@@ -1231,19 +1263,34 @@ function recolectarHallazgos() {
     H.stMm = v('ecg_st_mm');
     H.stDeriv = v('ecg_st_deriv');
 
+    // Trastorno de conducción
+    H.conduccion = document.getElementById('ecg_conduccion').value;
+    H.hayConduccion = !!H.conduccion && H.conduccion !== 'ninguno';
+    H.conduccionProsa = H.hayConduccion ? CONDUCCION_PROSA[H.conduccion] : null;
+
     // Síntomas del máximo esfuerzo
     H.sintomasEsfuerzo = v('esf_max_sint');
 
     // ── Motilidad ──
-    const isquemicos = [], secuelas = [];
+    // Con trastorno de conducción los segmentos septales se apartan ANTES de clasificar:
+    // su alteración es eléctrica, no isquémica ni necrótica. Al quedar fuera de `secuelas`
+    // e `isquemicos`, la rama de secuela se vuelve inalcanzable por construcción y no se
+    // les atribuye ningún territorio coronario.
+    const isquemicos = [], secuelas = [], septales = [];
     SEGMENTS.forEach(s => {
         const r = WM.reposo[s.id], e = WM.estres[s.id];
         const c = classifyResponse(r, e);
+        if (H.hayConduccion && SEGMENTOS_SEPTALES.includes(s.id)) {
+            if (r > 1 || e > 1) septales.push({ ...s, scoreReposo: r, scoreEstres: e });
+            return;
+        }
         if (c.key === 'isquemia' || c.key === 'isquemia_necrosis') isquemicos.push({ ...s, scoreEstres: e });
         if (c.key === 'cicatriz') secuelas.push({ ...s, scoreReposo: r });
     });
     isquemicos.sort((a, b) => a.id - b.id);
     secuelas.sort((a, b) => a.id - b.id);
+    septales.sort((a, b) => a.id - b.id);
+    H.septalesConduccion = septales;
 
     H.isquemicos = isquemicos;
     H.secuelas = secuelas;
@@ -1315,16 +1362,25 @@ function gradoEnProsa(segs, campo) {
     return GRADO_PROSA[peor] || 'alteración de la motilidad';
 }
 
-// Frase de acompañamiento: cambios del ST y/o síntomas
+// Frase de acompañamiento: cambios del ST y/o síntomas.
+// Si no hubo nada, se dice explícitamente: en un positivo por imagen, que el ECG
+// haya sido mudo es información clínica y no debe quedar omitida.
 function acompanamientoEnProsa(H) {
+    const T = NARRATIVA;
     const partes = [];
     if (H.stTipo) {
         const tipo = H.stTipo === 'supra' ? 'supradesnivel del ST' : 'infradesnivel del ST';
         partes.push(tipo + (H.stMm ? ` de ${H.stMm} mm` : '') + (H.stDeriv ? ` en ${H.stDeriv}` : ''));
     }
     if (H.sintomasEsfuerzo) partes.push(H.sintomasEsfuerzo.toLowerCase());
-    if (!partes.length) return '';
-    return ` Se acompañó de ${listarEnProsa(partes)} al doble producto alcanzado.`;
+
+    if (!partes.length) {
+        return H.hayConduccion ? T.acompanamientoConduccionSinHallazgos : T.acompanamientoSinHallazgos;
+    }
+    // Con trastorno de conducción el hallazgo del ST se describe, pero aclarando
+    // en la misma frase que no es valorable.
+    const plantilla = (H.hayConduccion && H.stTipo) ? T.acompanamientoConduccion : T.acompanamiento;
+    return rellenar(plantilla, { lista: listarEnProsa(partes) });
 }
 
 // Rellena {{marcadores}} y borra los que quedaron vacíos
@@ -1373,6 +1429,16 @@ function construirNarrativa(H) {
     };
     parrafos.push(rellenar(H.ventana === 'limitada' ? T.calidadLimitada : T.calidad, datosCalidad));
 
+    // ── Datos del trastorno de conducción, comunes a los tres bloques ──
+    const cond = H.conduccionProsa || {};
+    const datosConduccion = {
+        trastorno: cond.trastorno || '',
+        alTrastorno: cond.alTrastorno || '',
+        hallazgoSeptal: cond.hallazgoSeptal || '',
+        segmentosSeptales: segmentosEnProsa(H.septalesConduccion || [])
+    };
+    const hayAsincronia = H.hayConduccion && (H.septalesConduccion || []).length > 0;
+
     // ── REPOSO ──
     const datosReposo = {
         fey: H.feyReposo || nada,
@@ -1387,10 +1453,17 @@ function construirNarrativa(H) {
     };
     let plantillaReposo;
     if (H.secuelas.length) plantillaReposo = T.reposoSecuela;
+    else if (hayAsincronia) plantillaReposo = T.reposoConduccion;
     else if (rama === 'diastolico') plantillaReposo = T.reposoDiastolico;
     else if (rama === 'negativa') plantillaReposo = T.reposoNormalLargo;
     else plantillaReposo = T.reposoNormalCorto;
-    parrafos.push(rellenar(plantillaReposo, datosReposo));
+
+    let parrafoReposo = rellenar(plantillaReposo, { ...datosReposo, ...datosConduccion });
+    // Secuela real en un territorio + asincronía septal por conducción: van las dos cosas
+    if (H.secuelas.length && hayAsincronia) {
+        parrafoReposo += ' ' + rellenar(T.asincroniaSeptalSuelta, datosConduccion);
+    }
+    parrafos.push(parrafoReposo);
 
     // ── ESFUERZO ──
     const acompanamiento = acompanamientoEnProsa(H);
@@ -1420,11 +1493,17 @@ function construirNarrativa(H) {
         positivaUnico: T.esfuerzoPositivoUnico,
         secuela:       T.esfuerzoSecuela,
         diastolico:    T.esfuerzoDiastolico,
-        negativa:      H.hipertension ? T.esfuerzoHipertensiva
+        negativa:      hayAsincronia ? T.esfuerzoConduccion
+                     : H.hipertension ? T.esfuerzoHipertensiva
                      : H.fcSuboptima ? T.esfuerzoFCSuboptima
                      : T.esfuerzoNegativo
     }[rama];
     let parrafoEsfuerzo = rellenar(plantillaEsfuerzo, datosEsfuerzo);
+
+    // En las ramas que no son la negativa, la limitación septal se suma al párrafo
+    if (hayAsincronia && rama !== 'negativa') {
+        parrafoEsfuerzo += ' ' + T.limitacionSeptalEsfuerzo;
+    }
 
     // Secuela previa + isquemia nueva en otro territorio: se suma el párrafo de secuela
     if (H.secuelas.length && H.isquemicos.length) {
@@ -1434,8 +1513,11 @@ function construirNarrativa(H) {
 
     // ── CONCLUSIÓN ──
     // Con FC subóptima la conclusión negativa arranca corta: la limitación es el foco
-    const claveConclusion = (rama === 'negativa' && H.fcSuboptima) ? 'negativaCorta' : rama;
+    let claveConclusion = rama;
+    if (rama === 'negativa' && H.hayConduccion) claveConclusion = 'negativaConduccion';
+    else if (rama === 'negativa' && H.fcSuboptima) claveConclusion = 'negativaCorta';
     let conclusion = rellenar(T.conclusiones[claveConclusion], {
+        ...datosConduccion,
         capacidadFuncional: H.capacidadFuncional || 'adecuada tolerancia al esfuerzo',
         territorioFrase: territorioFrase(H.territoriosIsquemia),
         territorioSecuelaFrase: territorioFrase(H.territoriosSecuela),
@@ -1450,6 +1532,12 @@ function construirNarrativa(H) {
     if (H.adquisicionTardia && rama !== 'noConcluyente')
         extras.push(rellenar(T.modificadores.adquisicionTardia, { segImagen: H.segImagen, pctFCadq: H.pctFCadq }));
     if (H.caidaFey && rama !== 'positivaMulti' && rama !== 'hipotensiva') extras.push(T.modificadores.caidaFey);
+    if (H.hayConduccion && rama !== 'negativa') {
+        // Si ya se demostró isquemia en la DA con segmentos valorables, hablar de
+        // especificidad reducida en ese territorio contradiría el propio hallazgo.
+        const clave = H.territoriosIsquemia.includes('DA') ? 'conduccionSeptalAcotado' : 'conduccionSeptal';
+        extras.push(rellenar(T.modificadores[clave], datosConduccion));
+    }
 
     if (extras.length) conclusion = conclusion.replace(/\.$/, '') + extras.join('') + '.';
     if (H.categorizacion) conclusion += ' ' + rellenar(T.categorizacion, { categorizacion: H.categorizacion });
@@ -1562,6 +1650,17 @@ function validarEstudio(rama) {
                            diastolico: 'diastolico_positivo', secuela: 'negativo' }[rama];
         if (resultado && esperado && resultado !== esperado)
             av.push({ nivel: 'warn', txt: `El informe narrativo salió por la rama "${rama}" pero el resultado elegido a mano es otro. Verificá cuál corresponde.` });
+    }
+
+    const conduccion = document.getElementById('ecg_conduccion').value;
+    if (conduccion && conduccion !== 'ninguno') {
+        if (document.getElementById('ecg_st_tipo').value)
+            av.push({ nivel: 'warn', txt: 'Cargaste cambios del ST con un trastorno de conducción: el informe los describe pero deja constancia de que el análisis del ST no es valorable.' });
+        const septalesAlterados = SEGMENTOS_SEPTALES.filter(id => WM.reposo[id] > 1 || WM.estres[id] > 1);
+        if (septalesAlterados.length && resultado === 'positivo' && cnt.isquemicos === 0)
+            av.push({ nivel: 'error', txt: 'Resultado POSITIVO sostenido sólo por segmentos septales con trastorno de conducción: esa alteración es eléctrica, no isquémica. Revisá el resultado.' });
+        if (septalesAlterados.length)
+            av.push({ nivel: 'info', txt: `${septalesAlterados.length} segmento(s) septal(es) quedan fuera del análisis isquémico por el trastorno de conducción. El WMSI de la tabla los sigue incluyendo.` });
     }
 
     const preFaltantes = Array.from(document.querySelectorAll('.chk-pre')).filter(c => !c.checked).length;

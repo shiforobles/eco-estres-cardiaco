@@ -71,6 +71,25 @@ const NARRATIVA = {
 
     esfuerzoHipotensiva: 'Con el esfuerzo se objetivaron {{hallazgos}}, con caída de la FEy de {{feyReposo}} % a {{feyEstres}} %.',
 
+    // ── TRASTORNO DE CONDUCCIÓN ───────────────────────────────────────
+    // En BCRI, marcapasos o preexcitación el septum se mueve mal por activación
+    // eléctrica anómala, no por isquemia ni necrosis: no se atribuye a un vaso.
+    reposoConduccion: 'En reposo se observó {{hallazgoSeptal}}, con asincronía de los segmentos {{segmentosSeptales}}, ' +
+                       'atribuible {{alTrastorno}} y no a secuela isquémica. El resto de los segmentos presentó motilidad ' +
+                       'conservada, con FEy {{fey}} % y relación E/e\' de {{ee}}.',
+
+    // Cuando además hay secuela real en otro territorio, esta frase se suma al párrafo de reposo
+    asincroniaSeptalSuelta: 'Se observó además {{hallazgoSeptal}}, con asincronía de los segmentos {{segmentosSeptales}}, ' +
+                       'atribuible {{alTrastorno}} y no a secuela isquémica.',
+
+    esfuerzoConduccion: 'Con el esfuerzo los segmentos no septales mostraron adecuada respuesta hiperdinámica, sin nuevas ' +
+                       'alteraciones de la motilidad. La evaluación de los segmentos septales se encuentra limitada por el ' +
+                       'trastorno de conducción, que genera alteraciones del movimiento septal no atribuibles a isquemia.',
+
+    // Se suma al párrafo de esfuerzo cuando la rama no es la negativa
+    limitacionSeptalEsfuerzo: 'La evaluación de los segmentos septales se encuentra limitada por el trastorno de conducción, ' +
+                       'que genera alteraciones del movimiento septal no atribuibles a isquemia.',
+
     // Párrafo que se agrega cuando hay secuela previa Y además isquemia nueva en otro territorio
     parrafoSecuelaAgregado: '{{segmentosSecuelaArt}} con alteración basal ({{segmentosSecuela}}, {{territorioSecuelaFrase}}) no modificaron su ' +
                        'motilidad con el esfuerzo, sin evidencia de reserva contráctil, en relación con secuela.',
@@ -83,6 +102,11 @@ const NARRATIVA = {
 
         // Versión corta, para cuando la conclusión sigue con la limitación de FC subóptima
         negativaCorta: 'Conclusión: prueba de eco estrés con ejercicio negativa para isquemia miocárdica inducible.',
+
+        negativaConduccion: 'Conclusión: prueba negativa para isquemia miocárdica inducible en los territorios evaluables. ' +
+                  'La presencia de {{trastorno}} limita la valoración de los segmentos septales y reduce la especificidad del ' +
+                  'estudio en territorio de la descendente anterior, además de invalidar el análisis del segmento ST. ' +
+                  'De persistir la sospecha clínica en dicho territorio, considerar apremio con dipiridamol o método de perfusión.',
 
         positivaUnico: 'Conclusión: prueba de eco estrés con ejercicio positiva para isquemia miocárdica inducible en {{territorioFrase}}. ' +
                   'Se sugiere correlación clínica y evaluación por cinecoronariografía.',
@@ -116,8 +140,30 @@ const NARRATIVA = {
         adquisicionTardia: ', con la limitación de una adquisición post-esfuerzo tardía ({{segImagen}} segundos, FC al adquirir ' +
                      '{{pctFCadq}} % de la FC pico), lo que reduce la sensibilidad del estudio',
 
-        caidaFey: '. La caída de la fracción de eyección con el esfuerzo constituye un marcador de alto riesgo'
+        caidaFey: '. La caída de la fracción de eyección con el esfuerzo constituye un marcador de alto riesgo',
+
+        // Limitación septal para ramas que NO son la negativa.
+        // Versión completa: no se demostró isquemia en la DA, así que su especificidad queda comprometida.
+        conduccionSeptal: '. La presencia de {{trastorno}} limita la valoración de los segmentos septales y reduce la ' +
+                     'especificidad del estudio en territorio de la descendente anterior, además de invalidar el análisis ' +
+                     'del segmento ST. De persistir la sospecha clínica en dicho territorio, considerar apremio con ' +
+                     'dipiridamol o método de perfusión',
+
+        // Versión acotada: ya hay isquemia demostrada en la DA por segmentos valorables,
+        // así que hablar de especificidad reducida en ese territorio contradiría el hallazgo.
+        conduccionSeptalAcotado: '. La presencia de {{trastorno}} limita la valoración de los segmentos septales e ' +
+                     'invalida el análisis del segmento ST'
     },
+
+    // ── FRASE DE ACOMPAÑAMIENTO (ST-T y síntomas) ─────────────────────
+    // En un positivo por imagen, que el ECG haya sido mudo es información relevante:
+    // se dice explícitamente en lugar de omitirse.
+    acompanamiento:            ' Se acompañó de {{lista}} al doble producto alcanzado.',
+    acompanamientoSinHallazgos:' No presentó cambios del ST-T ni angina.',
+    acompanamientoConduccion:  ' Se acompañó de {{lista}} al doble producto alcanzado; el análisis del segmento ST no es ' +
+                               'valorable por el trastorno de conducción.',
+    acompanamientoConduccionSinHallazgos: ' No presentó angina; el análisis del segmento ST no es valorable por el ' +
+                               'trastorno de conducción.',
 
     categorizacion: 'Categorización: {{categorizacion}}.',
 
@@ -141,6 +187,26 @@ const TERRITORIO_PROSA = {
     DA: 'la arteria descendente anterior',
     CD: 'la arteria coronaria derecha',
     Cx: 'la arteria circunfleja'
+};
+
+// ── Trastorno de conducción → cómo se nombra en la prosa ──
+// `alTrastorno` ya trae la preposición contraída para que la frase cierre bien.
+const CONDUCCION_PROSA = {
+    bcri: {
+        trastorno:     'bloqueo completo de rama izquierda',
+        alTrastorno:   'al bloqueo completo de rama izquierda',
+        hallazgoSeptal:'movimiento septal paradójico'
+    },
+    marcapasos: {
+        trastorno:     'ritmo de marcapasos',
+        alTrastorno:   'al ritmo de marcapasos',
+        hallazgoSeptal:'movimiento septal paradójico por estimulación ventricular derecha'
+    },
+    preexcitacion: {
+        trastorno:     'preexcitación ventricular',
+        alTrastorno:   'a la preexcitación ventricular',
+        hallazgoSeptal:'alteración del movimiento septal por activación ventricular anómala'
+    }
 };
 
 // ── Causa de detención → cómo se dice dentro de la frase ──
