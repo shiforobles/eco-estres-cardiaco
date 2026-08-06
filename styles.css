@@ -895,3 +895,13 @@ details[open] summary::after { content: ' ▲'; }
 .firma-config { margin-bottom: 1rem; max-width: 480px; }
 .firma-nota { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
 @media print { .firma-config { display: none !important; } }
+
+/* ── Historial: acciones de jornada ── */
+.historial-acciones {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    margin: 0.75rem 0 1rem;
+}
+.historial-nota { font-size: var(--font-size-xs); color: var(--color-text-secondary); }

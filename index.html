@@ -1061,8 +1061,13 @@
             </summary>
             <p class="module-description" style="margin-top:0.75rem">
                 Los estudios guardados quedan en <strong>este navegador y esta computadora</strong> (localStorage). No se envían a ningún servidor.
-                Sirven como respaldo dentro de la jornada; el registro definitivo es el informe firmado en la historia clínica.
+                Son un <strong>respaldo dentro de la jornada</strong>, no un archivo: se descartan solos a las 12 horas y el registro
+                definitivo es el informe firmado en la historia clínica.
             </p>
+            <div class="historial-acciones">
+                <button class="btn btn-danger btn-sm" onclick="cerrarJornada()">🔒 Cerrar jornada</button>
+                <span class="historial-nota">Vacía el historial de esta computadora. Usalo al terminar el día.</span>
+            </div>
             <div id="historial-lista"></div>
         </details>
     </section>

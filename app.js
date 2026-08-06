@@ -86,7 +86,7 @@ document.addEventListener('DOMContentLoaded', () => {
     calcEjercicio();
     document.querySelectorAll('.chk-pre').forEach(el => el.addEventListener('change', updateChecklistBadge));
     updateChecklistBadge();
-    renderHistorial();
+    renderHistorial(true);
 
     // Autosave / recuperación del estudio en curso (al final, con todo ya construido)
     setupAutosave();
@@ -1741,15 +1741,55 @@ function updateChecklistBadge() {
 // ══════════════════════════════════════════════
 const HIST_KEY = 'eco-estres-historial';
 const HIST_MAX = 50;
+const HIST_VIDA_MS = 12 * 60 * 60 * 1000;   // el historial es respaldo de la jornada, no archivo
 
 function leerHistorial() {
     try { return JSON.parse(localStorage.getItem(HIST_KEY)) || []; }
     catch (e) { return []; }
 }
 
+// Descarta lo que pasó las 12 h. Devuelve cuántos se fueron, para poder avisarlo:
+// borrar datos de pacientes en silencio sería peor que no borrarlos.
+function purgarHistorialVencido() {
+    const lista = leerHistorial();
+    if (!lista.length) return 0;
+    const limite = Date.now() - HIST_VIDA_MS;
+    const vigentes = lista.filter(h => (h.ts || 0) >= limite);
+    if (vigentes.length === lista.length) return 0;
+    try { localStorage.setItem(HIST_KEY, JSON.stringify(vigentes)); } catch (e) { return 0; }
+    return lista.length - vigentes.length;
+}
+
+// Fin del día: se vacía todo de esta computadora.
+function cerrarJornada() {
+    const lista = leerHistorial();
+    if (!lista.length) { showNotice('El historial ya está vacío.', 'ok'); return; }
+    const nombres = lista.slice(0, 3).map(h => h.nombre || h.id).join(', ');
+    if (!confirm(
+        `Se van a borrar ${lista.length} estudio(s) del historial de esta computadora` +
+        `\n(${nombres}${lista.length > 3 ? ', …' : ''}).\n\n` +
+        `Los informes ya firmados en la historia clínica no se tocan.\n` +
+        `Esta acción no se puede deshacer. ¿Cerrar la jornada?`)) return;
+    try { localStorage.removeItem(HIST_KEY); } catch (e) { /* noop */ }
+    renderHistorial();
+    showNotice('Historial vaciado. No quedan datos de pacientes en esta computadora.', 'ok');
+}
+
 function guardarEnHistorial() {
     const reporte = document.getElementById('reporte-output').textContent;
-    if (!reporte) { alert('Primero genere el reporte.'); return; }
+    if (!reporte) { alert('Primero generá el informe.'); return; }
+
+    // Sin HC el estudio no se puede identificar después: se avisa y se pide confirmación
+    // explícita en vez de dejarlo pasar sin más.
+    if (!v('paciente_id')) {
+        const campo = document.getElementById('paciente_id');
+        campo.focus();
+        campo.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        if (!confirm('Falta el número de HC / ID del paciente.\n\n' +
+                     'Sin HC no vas a poder distinguir este estudio de los demás en el historial.\n\n' +
+                     '¿Guardar igual, sin identificar?')) return;
+    }
+
     const lista = leerHistorial();
     const resEl = document.getElementById('resultado_estudio');
     lista.unshift({
@@ -1776,9 +1816,14 @@ function guardarEnHistorial() {
     }
 }
 
-function renderHistorial() {
+function renderHistorial(avisarPurga) {
     const cont = document.getElementById('historial-lista');
     if (!cont) return;
+    const purgados = purgarHistorialVencido();
+    if (purgados && avisarPurga)
+        showNotice(purgados === 1
+            ? 'Se descartó del historial 1 estudio de más de 12 h.'
+            : `Se descartaron del historial ${purgados} estudios de más de 12 h.`, 'warn');
     const lista = leerHistorial();
     document.getElementById('historial-badge').textContent = lista.length;
     if (!lista.length) {
