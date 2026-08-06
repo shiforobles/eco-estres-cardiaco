@@ -47,11 +47,13 @@ const NARRATIVA = {
                        'ni refirió dolor precordial o equivalentes anginosos.',
 
     esfuerzoPositivoUnico: 'Con el esfuerzo se objetivó nueva {{grado}} {{deSegmentos}}, con caída del engrosamiento sistólico ' +
-                       'respecto del reposo, en {{territorioFrase}}. El WMSI ascendió de {{wmsiReposo}} en reposo a {{wmsiEstres}} post-esfuerzo.' +
+                       'respecto del reposo, en {{territorioFrase}}. El WMSI{{aclaracionWMSI}} ascendió de {{wmsiReposo}} en reposo a ' +
+                       '{{wmsiEstres}} post-esfuerzo.' +
                        '{{acompanamiento}} El resto de los segmentos mostró adecuada respuesta hiperdinámica.',
 
     esfuerzoPositivoMulti: 'Con el esfuerzo se objetivaron nuevas alteraciones de la motilidad en los segmentos {{segmentos}}, con compromiso ' +
-                       'de más de un territorio coronario ({{territorios}}). El WMSI ascendió de {{wmsiReposo}} a {{wmsiEstres}}{{caidaFey}}.' +
+                       'de más de un territorio coronario ({{territorios}}). El WMSI{{aclaracionWMSI}} ascendió de {{wmsiReposo}} a ' +
+                       '{{wmsiEstres}}{{caidaFey}}.' +
                        '{{acompanamiento}} El hallazgo de isquemia extensa y multiterritorial constituye un marcador de alto riesgo.',
 
     esfuerzoSecuela:   'Con el esfuerzo los segmentos comprometidos no modificaron su motilidad, sin evidencia de reserva contráctil en dicho ' +
@@ -164,6 +166,10 @@ const NARRATIVA = {
                                'valorable por el trastorno de conducción.',
     acompanamientoConduccionSinHallazgos: ' No presentó angina; el análisis del segmento ST no es valorable por el ' +
                                'trastorno de conducción.',
+
+    // El WMSI es un índice de motilidad: con trastorno de conducción se calcula sin
+    // los septales, y el informe deja constancia de cómo se obtuvo el número.
+    aclaracionWMSI: ' (calculado sobre los segmentos valorables, excluidos los septales por el trastorno de conducción)',
 
     categorizacion: 'Categorización: {{categorizacion}}.',
 

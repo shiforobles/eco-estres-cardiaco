@@ -559,9 +559,15 @@ function addRingLabels(svg, NS) {
 }
 
 // ── WMSI ─────────────────────────────────────
-function calcWMSI(stateKey) {
+// `excluir` = ids que no deben entrar en el índice. Se usa con trastorno de
+// conducción: el WMSI es un índice de MOTILIDAD, y un septum alterado por
+// activación eléctrica anómala no describe contractilidad. Incluirlo hace que el
+// número se lea como disfunción inexistente y arruina la comparación entre
+// estudios seriados del mismo paciente.
+function calcWMSI(stateKey, excluir) {
     let sum = 0, n = 0;
     SEGMENTS.forEach(s => {
+        if (excluir && excluir.includes(s.id)) return;
         const score = WM[stateKey][s.id];
         if (score > 0) { sum += score; n++; }
     });
@@ -679,11 +685,15 @@ function avisarWMSIConduccion() {
     if (!alterados.length) { aviso.style.display = 'none'; return; }
 
     const nombre = (CONDUCCION_PROSA[conduccion] || {}).trastorno || 'el trastorno de conducción';
+    const crudoRep = calcWMSI('reposo'), crudoEst = calcWMSI('estres');
+    const valRep = calcWMSI('reposo', SEGMENTOS_SEPTALES), valEst = calcWMSI('estres', SEGMENTOS_SEPTALES);
+    const par = (a, b) => (a || '—') + ' → ' + (b || '—');
     aviso.style.display = 'block';
-    aviso.innerHTML = `<strong>⚠ WMSI sobreestimado.</strong> ${alterados.length} segmento(s) septal(es) ` +
-        `(${alterados.join(', ')}) están alterados por ${nombre}, no por isquemia ni necrosis. ` +
-        `El WMSI que muestra la tabla los incluye y queda inflado. ` +
-        `<strong>En el informe quedan excluidos</strong>: no se describen como secuela ni se atribuyen a un territorio coronario.`;
+    aviso.innerHTML = `<strong>⚠ WMSI sobreestimado en la tabla.</strong> ${alterados.length} segmento(s) septal(es) ` +
+        `(${alterados.join(', ')}) están alterados por ${nombre}, no por isquemia ni necrosis.<br>` +
+        `Tabla, con septum: <strong>${par(crudoRep, crudoEst)}</strong> &nbsp;·&nbsp; ` +
+        `Informe, sólo segmentos valorables: <strong>${par(valRep, valEst)}</strong><br>` +
+        `En el informe los septales quedan excluidos del índice, no se describen como secuela y no se atribuyen a un territorio coronario.`;
 }
 
 // ── TABLA SEGMENTOS ───────────────────────────
@@ -1067,6 +1077,10 @@ ${v('nc_descripcion') ? 'Descripción: ' + v('nc_descripcion') : ''}`;
     });
     const wmsiRep = calcWMSI('reposo') || '—';
     const wmsiEst = calcWMSI('estres') || '—';
+    const conduccionPlanilla = document.getElementById('ecg_conduccion').value;
+    const wmsiValorableTxt = (conduccionPlanilla && conduccionPlanilla !== 'ninguno')
+        ? `\n  WMSI sobre segmentos valorables (sin septales): ${calcWMSI('reposo', SEGMENTOS_SEPTALES) || '—'} → ${calcWMSI('estres', SEGMENTOS_SEPTALES) || '—'}`
+        : '';
     const cnt = contarMotilidad();
     const calidadTxt = (cnt.evalRep || cnt.evalEst)
         ? `Segmentos evaluados: reposo ${cnt.evalRep}/17, pico ${cnt.evalEst}/17` +
@@ -1160,7 +1174,7 @@ MOTILIDAD PARIETAL SEGMENTARIA — MODELO AHA 17 SEGMENTOS
 ${sep}
 ${wmLines || '  Motilidad normal en todos los segmentos evaluados, en reposo y en el pico.\n'}
 ${sep}
-  WMSI Reposo: ${wmsiRep}   |   WMSI Pico Estrés: ${wmsiEst}
+  WMSI Reposo: ${wmsiRep}   |   WMSI Pico Estrés: ${wmsiEst}${wmsiValorableTxt}
   ${calidadTxt}
 ${extensionTxt ? '  ' + extensionTxt + '\n' : ''}${recTxt ? '  ' + recTxt + '\n' : ''}
 ${eeRep || eeEst ? `ESTRÉS DIASTÓLICO
@@ -1299,8 +1313,12 @@ function recolectarHallazgos() {
 
     const cnt = contarMotilidad();
     H.segEvaluados = Math.min(cnt.evalRep, cnt.evalEst);
-    H.wmsiReposo = calcWMSI('reposo');
-    H.wmsiEstres = calcWMSI('estres');
+    // Con trastorno de conducción el septum no es valorable, esté normal o alterado:
+    // queda fuera del índice y así se aclara en el informe.
+    const excluirDelWMSI = H.hayConduccion ? SEGMENTOS_SEPTALES : null;
+    H.wmsiReposo = calcWMSI('reposo', excluirDelWMSI);
+    H.wmsiEstres = calcWMSI('estres', excluirDelWMSI);
+    H.wmsiExcluyeSeptales = H.hayConduccion;
     H.wmsiSubio = H.wmsiReposo !== null && H.wmsiEstres !== null &&
                   parseFloat(H.wmsiEstres) > parseFloat(H.wmsiReposo);
 
@@ -1476,6 +1494,7 @@ function construirNarrativa(H) {
         territorios: territoriosEnProsa(H.territoriosIsquemia),
         wmsiReposo: H.wmsiReposo || nada,
         wmsiEstres: H.wmsiEstres || nada,
+        aclaracionWMSI: H.wmsiExcluyeSeptales ? NARRATIVA.aclaracionWMSI : '',
         acompanamiento: acompanamiento,
         caidaFey: H.caidaFey ? `, con caída de la FEy de ${H.feyReposo} % a ${H.feyEstres} % post-esfuerzo` : '',
         hallazgos: H.isquemicos.length
