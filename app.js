@@ -85,6 +85,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     calcEjercicio();
     document.querySelectorAll('.chk-pre').forEach(el => el.addEventListener('change', updateChecklistBadge));
+    document.querySelectorAll('.chk-arr').forEach(el => el.addEventListener('change', avisarArritmias));
+    document.getElementById('arr_sintomas').addEventListener('change', avisarArritmias);
     updateChecklistBadge();
     renderHistorial(true);
 
@@ -104,6 +106,27 @@ function toggleTheme() {
     document.documentElement.setAttribute('data-theme', next);
     document.getElementById('theme-icon').textContent = next === 'dark' ? '☀️' : '🌙';
     localStorage.setItem('eco-estres-theme', next);
+}
+
+// ── ESTUDIO DIASTÓLICO: autocompletado con override ───
+// El select arranca con lo que dio el cálculo; si el operador lo toca, manda su criterio.
+let diastolicoTocadoAMano = false;
+
+function marcarDiastolicoManual() {
+    diastolicoTocadoAMano = true;
+    const nota = document.getElementById('diast_origen');
+    if (nota) nota.textContent = 'Corregido a mano: el cálculo ya no lo modifica.';
+    scheduleSave();
+}
+
+function autocompletarDiastolico(veredicto) {
+    const el = document.getElementById('diast_resultado');
+    if (!el || diastolicoTocadoAMano) return;
+    el.value = veredicto;
+    const nota = document.getElementById('diast_origen');
+    if (nota) nota.textContent = veredicto === 'no_evaluado'
+        ? 'Se completa solo desde E/e\' y VRT; podés corregirlo.'
+        : `Completado desde E/e' y VRT; podés corregirlo.`;
 }
 
 // ── FIRMA DEL INFORME ─────────────────────────
@@ -293,6 +316,31 @@ function calcEjercicio() {
     }
 
     sugerirCategorizacion();
+    avisarArritmias();
+}
+
+// Aviso de pantalla: qué arritmias van a pasar a la conclusión y cuáles no.
+function avisarArritmias() {
+    const aviso = document.getElementById('aviso-arritmias');
+    if (!aviso) return;
+    const marcadas = ARRITMIAS.filter(a => document.getElementById(a.id) && document.getElementById(a.id).checked);
+    if (!marcadas.length) { aviso.style.display = 'none'; return; }
+    const relevantes = marcadas.filter(a => a.relevante);
+    const sintomatica = document.getElementById('arr_sintomas').value === 'sintomatica';
+    aviso.style.display = 'block';
+    if (relevantes.length || sintomatica) {
+        aviso.style.borderLeftColor = 'var(--color-warning)';
+        aviso.style.background = 'var(--color-warning-bg)';
+        aviso.innerHTML = '<strong>Pasa a la conclusión.</strong> ' +
+            (relevantes.length ? relevantes.map(a => a.txt).join(', ') : marcadas.map(a => a.txt).join(', ')) +
+            (sintomatica && !relevantes.length ? ' (por ser sintomática)' : '') +
+            ' — tiene peso pronóstico propio.';
+    } else {
+        aviso.style.borderLeftColor = 'var(--color-success)';
+        aviso.style.background = 'var(--color-success-bg)';
+        aviso.innerHTML = '<strong>Queda sólo en el bloque ECG.</strong> ' + marcadas.map(a => a.txt).join(', ') +
+            ' — patrón benigno, no modifica la conclusión.';
+    }
 }
 
 // ── SUGERENCIA DE CATEGORIZACIÓN DE RIESGO ────
@@ -813,7 +861,11 @@ function calcDiastolico() {
         else if (vrtAlto) txt = 'Indeterminado — VRT >2,8 m/s pero E/e\' ≤14';
         else txt = '✓ Negativo — sin aumento de las presiones de llenado con el esfuerzo';
         set('diast_respuesta', txt);
-    } else set('diast_respuesta', '—');
+        autocompletarDiastolico(eeAlto && vrtAlto ? 'positivo' : (eeAlto || vrtAlto) ? 'no_evaluado' : 'negativo');
+    } else {
+        set('diast_respuesta', '—');
+        autocompletarDiastolico('no_evaluado');
+    }
 }
 
 // ── RESULTADO BANNER ──────────────────────────
@@ -1098,9 +1150,13 @@ ${v('nc_descripcion') ? 'Descripción: ' + v('nc_descripcion') : ''}`;
         : '';
 
     // ECG
-    const ecgBasalEl = document.getElementById('ecg_basal');
+    const ecgLineas = [
+        `ECG reposo: ${textoSelect('ecg_ritmo')}` +
+            (document.getElementById('ecg_conduccion').value !== 'ninguno' ? ` con ${textoSelect('ecg_conduccion')}` : '') +
+            (document.getElementById('ecg_st_basal').value !== 'normal' ? `. ${textoSelect('ecg_st_basal')}` : '') +
+            (v('ecg_otros_basal') ? `. ${v('ecg_otros_basal')}` : '')
+    ];
     const ecgTipoEl = document.getElementById('ecg_st_tipo');
-    const ecgLineas = [`ECG basal: ${textoSelect('ecg_basal')}`];
     if (ecgTipoEl.value) {
         ecgLineas.push(`Cambios del ST: ${textoSelect('ecg_st_tipo')}` +
             (v('ecg_st_mm') ? ` de ${v('ecg_st_mm')} mm` : '') +
@@ -1110,7 +1166,9 @@ ${v('nc_descripcion') ? 'Descripción: ' + v('nc_descripcion') : ''}`;
     }
     if (v('ecg_st_aparicion')) ecgLineas.push(`Aparición: ${v('ecg_st_aparicion')}`);
     if (v('ecg_st_resolucion')) ecgLineas.push(`Resolución en recuperación: ${v('ecg_st_resolucion')}`);
+    const arrMarcadas = ARRITMIAS.filter(a => document.getElementById(a.id).checked);
     if (v('ecg_arritmias')) ecgLineas.push(`Arritmias: ${v('ecg_arritmias')}`);
+    else if (arrMarcadas.length) ecgLineas.push(`Arritmias: ${arrMarcadas.map(a => a.txt).join(', ')}`);
 
     // Diastólico
     const eeRep = document.getElementById('ee_reposo').value;
@@ -1210,6 +1268,23 @@ Eco Estrés Cardíaco v1.1 — Calculadora Clínica
 //  El texto vive en report-templates.js; acá no se redacta nada.
 // ══════════════════════════════════════════════
 
+// Arritmias: cuáles tienen peso pronóstico propio y llegan a la conclusión.
+// El criterio es morfología y patrón, no síntoma: unas EV polimorfas con bigeminia
+// pesan aunque el paciente no haya sentido nada.
+const ARRITMIAS = [
+    { id: 'arr_esv',       txt: 'extrasístoles supraventriculares aisladas', relevante: false },
+    { id: 'arr_ev_mono',   txt: 'extrasístoles ventriculares monomorfas aisladas', relevante: false },
+    { id: 'arr_ev_poli',   txt: 'extrasístoles ventriculares polimorfas', relevante: true },
+    { id: 'arr_bigeminia', txt: 'bigeminia ventricular', relevante: true },
+    { id: 'arr_dupletas',  txt: 'dupletas ventriculares', relevante: true },
+    { id: 'arr_tvns',      txt: 'taquicardia ventricular no sostenida', relevante: true },
+    { id: 'arr_fa_tsv',    txt: 'fibrilación auricular o taquicardia supraventricular inducida', relevante: true },
+    { id: 'arr_aumenta',   txt: 'aumento de la ectopia ventricular con la carga', relevante: true }
+];
+
+// Sólo estos trastornos comprometen la valoración septal; el resto sólo se describe.
+const CONDUCCION_LIMITA_SEPTUM = ['bcri', 'marcapasos', 'preexcitacion'];
+
 // Segmentos septales afectados por la activación eléctrica anómala.
 // El apical septal (14) queda FUERA a propósito: la asincronía del BCRI es
 // sobre todo basal y media, y excluirlo perdería isquemia apical de la DA.
@@ -1279,11 +1354,42 @@ function recolectarHallazgos() {
     H.stTipo = document.getElementById('ecg_st_tipo').value;
     H.stMm = v('ecg_st_mm');
     H.stDeriv = v('ecg_st_deriv');
+    H.stAparicion = v('ecg_st_aparicion');
+    H.stResolucion = v('ecg_st_resolucion');
 
     // Trastorno de conducción
     H.conduccion = document.getElementById('ecg_conduccion').value;
-    H.hayConduccion = !!H.conduccion && H.conduccion !== 'ninguno';
+    // BCRD y hemibloqueos se informan, pero no generan movimiento septal paradójico:
+    // no disparan el modificador ni excluyen segmentos del WMSI.
+    H.hayConduccion = CONDUCCION_LIMITA_SEPTUM.includes(H.conduccion);
     H.conduccionProsa = H.hayConduccion ? CONDUCCION_PROSA[H.conduccion] : null;
+
+    // ECG en reposo
+    H.ritmo = document.getElementById('ecg_ritmo').value;
+    H.ritmoTxt = textoSelect('ecg_ritmo');
+    H.conduccionTxt = H.conduccion === 'ninguno' ? '' : (CONDUCCION_SIGLA[H.conduccion] || textoSelect('ecg_conduccion'));
+    H.stBasal = document.getElementById('ecg_st_basal').value;
+    H.stBasalTxt = textoSelect('ecg_st_basal');
+    H.otrosBasal = v('ecg_otros_basal');
+
+    // Arritmias
+    H.arritmias = ARRITMIAS.filter(a => document.getElementById(a.id).checked);
+    H.arritmiasRelevantes = H.arritmias.filter(a => a.relevante);
+    H.arrMomento = document.getElementById('arr_momento').value;
+    H.arrMomentoTxt = textoSelect('arr_momento').toLowerCase();
+    H.arrSintomatica = document.getElementById('arr_sintomas').value === 'sintomatica';
+    H.arrLibre = v('ecg_arritmias');
+    // Una arritmia sintomática pesa aunque su morfología sea benigna
+    H.hayArritmiaRelevante = H.arritmiasRelevantes.length > 0 || (H.arritmias.length > 0 && H.arrSintomatica);
+
+    // Esfuerzo: protocolo, carga y etapa
+    H.protocolo = document.getElementById('ej_protocolo').value;
+    H.protocoloTxt = textoSelect('ej_protocolo');
+    H.cargaKgm = num('ej_carga');
+    H.etapa = num('ej_etapa');
+
+    // Estudio diastólico (lo que va al informe)
+    H.diastResultado = document.getElementById('diast_resultado').value;
 
     // Síntomas del máximo esfuerzo
     H.sintomasEsfuerzo = v('esf_max_sint');
@@ -1388,20 +1494,48 @@ function gradoEnProsa(segs, campo) {
 // haya sido mudo es información clínica y no debe quedar omitida.
 function acompanamientoEnProsa(H) {
     const T = NARRATIVA;
+    // El ST y las arritmias ya tienen sus propias líneas de ECG: acá van sólo los síntomas.
+    if (!H.sintomasEsfuerzo) return T.acompanamientoSinHallazgos;
+    return rellenar(T.acompanamiento, { lista: H.sintomasEsfuerzo.toLowerCase() });
+}
+
+// Frase de arritmias: si hay descripción libre, manda esa; si no, se arma de los campos.
+function arritmiasEnProsa(H) {
+    if (H.arrLibre) return H.arrLibre;
+    if (!H.arritmias.length) return '';
+    const lista = listarEnProsa(H.arritmias.map(a => a.txt));
+    const momento = H.arrMomentoTxt && H.arrMomentoTxt !== '—' ? ' ' + H.arrMomentoTxt : '';
+    const sintomas = H.arrSintomatica ? ', con síntomas asociados' : ', sin síntomas asociados';
+    return lista.charAt(0).toUpperCase() + lista.slice(1) + momento + sintomas + '.';
+}
+
+// Línea "ECG reposo:" — ritmo, conducción, ST basal y otros hallazgos
+function ecgReposoEnProsa(H) {
+    const partes = [];
+    let ritmo = H.ritmoTxt;
+    if (H.conduccionTxt) ritmo += ' con ' + H.conduccionTxt;
+    partes.push(ritmo + '.');
+    if (H.stBasal && H.stBasal !== 'normal') partes.push(H.stBasalTxt + '.');
+    if (H.otrosBasal) partes.push(H.otrosBasal.replace(/\.*$/, '') + '.');
+    return partes.join(' ');
+}
+
+// Línea "ECG post-esfuerzo:" — cambios del ST y arritmias
+function ecgEsfuerzoEnProsa(H) {
     const partes = [];
     if (H.stTipo) {
-        const tipo = H.stTipo === 'supra' ? 'supradesnivel del ST' : 'infradesnivel del ST';
-        partes.push(tipo + (H.stMm ? ` de ${H.stMm} mm` : '') + (H.stDeriv ? ` en ${H.stDeriv}` : ''));
+        const tipo = H.stTipo === 'supra' ? 'Supradesnivel del ST' : 'Infradesnivel del ST';
+        partes.push(tipo + (H.stMm ? ` de ${H.stMm} mm` : '') + (H.stDeriv ? ` en ${H.stDeriv}` : '') +
+            (H.stAparicion ? `, desde ${H.stAparicion}` : '') +
+            (H.stResolucion ? `, con resolución en ${H.stResolucion}` : '') + '.');
+    } else if (H.hayConduccion) {
+        partes.push('Análisis del ST no valorable por el trastorno de conducción.');
+    } else {
+        partes.push('Sin cambios del ST-T.');
     }
-    if (H.sintomasEsfuerzo) partes.push(H.sintomasEsfuerzo.toLowerCase());
-
-    if (!partes.length) {
-        return H.hayConduccion ? T.acompanamientoConduccionSinHallazgos : T.acompanamientoSinHallazgos;
-    }
-    // Con trastorno de conducción el hallazgo del ST se describe, pero aclarando
-    // en la misma frase que no es valorable.
-    const plantilla = (H.hayConduccion && H.stTipo) ? T.acompanamientoConduccion : T.acompanamiento;
-    return rellenar(plantilla, { lista: listarEnProsa(partes) });
+    const arr = arritmiasEnProsa(H);
+    partes.push(arr || 'Sin arritmias.');
+    return partes.join(' ');
 }
 
 // Rellena {{marcadores}} y borra los que quedaron vacíos
@@ -1417,13 +1551,17 @@ function construirNarrativa(H) {
     const parrafos = [];
 
     // ── MÉTODO ──
-    const metodo = [rellenar(T.metodo, {
-        carga: H.carga ? ' hasta ' + H.carga : '',
+    const datosMetodo = {
+        protocolo: H.protocolo && H.protocolo !== 'otro' ? ' con protocolo de ' + H.protocoloTxt : '',
+        carga: H.cargaKgm || nada,
+        etapaMetodo: H.etapa ? `, en etapa ${H.etapa}` : '',
         fcPico: H.fcPico || nada,
         pctFCmax: H.pctFCmax || nada,
         dobleProducto: H.dobleProducto ? H.dobleProducto.toLocaleString('es-AR') : nada,
+        metsMetodo: H.mets ? `, con ${H.mets} METs` : '',
         causaDetencion: H.causaDetencionTxt
-    })];
+    };
+    const metodo = [rellenar(H.cargaKgm ? T.metodo : T.metodoSinCarga, datosMetodo)];
 
     if (H.hipotension) {
         metodo.push(rellenar(T.respuestaHipotensiva, { taBasal: H.taBasal || nada, taPico: H.taPico || nada }));
@@ -1544,6 +1682,16 @@ function construirNarrativa(H) {
     }
     parrafos.push(parrafoEsfuerzo);
 
+    // ── ECG: líneas propias, fuera del párrafo de motilidad ──
+    parrafos.push(rellenar(T.ecgReposo, { contenido: ecgReposoEnProsa(H) }));
+    parrafos.push(rellenar(T.ecgPostEsfuerzo, { contenido: ecgEsfuerzoEnProsa(H) }));
+
+    // ── ESTUDIO DIASTÓLICO: línea fija ──
+    parrafos.push({
+        negativo: T.diastolicoNegativo,
+        positivo: T.diastolicoPositivo
+    }[H.diastResultado] || T.diastolicoNoEvaluado);
+
     // ── CONCLUSIÓN ──
     // Con FC subóptima la conclusión negativa arranca corta: la limitación es el foco
     let claveConclusion = rama;
@@ -1570,6 +1718,16 @@ function construirNarrativa(H) {
     if (H.adquisicionTardia && rama !== 'noConcluyente')
         extras.push(rellenar(T.modificadores.adquisicionTardia, { segImagen: H.segImagen, pctFCadq: H.pctFCadq }));
     if (H.caidaFey && rama !== 'positivaMulti' && rama !== 'hipotensiva') extras.push(T.modificadores.caidaFey);
+    if (H.hayArritmiaRelevante) {
+        const lista = H.arritmiasRelevantes.length
+            ? listarEnProsa(H.arritmiasRelevantes.map(a => a.txt))
+            : listarEnProsa(H.arritmias.map(a => a.txt));
+        extras.push(rellenar(T.modificadores.arritmiaRelevante, {
+            arritmias: lista,
+            momento: (H.arrMomentoTxt && H.arrMomentoTxt !== '—') ? ' ' + H.arrMomentoTxt : '',
+            sintomas: H.arrSintomatica ? ', con síntomas asociados' : ''
+        }));
+    }
     if (H.hayConduccion && rama !== 'negativa') {
         // Si ya se demostró isquemia en la DA con segmentos valorables, hablar de
         // especificidad reducida en ese territorio contradiría el propio hallazgo.
@@ -1579,6 +1737,20 @@ function construirNarrativa(H) {
 
     if (extras.length) conclusion = conclusion.replace(/\.$/, '') + extras.join('') + '.';
     if (oracionesFinales.length) conclusion += oracionesFinales.join('');
+
+    // Preámbulo: encabeza SIEMPRE, antes del veredicto.
+    const metsFrase = H.mets ? rellenar(T.preambuloMETs, { mets: H.mets }) : '';
+    const preambulo = rellenar(T.preambulo, {
+        suficiencia: H.pctFCmax >= 85 ? 'suficiente' : 'insuficiente',
+        pctFCmax: H.pctFCmax || nada,
+        betabloqueo: H.betabloqueante ? T.preambuloBetabloqueo : '',
+        etapa: H.etapa ? rellenar(T.preambuloEtapa, { etapa: H.etapa }) : T.preambuloSinEtapa,
+        causaDetencion: H.causaDetencionTxt
+    }) + rellenar(H.isquemicos.length ? T.preambuloConIsquemia : T.preambuloSinIsquemia, {
+        dobleProducto: H.dobleProducto ? H.dobleProducto.toLocaleString('es-AR') : nada,
+        mets: metsFrase
+    });
+    conclusion = preambulo + '\n' + conclusion;
     if (H.categorizacion) conclusion += ' ' + rellenar(T.categorizacion, { categorizacion: H.categorizacion });
     parrafos.push(conclusion);
 
@@ -1670,7 +1842,8 @@ function validarEstudio(rama) {
         if (!num('ej_fc_img')) av.push({ nivel: 'error', txt: 'Falta la FC al adquirir la primera imagen post-esfuerzo: sin ese dato no se puede afirmar que la adquisición fue oportuna.' });
         else if (fcPico > 0 && (num('ej_fc_img') / fcPico) < 0.85)
             av.push({ nivel: 'warn', txt: 'Imagen post-esfuerzo adquirida con <85% de la FC pico: la sensibilidad está reducida y debe constar en el informe.' });
-        if (!v('ej_carga')) av.push({ nivel: 'info', txt: 'Sin carga alcanzada cargada (discos/kg).' });
+        if (!num('ej_carga')) av.push({ nivel: 'info', txt: 'Sin carga alcanzada (Kgm/min).' });
+        if (!num('ej_etapa')) av.push({ nivel: 'info', txt: 'Sin etapa alcanzada: la conclusión no va a poder decir en qué etapa se detuvo.' });
     }
 
     if (!resultado) av.push({ nivel: 'error', txt: 'Falta seleccionar el RESULTADO del estudio.' });
@@ -1967,6 +2140,7 @@ function resetFormulario() {
     document.getElementById('resultado-banner').style.display = 'none';
     document.getElementById('validacion-panel').style.display = 'none';
     setFechaHoy();
+    diastolicoTocadoAMano = false;
     setProtocol('ejercicio');
     setSpecialTab('viabilidad');
     updateChecklistBadge();
@@ -2030,7 +2204,7 @@ function applyPreset(name) {
     if (P.protocolo) {
         setProtocol(P.protocolo);
         if (P.protocolo === 'ejercicio') {
-            ['ej_carga','ej_duracion','ej_mets','ej_seg_img','ej_fc_img','ej_causa_detencion']
+            ['ej_carga','ej_protocolo','ej_etapa','ej_duracion','ej_mets','ej_seg_img','ej_fc_img','ej_causa_detencion']
                 .forEach(k => { if (P[k]) setVal(k, P[k]); });
             calcEjercicio();
         } else if (P.protocolo === 'dobutamina') {
@@ -2092,7 +2266,7 @@ function applyPreset(name) {
 // ══════════════════════════════════════════════
 const DRAFT_KEY = 'eco-estres-draft';
 const DRAFT_PENDIENTE_KEY = 'eco-estres-draft-pendiente';
-const DRAFT_VERSION = 2;
+const DRAFT_VERSION = 3;
 const DRAFT_DEBOUNCE_MS = 600;
 
 // El autosave NUNCA se suspende. Mientras el aviso de recuperación está en pantalla
@@ -2241,6 +2415,7 @@ function aplicarEstudio(d) {
     calcBSA(); calcEjercicio(); calcDobutamina(); calcDipiridamol();
     calcFEVI(); calcDiastolico(); calcCFR(); calcStrain(); calcEAo(); calcMCH();
     updateResultBanner(); updateChecklistBadge();
+    diastolicoTocadoAMano = !!(d.fields && d.fields.diast_resultado && d.fields.diast_resultado !== 'no_evaluado');
 
     // La planilla de dobutamina se restaura DESPUÉS de que calcDobutamina rearmó la tabla
     restoreDobStages(d.dobStages);
@@ -2359,7 +2534,7 @@ const PRESETS = {
         esf_basal_tas: '130', esf_basal_tad: '80', esf_basal_fc: '72',
         esf_max_tas: '185', esf_max_tad: '85', esf_max_fc: '156',
         esf_rec_tas: '150', esf_rec_tad: '82', esf_rec_fc: '132',
-        ej_carga: '4 discos / 6 kg', ej_duracion: '12:00', ej_mets: '9.5',
+        ej_carga: '600', ej_protocolo: 'astrand', ej_etapa: '4', ej_duracion: '12:00', ej_mets: '9.5',
         ej_causa_detencion: 'fc_objetivo', ej_seg_img: '45', ej_fc_img: '148',
         fevi_reposo: 62, fevi_pico: 68, fevi_recup: 64,
         e_prima_rep: '9', e_onda_rep: '72', e_prima_est: '12', e_onda_est: '95',
@@ -2375,7 +2550,7 @@ const PRESETS = {
         esf_basal_tas: '145', esf_basal_tad: '88', esf_basal_fc: '64',
         esf_max_tas: '170', esf_max_tad: '92', esf_max_fc: '108',
         esf_rec_tas: '155', esf_rec_tad: '85', esf_rec_fc: '94',
-        ej_carga: '2 discos / 3 kg', ej_duracion: '5:40', ej_mets: '5.2',
+        ej_carga: '300', ej_protocolo: 'astrand', ej_etapa: '2', ej_duracion: '5:40', ej_mets: '5.2',
         ej_causa_detencion: 'fatiga', ej_seg_img: '50', ej_fc_img: '100',
         fevi_reposo: 58, fevi_pico: 62,
         wm: { reposo: allSegments(1), estres: allSegments(1) },
@@ -2390,7 +2565,7 @@ const PRESETS = {
         esf_basal_tas: '138', esf_basal_tad: '82', esf_basal_fc: '68',
         esf_max_tas: '178', esf_max_tad: '88', esf_max_fc: '148', esf_max_sint: 'Angina típica',
         esf_rec_tas: '160', esf_rec_tad: '85', esf_rec_fc: '141',
-        ej_carga: '3 discos / 4,5 kg', ej_duracion: '8:00', ej_mets: '7.2',
+        ej_carga: '450', ej_protocolo: 'astrand', ej_etapa: '3', ej_duracion: '8:00', ej_mets: '7.2',
         ej_causa_detencion: 'angina', ej_seg_img: '40', ej_fc_img: '140',
         fevi_reposo: 58, fevi_pico: 52,
         wm: {
@@ -2471,7 +2646,7 @@ const PRESETS = {
         esf_basal_tas: '140', esf_basal_tad: '88', esf_basal_fc: '70',
         esf_max_tas: '195', esf_max_tad: '95', esf_max_fc: '145', esf_max_sint: 'Disnea',
         esf_rec_tas: '170', esf_rec_tad: '90', esf_rec_fc: '128',
-        ej_carga: '2 discos / 3 kg', ej_duracion: '7:00', ej_mets: '6.5',
+        ej_carga: '300', ej_protocolo: 'astrand', ej_etapa: '2', ej_duracion: '7:00', ej_mets: '6.5',
         ej_causa_detencion: 'fatiga', ej_seg_img: '45', ej_fc_img: '138',
         e_prima_lat_rep: '9', e_prima_lat_est: '8', vrt_rep: '2.4', vrt_est: '3.1',
         fevi_reposo: 60, fevi_pico: 65,
@@ -2488,7 +2663,7 @@ const PRESETS = {
         esf_basal_tas: '120', esf_basal_tad: '78', esf_basal_fc: '62',
         esf_max_tas: '165', esf_max_tad: '80', esf_max_fc: '162', esf_max_sint: 'Disnea',
         esf_rec_tas: '140', esf_rec_tad: '78', esf_rec_fc: '140',
-        ej_carga: '5 discos / 7,5 kg', ej_duracion: '8:45', ej_mets: '9.5',
+        ej_carga: '750', ej_protocolo: 'astrand', ej_etapa: '5', ej_duracion: '8:45', ej_mets: '9.5',
         ej_causa_detencion: 'fatiga', ej_seg_img: '40', ej_fc_img: '150',
         fevi_reposo: 68, fevi_pico: 75,
         wm: { reposo: allSegments(1), estres: allSegments(1) },

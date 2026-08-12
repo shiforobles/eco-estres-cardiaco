@@ -234,8 +234,22 @@
 
             <div class="grid" style="margin-top:1rem">
                 <div class="form-group">
-                    <label for="ej_carga">Carga alcanzada</label>
-                    <input autocomplete="off" type="text" id="ej_carga" placeholder="Ej: 3 discos / 4,5 kg">
+                    <label for="ej_protocolo">Protocolo</label>
+                    <select autocomplete="off" id="ej_protocolo">
+                        <option value="astrand">Astrand</option>
+                        <option value="balke">Balke</option>
+                        <option value="naughton">Naughton</option>
+                        <option value="rampa">Rampa</option>
+                        <option value="otro">Otro</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="ej_carga">Carga alcanzada (Kgm/min)</label>
+                    <input autocomplete="off" type="number" id="ej_carga" placeholder="Ej: 600" min="0" max="2000" step="25" oninput="calcEjercicio()">
+                </div>
+                <div class="form-group">
+                    <label for="ej_etapa">Etapa alcanzada</label>
+                    <input autocomplete="off" type="number" id="ej_etapa" placeholder="Nº" min="1" max="12" step="1">
                 </div>
                 <div class="form-group">
                     <label for="ej_duracion">Duración total (min:seg)</label>
@@ -490,38 +504,57 @@
     </section>
 
     <!-- ══════════════════════════════════════
-         SECCIÓN 4b: ECG DURANTE EL ESTRÉS
+         SECCIÓN 4b: ECG
          ══════════════════════════════════════ -->
     <section class="card">
-        <h2 class="section-title">ECG durante el Estrés</h2>
+        <h2 class="section-title">ECG</h2>
+
+        <h3 class="subsection-title">ECG en reposo</h3>
         <div class="grid">
             <div class="form-group">
-                <label for="ecg_basal">ECG Basal</label>
-                <select autocomplete="off" id="ecg_basal">
-                    <option value="normal">Normal</option>
-                    <option value="alteraciones_repol">Alteraciones inespecíficas de la repolarización</option>
-                    <option value="hvi">HVI con sobrecarga</option>
-                    <option value="brder">Bloqueo completo de rama derecha</option>
-                    <option value="q_previa">Ondas Q de necrosis previa</option>
+                <label for="ecg_ritmo">Ritmo de base</label>
+                <select autocomplete="off" id="ecg_ritmo">
+                    <option value="sinusal">Ritmo sinusal</option>
                     <option value="fa">Fibrilación auricular</option>
-                    <option value="no_interpretable">No interpretable para isquemia</option>
+                    <option value="aleteo">Aleteo auricular</option>
+                    <option value="marcapasos">Ritmo de marcapasos</option>
+                    <option value="otro">Otro</option>
                 </select>
             </div>
             <div class="form-group">
                 <label for="ecg_conduccion">Trastorno de conducción</label>
                 <select autocomplete="off" id="ecg_conduccion" onchange="calcEjercicio()">
                     <option value="ninguno">Ninguno</option>
-                    <option value="bcri">BCRI (bloqueo completo de rama izquierda)</option>
-                    <option value="marcapasos">Ritmo de marcapasos</option>
+                    <option value="bcri">BCRI — bloqueo completo de rama izquierda</option>
+                    <option value="marcapasos">Estimulación por marcapasos</option>
                     <option value="preexcitacion">Preexcitación ventricular</option>
+                    <option value="bcrd">BCRD — bloqueo completo de rama derecha</option>
+                    <option value="hbai">Hemibloqueo anterior izquierdo</option>
+                    <option value="hbpi">Hemibloqueo posterior izquierdo</option>
+                    <option value="bcrd_hbai">BCRD + hemibloqueo anterior izquierdo</option>
+                </select>
+                <span class="firma-nota">Sólo BCRI, marcapasos y preexcitación limitan la valoración septal.</span>
+            </div>
+            <div class="form-group">
+                <label for="ecg_st_basal">ST-T basal</label>
+                <select autocomplete="off" id="ecg_st_basal">
+                    <option value="normal">Normal</option>
+                    <option value="repol">Alteraciones inespecíficas de la repolarización</option>
+                    <option value="hvi">HVI con sobrecarga</option>
+                    <option value="infra_basal">Infradesnivel del ST basal</option>
+                    <option value="no_interpretable">No interpretable para isquemia</option>
                 </select>
             </div>
             <div class="form-group">
-                <label for="ecg_st_mm">Desnivel ST máximo (mm)</label>
-                <input autocomplete="off" type="number" id="ecg_st_mm" placeholder="mm" min="0" max="10" step="0.5">
+                <label for="ecg_otros_basal">Otros hallazgos del ECG basal</label>
+                <input autocomplete="off" type="text" id="ecg_otros_basal" placeholder="Ej: imagen de secuela inferolateral">
             </div>
+        </div>
+
+        <h3 class="subsection-title" style="margin-top:1.25rem">ECG post-esfuerzo</h3>
+        <div class="grid">
             <div class="form-group">
-                <label for="ecg_st_tipo">Tipo de desnivel</label>
+                <label for="ecg_st_tipo">Cambios del ST-T</label>
                 <select autocomplete="off" id="ecg_st_tipo">
                     <option value="">Sin cambios</option>
                     <option value="infra">Infradesnivel del ST</option>
@@ -529,22 +562,58 @@
                 </select>
             </div>
             <div class="form-group">
+                <label for="ecg_st_mm">Desnivel máximo (mm)</label>
+                <input autocomplete="off" type="number" id="ecg_st_mm" placeholder="mm" min="0" max="10" step="0.5">
+            </div>
+            <div class="form-group">
                 <label for="ecg_st_deriv">Derivaciones comprometidas</label>
                 <input autocomplete="off" type="text" id="ecg_st_deriv" placeholder="Ej: V4-V6, DII, aVF">
             </div>
             <div class="form-group">
                 <label for="ecg_st_aparicion">Aparición (etapa / carga / FC)</label>
-                <input autocomplete="off" type="text" id="ecg_st_aparicion" placeholder="Ej: E3 — 75 W — 128 lpm">
+                <input autocomplete="off" type="text" id="ecg_st_aparicion" placeholder="Ej: etapa 3 — 450 Kgm/min">
             </div>
             <div class="form-group">
-                <label for="ecg_st_resolucion">Resolución en recuperación (min)</label>
+                <label for="ecg_st_resolucion">Resolución en recuperación</label>
                 <input autocomplete="off" type="text" id="ecg_st_resolucion" placeholder="Ej: 3 min">
             </div>
+        </div>
+
+        <h4 class="subsection-title" style="margin-top:1rem">Arritmias</h4>
+        <div class="grid grid-3col">
+            <div class="checkbox-group"><input autocomplete="off" type="checkbox" class="chk-arr" id="arr_esv"><label for="arr_esv">ESV / ESSV aisladas</label></div>
+            <div class="checkbox-group"><input autocomplete="off" type="checkbox" class="chk-arr" id="arr_ev_mono"><label for="arr_ev_mono">EV monomorfas aisladas</label></div>
+            <div class="checkbox-group"><input autocomplete="off" type="checkbox" class="chk-arr" id="arr_ev_poli"><label for="arr_ev_poli">EV polimorfas</label></div>
+            <div class="checkbox-group"><input autocomplete="off" type="checkbox" class="chk-arr" id="arr_bigeminia"><label for="arr_bigeminia">Bigeminia / trigeminia</label></div>
+            <div class="checkbox-group"><input autocomplete="off" type="checkbox" class="chk-arr" id="arr_dupletas"><label for="arr_dupletas">Dupletas</label></div>
+            <div class="checkbox-group"><input autocomplete="off" type="checkbox" class="chk-arr" id="arr_tvns"><label for="arr_tvns">TV no sostenida</label></div>
+            <div class="checkbox-group"><input autocomplete="off" type="checkbox" class="chk-arr" id="arr_fa_tsv"><label for="arr_fa_tsv">FA / TSV inducida</label></div>
+            <div class="checkbox-group"><input autocomplete="off" type="checkbox" class="chk-arr" id="arr_aumenta"><label for="arr_aumenta">Aumentan con la carga</label></div>
+        </div>
+        <div class="grid" style="margin-top:0.75rem">
             <div class="form-group">
-                <label for="ecg_arritmias">Arritmias durante el estudio</label>
-                <input autocomplete="off" type="text" id="ecg_arritmias" placeholder="Ej: EV aisladas, dupletas en recuperación">
+                <label for="arr_momento">Momento de aparición</label>
+                <select autocomplete="off" id="arr_momento">
+                    <option value="">—</option>
+                    <option value="esfuerzo">En esfuerzo</option>
+                    <option value="recuperacion">En recuperación</option>
+                    <option value="ambos">En esfuerzo y recuperación</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="arr_sintomas">Tolerancia</label>
+                <select autocomplete="off" id="arr_sintomas">
+                    <option value="asintomatica">Asintomática</option>
+                    <option value="sintomatica">Sintomática</option>
+                </select>
+            </div>
+            <div class="form-group" style="grid-column: 1 / -1">
+                <label for="ecg_arritmias">Descripción libre (si la cargás, es la que va al informe)</label>
+                <input autocomplete="off" type="text" id="ecg_arritmias" placeholder="Ej: EV polimorfas con episodios de bigeminia ventricular durante el esfuerzo, asintomática">
             </div>
         </div>
+        <div id="aviso-arritmias" class="aviso-adquisicion" style="display:none"></div>
+
         <div class="info-banner" style="margin-top:0.75rem">
             <strong>Criterio ECG de isquemia:</strong> infradesnivel del ST ≥1 mm horizontal o descendente a 80 ms del punto J.
             &nbsp;|&nbsp; La <strong>discordancia</strong> entre ECG y motilidad es frecuente: la alteración de motilidad precede al ST en la cascada isquémica y manda en el informe del eco estrés.
@@ -767,6 +836,17 @@
             <div class="calc-row"><span>E/e' Estrés:</span><span id="diast_est_interp" class="calc-value">—</span></div>
             <div class="calc-row"><span>Respuesta de e' al esfuerzo:</span><span id="diast_eprima_resp" class="calc-value">—</span></div>
             <div class="calc-row"><span>Test diastólico de esfuerzo:</span><span id="diast_respuesta" class="calc-value">—</span></div>
+        </div>
+        <div class="grid" style="margin-top:0.75rem">
+            <div class="form-group">
+                <label for="diast_resultado">Estudio diastólico de esfuerzo — resultado que va al informe</label>
+                <select autocomplete="off" id="diast_resultado" onchange="marcarDiastolicoManual()">
+                    <option value="no_evaluado">No evaluado</option>
+                    <option value="negativo">Negativo</option>
+                    <option value="positivo">Positivo</option>
+                </select>
+                <span class="firma-nota" id="diast_origen">Se completa solo desde E/e' y VRT; podés corregirlo.</span>
+            </div>
         </div>
         <p class="table-note">
             Criterio de test diastólico positivo (ASE): E/e' promedio &gt;14 con el esfuerzo <em>y</em> VRT &gt;2,8 m/s, con e' septal &lt;7 cm/s en reposo.

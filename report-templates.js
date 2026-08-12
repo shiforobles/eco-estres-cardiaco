@@ -12,10 +12,36 @@
 
 const NARRATIVA = {
 
+    // ── PREÁMBULO DE LA CONCLUSIÓN ────────────────────────────────────
+    // Encabeza SIEMPRE la conclusión, antes del veredicto del Word.
+    preambulo: 'Test de Eco estrés {{suficiencia}} ({{pctFCmax}} % de la FCMT{{betabloqueo}}){{etapa}} por {{causaDetencion}}.',
+    preambuloBetabloqueo: ', realizada bajo tratamiento con Beta Bloqueante',
+    preambuloEtapa: ', detenido en etapa {{etapa}}',
+    preambuloSinEtapa: ', detenido',
+
+    // Segunda oración: sólo afirma ausencia de isquemia cuando efectivamente no la hubo
+    preambuloSinIsquemia: ' Sin evidencia de isquemia hasta el DP alcanzado ({{dobleProducto}}){{mets}}.',
+    preambuloConIsquemia: ' DP alcanzado {{dobleProducto}}{{mets}}.',
+    preambuloMETs: '; {{mets}} METs',
+
+    // ── BLOQUE ECG ────────────────────────────────────────────────────
+    // Va en líneas propias, fuera del párrafo de motilidad.
+    ecgReposo: 'ECG reposo: {{contenido}}',
+    ecgPostEsfuerzo: 'ECG post-esfuerzo: {{contenido}}',
+    ecgSinCambios: 'Sin cambios del ST-T ni arritmias.',
+
+    // ── ESTUDIO DIASTÓLICO ────────────────────────────────────────────
+    diastolicoNegativo:  'Estudio diastólico de esfuerzo: Negativo, sin aumento de las presiones de llenado con el esfuerzo.',
+    diastolicoPositivo:  'Estudio diastólico de esfuerzo: Positivo, con aumento de las presiones de llenado inducido por el ejercicio.',
+    diastolicoNoEvaluado:'Estudio diastólico de esfuerzo: No evaluado.',
+
     // ── MÉTODO ────────────────────────────────────────────────────────
-    metodo: 'Se realizó ecocardiograma con ejercicio en cicloergómetro con carga escalonada por discos{{carga}}, ' +
-            'alcanzando {{fcPico}} lpm ({{pctFCmax}} % de la FC máxima predicha) y un doble producto de {{dobleProducto}}, ' +
-            'deteniéndose la prueba por {{causaDetencion}}.',
+    metodo: 'Se realizó ecocardiograma con ejercicio en cicloergómetro{{protocolo}}, con carga escalonada hasta ' +
+            '{{carga}} Kgm/min{{etapaMetodo}}, alcanzando {{fcPico}} lpm ({{pctFCmax}} % de la FC máxima predicha) ' +
+            'y un doble producto de {{dobleProducto}}{{metsMetodo}}, deteniéndose la prueba por {{causaDetencion}}.',
+    metodoSinCarga: 'Se realizó ecocardiograma con ejercicio en cicloergómetro{{protocolo}}{{etapaMetodo}}, alcanzando ' +
+            '{{fcPico}} lpm ({{pctFCmax}} % de la FC máxima predicha) y un doble producto de {{dobleProducto}}' +
+            '{{metsMetodo}}, deteniéndose la prueba por {{causaDetencion}}.',
 
     // Frase de respuestas hemodinámicas: una sola de estas, según el caso
     respuestaNormal:      'La respuesta tensional fue normotensiva y la respuesta cronotrópica adecuada.',
@@ -162,6 +188,10 @@ const NARRATIVA = {
 
         caidaFey: '. La caída de la fracción de eyección con el esfuerzo constituye un marcador de alto riesgo',
 
+        // Sólo las arritmias con peso pronóstico propio llegan hasta acá.
+        arritmiaRelevante: '. Se constató la presencia de {{arritmias}}{{momento}}{{sintomas}}, hallazgo de significación ' +
+                     'pronóstica que amerita seguimiento',
+
         // Limitación septal para ramas que NO son la negativa.
         // Versión completa: no se demostró isquemia en la DA, así que su especificidad queda comprometida.
         conduccionSeptal: '. La presencia de {{trastorno}} limita la valoración de los segmentos septales y reduce la ' +
@@ -179,11 +209,7 @@ const NARRATIVA = {
     // En un positivo por imagen, que el ECG haya sido mudo es información relevante:
     // se dice explícitamente en lugar de omitirse.
     acompanamiento:            ' Se acompañó de {{lista}} al doble producto alcanzado.',
-    acompanamientoSinHallazgos:' No presentó cambios del ST-T ni angina.',
-    acompanamientoConduccion:  ' Se acompañó de {{lista}} al doble producto alcanzado; el análisis del segmento ST no es ' +
-                               'valorable por el trastorno de conducción.',
-    acompanamientoConduccionSinHallazgos: ' No presentó angina; el análisis del segmento ST no es valorable por el ' +
-                               'trastorno de conducción.',
+    acompanamientoSinHallazgos:' No refirió angina ni equivalentes anginosos.',
 
     // El WMSI es un índice de motilidad: con trastorno de conducción se calcula sin
     // los septales, y el informe deja constancia de cómo se obtuvo el número.
@@ -231,6 +257,17 @@ const CONDUCCION_PROSA = {
         alTrastorno:   'a la preexcitación ventricular',
         hallazgoSeptal:'alteración del movimiento septal por activación ventricular anómala'
     }
+};
+
+// Cómo se nombra cada trastorno en la línea "ECG reposo:" (sigla, como se escribe a mano)
+const CONDUCCION_SIGLA = {
+    bcri: 'BCRI',
+    marcapasos: 'ritmo de marcapasos',
+    preexcitacion: 'preexcitación ventricular',
+    bcrd: 'BCRD',
+    hbai: 'HBAI',
+    hbpi: 'HBPI',
+    bcrd_hbai: 'BCRD + HBAI'
 };
 
 // ── Causa de detención → cómo se dice dentro de la frase ──
