@@ -79,6 +79,24 @@ document.addEventListener('DOMContentLoaded', () => {
     ['change', 'input'].forEach(ev =>
         document.getElementById('ecg_conduccion').addEventListener(ev, updateWMSI));
 
+    // "Ritmo de marcapasos" se puede marcar en Ritmo de base o en Trastorno de conducción.
+    // Si sólo se marca en el primero, la exclusión septal no se aplicaba y los segmentos
+    // septales salían atribuidos a un territorio coronario. Se mantienen sincronizados.
+    document.getElementById('ecg_ritmo').addEventListener('change', () => {
+        const cond = document.getElementById('ecg_conduccion');
+        if (document.getElementById('ecg_ritmo').value === 'marcapasos' && cond.value !== 'marcapasos') {
+            cond.value = 'marcapasos';
+            updateWMSI();
+            showNotice('Ritmo de marcapasos: los segmentos septales quedan fuera del análisis isquémico.', 'warn');
+        }
+    });
+    document.getElementById('ecg_conduccion').addEventListener('change', () => {
+        const ritmo = document.getElementById('ecg_ritmo');
+        if (document.getElementById('ecg_conduccion').value === 'marcapasos' && ritmo.value !== 'marcapasos') {
+            ritmo.value = 'marcapasos';
+        }
+    });
+
     // Fecha del estudio: por defecto hoy
     setFechaHoy();
     initFirma();
@@ -106,6 +124,38 @@ function toggleTheme() {
     document.documentElement.setAttribute('data-theme', next);
     document.getElementById('theme-icon').textContent = next === 'dark' ? '☀️' : '🌙';
     localStorage.setItem('eco-estres-theme', next);
+}
+
+// ── PATRÓN DE LA ALTERACIÓN: autocompletado con override ──
+// Global = hipoquinesia difusa sin distribución coronaria (miocardiopatía dilatada).
+// Criterio: ≥12 de 17 segmentos alterados en reposo, los tres territorios y FEy ≤40%.
+let patronTocadoAMano = false;
+
+function marcarPatronManual() {
+    patronTocadoAMano = true;
+    const nota = document.getElementById('patron_origen');
+    if (nota) nota.textContent = 'Elegido a mano: la app ya no lo modifica.';
+    scheduleSave();
+}
+
+function detectarPatronGlobal() {
+    const alterados = SEGMENTS.filter(sg => WM.reposo[sg.id] > 1);
+    if (alterados.length < 12) return false;
+    const terr = new Set(alterados.map(sg => sg.territory));
+    if (terr.size < 3) return false;
+    const fey = num('fevi_reposo');
+    return fey > 0 && fey <= 40;
+}
+
+function autocompletarPatron() {
+    const el = document.getElementById('patron_motilidad');
+    if (!el || patronTocadoAMano) return;
+    const global = detectarPatronGlobal();
+    el.value = global ? 'global' : 'segmentaria';
+    const nota = document.getElementById('patron_origen');
+    if (nota) nota.textContent = global
+        ? 'Propuesto global: ≥12 segmentos, los tres territorios y FEy ≤40 %. Podés corregirlo.'
+        : 'Se propone solo según extensión, territorios y FEy.';
 }
 
 // ── ESTUDIO DIASTÓLICO: autocompletado con override ───
@@ -718,6 +768,7 @@ function updateMotilidadResumen(wmsiRep, wmsiEst) {
         c.territorios.length ? c.territorios.join(' + ') : '—';
 
     avisarWMSIConduccion();
+    autocompletarPatron();
 }
 
 // Aviso de pantalla: con trastorno de conducción los segmentos septales inflan el WMSI
@@ -1391,6 +1442,14 @@ function recolectarHallazgos() {
     // Estudio diastólico (lo que va al informe)
     H.diastResultado = document.getElementById('diast_resultado').value;
 
+    // Patrón de la alteración y ventrículo derecho
+    H.patronGlobal = document.getElementById('patron_motilidad').value === 'global';
+    H.vd = document.getElementById('vd_funcion').value;
+    H.vdProsa = VD_PROSA[H.vd] || '';
+
+    // Texto libre del bloque de reposo: reemplaza la REDACCIÓN, no los datos
+    H.reposoLibre = v('reposo_libre');
+
     // Síntomas del máximo esfuerzo
     H.sintomasEsfuerzo = v('esf_max_sint');
 
@@ -1437,6 +1496,11 @@ function recolectarHallazgos() {
     return H;
 }
 
+function gradoFeyEnProsa(fey) {
+    if (!(fey > 0)) return 'no evaluada';
+    return (FEY_PROSA.find(g => fey <= g.max) || { txt: 'conservada' }).txt;
+}
+
 // El ápex (17) tiene irrigación variable: sólo se le asigna vaso si viene
 // acompañado de otros segmentos del mismo territorio.
 function territoriosDe(segs) {
@@ -1451,6 +1515,8 @@ function elegirRama(H) {
     if (H.ventana === 'limitada') return 'noConcluyente';
     if (H.isquemicos.length && H.hipotension) return 'hipotensiva';
     if (H.isquemicos.length) return H.territoriosIsquemia.length > 1 ? 'positivaMulti' : 'positivaUnico';
+    // Hipoquinesia global: no es secuela segmentaria y no tiene territorio coronario
+    if (H.patronGlobal) return 'dilatada';
     if (H.secuelas.length) return 'secuela';
     if (H.diastolicoPositivo) return 'diastolico';
     return 'negativa';
@@ -1619,19 +1685,29 @@ function construirNarrativa(H) {
         deSegmentosSecuela: deSegmentos(H.secuelas),
         segmentosSecuelaArt: H.secuelas.length === 1 ? 'El segmento' : 'Los segmentos',
         territorioSecuela: territoriosEnProsa(H.territoriosSecuela),
-        territorioSecuelaFrase: territorioFrase(H.territoriosSecuela)
+        territorioSecuelaFrase: territorioFrase(H.territoriosSecuela),
+        gradoFey: gradoFeyEnProsa(H.feyReposo),
+        vd: H.vdProsa ? ', ' + H.vdProsa : ''
     };
     let plantillaReposo;
-    if (H.secuelas.length) plantillaReposo = T.reposoSecuela;
+    if (rama === 'dilatada') plantillaReposo = T.reposoDilatada;
+    else if (H.secuelas.length) plantillaReposo = T.reposoSecuela;
     else if (hayAsincronia) plantillaReposo = T.reposoConduccion;
     else if (rama === 'diastolico') plantillaReposo = T.reposoDiastolico;
     else if (rama === 'negativa') plantillaReposo = T.reposoNormalLargo;
     else plantillaReposo = T.reposoNormalCorto;
 
-    let parrafoReposo = rellenar(plantillaReposo, { ...datosReposo, ...datosConduccion });
-    // Secuela real en un territorio + asincronía septal por conducción: van las dos cosas
-    if (H.secuelas.length && hayAsincronia) {
-        parrafoReposo += ' ' + rellenar(T.asincroniaSeptalSuelta, datosConduccion);
+    let parrafoReposo;
+    if (H.reposoLibre) {
+        // El texto libre gobierna la redacción del bloque de reposo. Los datos cargados
+        // siguen alimentando la lógica: rama, WMSI, territorios y modificadores no cambian.
+        parrafoReposo = H.reposoLibre;
+    } else {
+        parrafoReposo = rellenar(plantillaReposo, { ...datosReposo, ...datosConduccion });
+        // Secuela real en un territorio + asincronía septal por conducción: van las dos cosas
+        if (H.secuelas.length && hayAsincronia) {
+            parrafoReposo += ' ' + rellenar(T.asincroniaSeptalSuelta, datosConduccion);
+        }
     }
     parrafos.push(parrafoReposo);
 
@@ -1658,6 +1734,7 @@ function construirNarrativa(H) {
         vrtEstres: H.vrtEstres || nada
     };
     const plantillaEsfuerzo = {
+        dilatada:      T.esfuerzoDilatada,
         noConcluyente: T.esfuerzoNoConcluyente,
         hipotensiva:   T.esfuerzoHipotensiva,
         positivaMulti: T.esfuerzoPositivoMulti,
@@ -1700,6 +1777,9 @@ function construirNarrativa(H) {
     let conclusion = rellenar(T.conclusiones[claveConclusion], {
         ...datosConduccion,
         capacidadFuncional: H.capacidadFuncional || 'adecuada tolerancia al esfuerzo',
+        gradoFey: gradoFeyEnProsa(H.feyReposo),
+        vdConcl: H.vdProsa ? ', ' + H.vdProsa : '',
+        capacidadDilatada: H.capacidadFuncional ? ` La capacidad funcional fue ${H.capacidadFuncional.replace('capacidad funcional ', '')}.` : '',
         territorioFrase: territorioFrase(H.territoriosIsquemia),
         territorioSecuelaFrase: territorioFrase(H.territoriosSecuela),
         motivoNoConcluyente: motivoNoConcluyente(H),
@@ -1713,11 +1793,14 @@ function construirNarrativa(H) {
     if (H.fcSuboptima && rama === 'negativa') extras.push(T.modificadores.fcSuboptima);
     // En un positivo la isquemia ya quedó demostrada y la FC insuficiente no lo invalida;
     // en un estudio sin isquemia, sí: no es un negativo pleno.
-    const sinIsquemiaDemostrada = ['secuela', 'diastolico'].includes(rama);
+    const sinIsquemiaDemostrada = ['secuela', 'diastolico', 'dilatada'].includes(rama);
     if (H.fcSuboptima && sinIsquemiaDemostrada) oracionesFinales.push(T.modificadores.fcSuboptimaOracion);
     if (H.adquisicionTardia && rama !== 'noConcluyente')
         extras.push(rellenar(T.modificadores.adquisicionTardia, { segImagen: H.segImagen, pctFCadq: H.pctFCadq }));
     if (H.caidaFey && rama !== 'positivaMulti' && rama !== 'hipotensiva') extras.push(T.modificadores.caidaFey);
+    // En la rama de HFpEF ya está en el núcleo de la conclusión: no se repite
+    if (H.diastResultado === 'positivo' && rama !== 'diastolico')
+        extras.push(T.modificadores.diastolicoPositivo);
     if (H.hayArritmiaRelevante) {
         const lista = H.arritmiasRelevantes.length
             ? listarEnProsa(H.arritmiasRelevantes.map(a => a.txt))
@@ -1866,6 +1949,27 @@ function validarEstudio(rama) {
 
     if (document.getElementById('ventana').value === 'limitada' && cnt.evalRep >= 17 && cnt.evalEst >= 17)
         av.push({ nivel: 'warn', txt: 'Marcaste ventana limitada pero evaluaste los 17 segmentos. El informe sale por la rama NO CONCLUYENTE: verificá si la ventana fue realmente limitada.' });
+
+    // El texto libre de reposo no lo lee el motor: si contradice lo cargado, el informe
+    // se contradice a sí mismo (el párrafo dice una FEy y la conclusión razona con otra).
+    const libre = v('reposo_libre');
+    if (libre) {
+        const feyCampo = num('fevi_reposo');
+        const m = libre.match(/FEy?\s*:?\s*(\d{1,2})\s*%/i);
+        if (m && feyCampo > 0 && Math.abs(parseInt(m[1]) - feyCampo) >= 1)
+            av.push({ nivel: 'error', txt: `El texto libre dice FEy ${m[1]} % y el campo tiene ${feyCampo} %. El informe va a mostrar un valor y razonar con el otro.` });
+        if (!m && feyCampo > 0)
+            av.push({ nivel: 'info', txt: 'El texto libre de reposo no menciona la FEy; el resto del informe la usa igual desde el campo.' });
+        const hablaDeAlteracion = /aquinesi|acinesi|hipoquinesi|hipocinesi|disquinesi|discinesi/i.test(libre);
+        if (hablaDeAlteracion && cnt.evalRep > 0 && !SEGMENTS.some(sg => WM.reposo[sg.id] > 1))
+            av.push({ nivel: 'error', txt: 'El texto libre describe alteraciones de la motilidad en reposo, pero en el bull\'s eye todos los segmentos están normales. La conclusión se arma con el bull\'s eye.' });
+    }
+
+    const patronEl = document.getElementById('patron_motilidad');
+    if (patronEl.value === 'segmentaria' && detectarPatronGlobal())
+        av.push({ nivel: 'warn', txt: 'El patrón cumple criterio de compromiso global (≥12 segmentos, tres territorios, FEy ≤40 %) pero está marcado como segmentario: la conclusión va a atribuir territorios coronarios.' });
+    if (patronEl.value === 'global' && !detectarPatronGlobal())
+        av.push({ nivel: 'info', txt: 'Marcaste patrón global sin que se cumpla el criterio automático. El informe respeta tu criterio.' });
 
     const conduccion = document.getElementById('ecg_conduccion').value;
     if (conduccion && conduccion !== 'ninguno') {
@@ -2141,6 +2245,7 @@ function resetFormulario() {
     document.getElementById('validacion-panel').style.display = 'none';
     setFechaHoy();
     diastolicoTocadoAMano = false;
+    patronTocadoAMano = false;
     setProtocol('ejercicio');
     setSpecialTab('viabilidad');
     updateChecklistBadge();
@@ -2416,6 +2521,7 @@ function aplicarEstudio(d) {
     calcFEVI(); calcDiastolico(); calcCFR(); calcStrain(); calcEAo(); calcMCH();
     updateResultBanner(); updateChecklistBadge();
     diastolicoTocadoAMano = !!(d.fields && d.fields.diast_resultado && d.fields.diast_resultado !== 'no_evaluado');
+    patronTocadoAMano = !!(d.fields && d.fields.patron_motilidad === 'global');
 
     // La planilla de dobutamina se restaura DESPUÉS de que calcDobutamina rearmó la tabla
     restoreDobStages(d.dobStages);

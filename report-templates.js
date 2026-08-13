@@ -111,6 +111,15 @@ const NARRATIVA = {
 
     esfuerzoHipotensiva: 'Con el esfuerzo se objetivaron {{hallazgos}}, con caída de la FEy de {{feyReposo}} % a {{feyEstres}} %.',
 
+    // ── HIPOQUINESIA GLOBAL / MIOCARDIOPATÍA DILATADA ─────────────────
+    // Patrón no coronario: NO se enumeran segmentos ni se atribuyen territorios,
+    // y no existe "el resto de los segmentos" del que hablar.
+    reposoDilatada:   'En reposo se observó hipoquinesia global del ventrículo izquierdo, sin distribución en territorio ' +
+                      'coronario, con función sistólica {{gradoFey}} (FEy {{fey}} %){{vd}} y relación E/e\' de {{ee}}.',
+
+    esfuerzoDilatada: 'Con el esfuerzo no se objetivó incremento significativo de la motilidad parietal ni de la función ' +
+                      'sistólica global, sin evidencia de reserva contráctil.{{acompanamiento}}',
+
     // ── TRASTORNO DE CONDUCCIÓN ───────────────────────────────────────
     // En BCRI, marcapasos o preexcitación el septum se mueve mal por activación
     // eléctrica anómala, no por isquemia ni necrosis: no se atribuye a un vaso.
@@ -142,6 +151,11 @@ const NARRATIVA = {
 
         // Versión corta, para cuando la conclusión sigue con la limitación de FC subóptima
         negativaCorta: 'Conclusión: prueba de eco estrés con ejercicio negativa para isquemia miocárdica inducible.',
+
+        dilatada: 'Conclusión: prueba de eco estrés con ejercicio sin isquemia inducible, en un ventrículo izquierdo con ' +
+                  'hipoquinesia global y función sistólica {{gradoFey}}, sin reserva contráctil con el esfuerzo. El patrón ' +
+                  'de compromiso no sigue una distribución coronaria, en relación con miocardiopatía dilatada{{vdConcl}}.' +
+                  '{{capacidadDilatada}}',
 
         negativaConduccion: 'Conclusión: prueba negativa para isquemia miocárdica inducible en los territorios evaluables. ' +
                   'La presencia de {{trastorno}} limita la valoración de los segmentos septales y reduce la especificidad del ' +
@@ -188,6 +202,11 @@ const NARRATIVA = {
 
         caidaFey: '. La caída de la fracción de eyección con el esfuerzo constituye un marcador de alto riesgo',
 
+        // Un test diastólico positivo es un hallazgo con peso propio: no puede quedarse
+        // sólo en la línea descriptiva del bloque post-esfuerzo.
+        diastolicoPositivo: '. El estudio diastólico de esfuerzo resultó positivo, con aumento de las presiones de llenado ' +
+                     'inducido por el ejercicio',
+
         // Sólo las arritmias con peso pronóstico propio llegan hasta acá.
         arritmiaRelevante: '. Se constató la presencia de {{arritmias}}{{momento}}{{sintomas}}, hallazgo de significación ' +
                      'pronóstica que amerita seguimiento',
@@ -220,6 +239,22 @@ const NARRATIVA = {
     // La firma NO se versiona: cada operador carga la suya en el campo
     // "Firma del informe" y queda guardada en su propio navegador.
     firma: ''
+};
+
+// Grado de deterioro de la FEy, en las palabras del informe
+const FEY_PROSA = [
+    { max: 30, txt: 'severamente deprimida' },
+    { max: 40, txt: 'moderadamente deprimida' },
+    { max: 52, txt: 'levemente deprimida' },
+    { max: 100, txt: 'conservada' }
+];
+
+// Función del ventrículo derecho
+const VD_PROSA = {
+    normal:   'con función del ventrículo derecho conservada',
+    leve:     'con disfunción leve del ventrículo derecho',
+    moderada: 'con disfunción moderada del ventrículo derecho',
+    severa:   'con disfunción severa del ventrículo derecho'
 };
 
 // ── Nombres de los 17 segmentos en prosa, para el cuerpo del informe ──

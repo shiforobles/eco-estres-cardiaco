@@ -500,6 +500,31 @@
                 <label for="pp_reposo">Presión Pulm. estimada (mmHg)</label>
                 <input autocomplete="off" type="number" id="pp_reposo" placeholder="mmHg" min="15" max="120">
             </div>
+            <div class="form-group">
+                <label for="vd_funcion">Función del ventrículo derecho</label>
+                <select autocomplete="off" id="vd_funcion">
+                    <option value="">No evaluada</option>
+                    <option value="normal">Normal</option>
+                    <option value="leve">Disfunción leve</option>
+                    <option value="moderada">Disfunción moderada</option>
+                    <option value="severa">Disfunción severa</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="patron_motilidad">Patrón de la alteración</label>
+                <select autocomplete="off" id="patron_motilidad" onchange="marcarPatronManual()">
+                    <option value="segmentaria">Segmentaria (distribución coronaria)</option>
+                    <option value="global">Global (no coronaria)</option>
+                </select>
+                <span class="firma-nota" id="patron_origen">Se propone solo según extensión, territorios y FEy.</span>
+            </div>
+        </div>
+
+        <div class="form-group" style="margin-top:1rem">
+            <label for="reposo_libre">Descripción del estudio en reposo — texto libre</label>
+            <textarea autocomplete="off" id="reposo_libre" rows="5"
+                placeholder="Pegá acá la descripción completa del eco en reposo (masa indexada, RWT, e' promedio, LAVI, cavidades derechas, válvulas...). Si cargás algo, este texto reemplaza el párrafo de reposo del informe."></textarea>
+            <span class="firma-nota">Reemplaza la <strong>redacción</strong> del párrafo de reposo, no los datos: el bull's eye, la FEy y el E/e' siguen decidiendo la lógica del resto del informe.</span>
         </div>
     </section>
 
