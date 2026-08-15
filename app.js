@@ -311,11 +311,26 @@ function calcEjercicio() {
     }
 
     // Doble producto en el máximo esfuerzo
+    const avisoDP = document.getElementById('aviso-dp');
     if (fcPico > 0 && tasPico > 0) {
         const dp = fcPico * tasPico;
-        set('doble_producto', `${dp.toLocaleString('es-AR')} — ${dp >= 25000 ? '✓ Carga hemodinámica adecuada' : '⚠ <25.000: carga submáxima'}`,
-            dp >= 25000 ? 'var(--color-success)' : 'var(--color-warning)');
-    } else set('doble_producto', '—');
+        const pctFC = edad > 0 ? Math.round((fcPico / (220 - edad)) * 100) : 0;
+        set('doble_producto', `${dp.toLocaleString('es-AR')} — ${dp >= 25000 ? '✓ Carga hemodinámica adecuada' : dp < 20000 ? '⚠ <20.000: estímulo insuficiente' : '⚠ <25.000: carga submáxima'}`,
+            dp >= 25000 ? 'var(--color-success)' : dp < 20000 ? 'var(--color-error)' : 'var(--color-warning)');
+        // En el borde del umbral con buena respuesta cronotrópica, la decisión es del operador
+        if (avisoDP) {
+            if (dp >= 18000 && dp < 20000 && pctFC >= 85) {
+                avisoDP.style.display = 'block';
+                avisoDP.innerHTML = `<strong>⚠ Doble producto en el límite.</strong> ${dp.toLocaleString('es-AR')} ` +
+                    `queda por debajo de 20.000 y el informe va a salir <strong>no concluyente por estímulo insuficiente</strong>, ` +
+                    `pero la respuesta cronotrópica fue buena (${pctFC} % de la FCMT). ` +
+                    `Si considerás que el estímulo fue adecuado, corregí el resultado a mano antes de firmar.`;
+            } else avisoDP.style.display = 'none';
+        }
+    } else {
+        set('doble_producto', '—');
+        if (avisoDP) avisoDP.style.display = 'none';
+    }
 
     // Respuesta tensional
     if (tasBasal > 0 && tasPico > 0) {
@@ -1407,6 +1422,14 @@ function recolectarHallazgos() {
     H.stDeriv = v('ecg_st_deriv');
     H.stAparicion = v('ecg_st_aparicion');
     H.stResolucion = v('ecg_st_resolucion');
+    H.stMorfologia = document.getElementById('ecg_st_morfologia').value;
+    H.stMorfologiaTxt = H.stMorfologia ? textoSelect('ecg_st_morfologia').toLowerCase() : '';
+
+    // El infradesnivel ascendente rápido es respuesta fisiológica al esfuerzo:
+    // describirlo como isquémico inventaría una discordancia que no existe.
+    const mm = parseFloat(H.stMm) || 0;
+    H.stIsquemico = H.stTipo === 'supra' ||
+        (H.stTipo === 'infra' && H.stMorfologia !== 'ascendente_rapido' && mm >= 1);
 
     // Trastorno de conducción
     H.conduccion = document.getElementById('ecg_conduccion').value;
@@ -1429,7 +1452,7 @@ function recolectarHallazgos() {
     H.arrMomento = document.getElementById('arr_momento').value;
     H.arrMomentoTxt = textoSelect('arr_momento').toLowerCase();
     H.arrSintomatica = document.getElementById('arr_sintomas').value === 'sintomatica';
-    H.arrLibre = v('ecg_arritmias');
+    H.arrLibre = normalizarTexto(v('ecg_arritmias'));
     // Una arritmia sintomática pesa aunque su morfología sea benigna
     H.hayArritmiaRelevante = H.arritmiasRelevantes.length > 0 || (H.arritmias.length > 0 && H.arrSintomatica);
 
@@ -1448,7 +1471,16 @@ function recolectarHallazgos() {
     H.vdProsa = VD_PROSA[H.vd] || '';
 
     // Texto libre del bloque de reposo: reemplaza la REDACCIÓN, no los datos
-    H.reposoLibre = v('reposo_libre');
+    H.reposoLibre = normalizarTexto(v('reposo_libre'));
+
+    // Reserva contráctil GLOBAL: ΔFEy ≥5 puntos. Es independiente de la regional.
+    H.deltaFey = (H.feyReposo > 0 && H.feyEstres > 0) ? H.feyEstres - H.feyReposo : null;
+    H.reservaGlobal = H.deltaFey !== null && H.deltaFey >= 5;
+
+    // Estímulo insuficiente: el DP es la carga real sobre el miocardio.
+    H.estimuloInsuficiente = H.dobleProducto > 0 && H.dobleProducto < 20000;
+    H.dpEnElBorde = H.dobleProducto >= 18000 && H.dobleProducto < 20000;
+
 
     // Síntomas del máximo esfuerzo
     H.sintomasEsfuerzo = v('esf_max_sint');
@@ -1487,6 +1519,9 @@ function recolectarHallazgos() {
     H.wmsiReposo = calcWMSI('reposo', excluirDelWMSI);
     H.wmsiEstres = calcWMSI('estres', excluirDelWMSI);
     H.wmsiExcluyeSeptales = H.hayConduccion;
+    // Se calcula acá y no antes: depende de los dos WMSI recién asignados
+    H.deltaWMSI = (H.wmsiReposo !== null && H.wmsiEstres !== null)
+        ? (parseFloat(H.wmsiEstres) - parseFloat(H.wmsiReposo)) : null;
     H.wmsiSubio = H.wmsiReposo !== null && H.wmsiEstres !== null &&
                   parseFloat(H.wmsiEstres) > parseFloat(H.wmsiReposo);
 
@@ -1513,13 +1548,28 @@ function territoriosDe(segs) {
 // ── Capa 2: selector de rama ──────────────────
 function elegirRama(H) {
     if (H.ventana === 'limitada') return 'noConcluyente';
+    // Estímulo insuficiente: por debajo de ese DP no se puede descartar isquemia.
+    // No aplica si el estudio YA dio resultado, por imagen o por ECG.
+    if (H.estimuloInsuficiente && !H.isquemicos.length && !H.stIsquemico) return 'noConcluyente';
     if (H.isquemicos.length && H.hipotension) return 'hipotensiva';
     if (H.isquemicos.length) return H.territoriosIsquemia.length > 1 ? 'positivaMulti' : 'positivaUnico';
     // Hipoquinesia global: no es secuela segmentaria y no tiene territorio coronario
     if (H.patronGlobal) return 'dilatada';
     if (H.secuelas.length) return 'secuela';
+    // ECG positivo con eco negativo. Requiere que el ST sea valorable: con BCRI,
+    // marcapasos o preexcitación ya declaramos ilegible el ST y no hay discordancia.
+    if (H.stIsquemico && !H.hayConduccion) return 'discordancia';
     if (H.diastolicoPositivo) return 'diastolico';
     return 'negativa';
+}
+
+// Cómo se nombra el hallazgo eléctrico dentro de la conclusión
+function descripcionSTEnProsa(H) {
+    if (!H.stIsquemico) return '';
+    const tipo = H.stTipo === 'supra' ? 'supradesnivel del ST' : 'infradesnivel del ST';
+    return tipo + (H.stMm ? ` de ${H.stMm} mm` : '') +
+        (H.stMorfologiaTxt ? `, ${H.stMorfologiaTxt}` : '') +
+        (H.stDeriv ? ` en ${H.stDeriv}` : '');
 }
 
 // ── Utilidades de prosa ───────────────────────
@@ -1602,6 +1652,22 @@ function ecgEsfuerzoEnProsa(H) {
     const arr = arritmiasEnProsa(H);
     partes.push(arr || 'Sin arritmias.');
     return partes.join(' ');
+}
+
+// Los textos libres vienen de otra app o de un teclado con la tilde invertida.
+// Se normalizan al generar, sin tocar lo que quedó escrito en pantalla.
+const TILDES_INVERTIDAS = { 'à':'á', 'è':'é', 'ì':'í', 'ò':'ó', 'ù':'ú',
+                            'À':'Á', 'È':'É', 'Ì':'Í', 'Ò':'Ó', 'Ù':'Ú' };
+
+function normalizarTexto(t) {
+    if (!t) return t;
+    return t
+        .replace(/[àèìòùÀÈÌÒÙ]/g, c => TILDES_INVERTIDAS[c] || c)
+        .replace(/bigemine[ao]/gi, m => m[0] === 'B' ? 'Bigeminia' : 'bigeminia')
+        .replace(/trigemine[ao]/gi, m => m[0] === 'T' ? 'Trigeminia' : 'trigeminia')
+        // Letras faltantes frecuentes al tipear rápido
+        .replace(/asintm(á|a)tic/gi, m => (m[0] === 'A' ? 'A' : 'a') + 'sintomátic')
+        .replace(/sintom(á|a)tica?mente/gi, m => (m[0] === 'S' ? 'S' : 's') + 'intomáticamente');
 }
 
 // Rellena {{marcadores}} y borra los que quedaron vacíos
@@ -1731,9 +1797,14 @@ function construirNarrativa(H) {
         feyReposo: H.feyReposo || nada,
         feyEstres: H.feyEstres || nada,
         eeEstres: H.eeEstres || nada,
-        vrtEstres: H.vrtEstres || nada
+        vrtEstres: H.vrtEstres || nada,
+        reservaGlobal: H.deltaFey === null ? '' : rellenar(
+            H.reservaGlobal ? T.reservaGlobalConservada : T.reservaGlobalAusente,
+            { feyReposo: H.feyReposo, feyEstres: H.feyEstres,
+              deltaFey: H.reservaGlobal ? H.deltaFey : (H.deltaFey >= 0 ? '+' + H.deltaFey : H.deltaFey) })
     };
     const plantillaEsfuerzo = {
+        discordancia:  T.esfuerzoDiscordancia,
         dilatada:      T.esfuerzoDilatada,
         noConcluyente: T.esfuerzoNoConcluyente,
         hipotensiva:   T.esfuerzoHipotensiva,
@@ -1759,6 +1830,28 @@ function construirNarrativa(H) {
     }
     parrafos.push(parrafoEsfuerzo);
 
+    // ── LÍNEA CUANTITATIVA DE MOTILIDAD ──
+    // Aparece siempre que haya segmentos comprometidos: en secuela y dilatada el
+    // Δ cero ES el hallazgo (ausencia de respuesta), no una ausencia de dato.
+    const comprometidos = H.isquemicos.length + H.secuelas.length;
+    if (comprometidos > 0 && H.wmsiReposo !== null && H.wmsiEstres !== null) {
+        const d = H.deltaWMSI;
+        const dTxt = d > 0 ? '+' + d.toFixed(2) : d.toFixed(2);
+        const detalle = [];
+        if (H.isquemicos.length) detalle.push(`${H.isquemicos.length} con isquemia inducible`);
+        if (H.secuelas.length) detalle.push(`${H.secuelas.length} sin respuesta al esfuerzo`);
+        if (detalle.length === 1 && comprometidos === parseInt(detalle[0])) detalle[0] = detalle[0].replace(/^\d+ /, '');
+        parrafos.push(rellenar(T.lineaWMSI, {
+            wmsiReposo: H.wmsiReposo,
+            wmsiEstres: H.wmsiEstres,
+            deltaWMSI: dTxt,
+            aclaracionWMSI: H.wmsiExcluyeSeptales ? NARRATIVA.aclaracionWMSI : '',
+            segmentos: comprometidos === 1
+                ? `1 segmento comprometido (${detalle.join(', ')})`
+                : `${comprometidos} segmentos comprometidos (${detalle.join(', ')})`
+        }));
+    }
+
     // ── ECG: líneas propias, fuera del párrafo de motilidad ──
     parrafos.push(rellenar(T.ecgReposo, { contenido: ecgReposoEnProsa(H) }));
     parrafos.push(rellenar(T.ecgPostEsfuerzo, { contenido: ecgEsfuerzoEnProsa(H) }));
@@ -1779,6 +1872,7 @@ function construirNarrativa(H) {
         capacidadFuncional: H.capacidadFuncional || 'adecuada tolerancia al esfuerzo',
         gradoFey: gradoFeyEnProsa(H.feyReposo),
         vdConcl: H.vdProsa ? ', ' + H.vdProsa : '',
+        descripcionST: descripcionSTEnProsa(H),
         capacidadDilatada: H.capacidadFuncional ? ` La capacidad funcional fue ${H.capacidadFuncional.replace('capacidad funcional ', '')}.` : '',
         territorioFrase: territorioFrase(H.territoriosIsquemia),
         territorioSecuelaFrase: territorioFrase(H.territoriosSecuela),
@@ -1798,6 +1892,9 @@ function construirNarrativa(H) {
     if (H.adquisicionTardia && rama !== 'noConcluyente')
         extras.push(rellenar(T.modificadores.adquisicionTardia, { segImagen: H.segImagen, pctFCadq: H.pctFCadq }));
     if (H.caidaFey && rama !== 'positivaMulti' && rama !== 'hipotensiva') extras.push(T.modificadores.caidaFey);
+    // La conclusión no puede negar lo que el bloque de ECG describe
+    if (H.stIsquemico && !H.hayConduccion && ['secuela', 'dilatada'].includes(rama))
+        extras.push(rellenar(T.modificadores.discordancia, { descripcionST: descripcionSTEnProsa(H) }));
     // En la rama de HFpEF ya está en el núcleo de la conclusión: no se repite
     if (H.diastResultado === 'positivo' && rama !== 'diastolico')
         extras.push(T.modificadores.diastolicoPositivo);
@@ -1843,6 +1940,9 @@ function construirNarrativa(H) {
 function motivoNoConcluyente(H) {
     const m = [];
     if (H.ventana === 'limitada') m.push('ventana acústica limitada');
+    if (H.estimuloInsuficiente)
+        m.push(`estímulo insuficiente (doble producto ${H.dobleProducto.toLocaleString('es-AR')})` +
+               (H.betabloqueante ? ', bajo tratamiento betabloqueante' : ''));
     if (H.adquisicionTardia) m.push('adquisición post-esfuerzo tardía');
     if (H.fcSuboptima) m.push('no haberse alcanzado la FC objetivo');
     return listarEnProsa(m) || 'limitaciones técnicas del estudio';

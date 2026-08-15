@@ -94,9 +94,19 @@ const NARRATIVA = {
                        '{{wmsiEstres}}{{caidaFey}}.' +
                        '{{acompanamiento}} El hallazgo de isquemia extensa y multiterritorial constituye un marcador de alto riesgo.',
 
-    esfuerzoSecuela:   'Con el esfuerzo los segmentos comprometidos no modificaron su motilidad, sin evidencia de reserva contráctil en dicho ' +
-                       'territorio. El resto de los segmentos mostró adecuada respuesta hiperdinámica, sin nuevas alteraciones. ' +
-                       'No presentó cambios del ST-T ni angina.',
+    esfuerzoSecuela:   'Con el esfuerzo los segmentos comprometidos no modificaron su motilidad, sin reserva contráctil regional ' +
+                       'en dicho territorio. El resto de los segmentos mostró adecuada respuesta hiperdinámica, sin nuevas ' +
+                       'alteraciones.{{reservaGlobal}}{{acompanamiento}}',
+
+    // Reserva contráctil GLOBAL: es el ΔFEy, y es un dato pronóstico propio que no
+    // se puede dar por perdido porque la respuesta regional haya sido nula.
+    reservaGlobalConservada: ' La función sistólica global mostró incremento adecuado con el esfuerzo (FEy {{feyReposo}} % → ' +
+                       '{{feyEstres}} %, Δ +{{deltaFey}} puntos), lo que traduce reserva contráctil global conservada.',
+    reservaGlobalAusente: ' La función sistólica global no mostró incremento significativo (FEy {{feyReposo}} % → {{feyEstres}} %, ' +
+                       'Δ {{deltaFey}} puntos), sin reserva contráctil global.',
+
+    // ── LÍNEA CUANTITATIVA DE MOTILIDAD ───────────────────────────────
+    lineaWMSI: 'Motilidad: WMSI {{wmsiReposo}} → {{wmsiEstres}} (Δ {{deltaWMSI}}){{aclaracionWMSI}}; {{segmentos}}.',
 
     esfuerzoHipertensiva: 'No se observaron nuevas alteraciones de la motilidad parietal, con adecuada respuesta hiperdinámica global, ' +
                        'sin cambios del ST-T ni angina.',
@@ -110,6 +120,13 @@ const NARRATIVA = {
                        'presiones de llenado del ventrículo izquierdo inducido por el ejercicio.',
 
     esfuerzoHipotensiva: 'Con el esfuerzo se objetivaron {{hallazgos}}, con caída de la FEy de {{feyReposo}} % a {{feyEstres}} %.',
+
+    // ── DISCORDANCIA ELÉCTRICO-ECOGRÁFICA ─────────────────────────────
+    // ECG positivo con eco negativo. La conclusión no puede negar la isquemia
+    // a secas cuando el bloque de ECG describe cambios isquémicos.
+    esfuerzoDiscordancia: 'Con el esfuerzo se objetivó adecuada respuesta hiperdinámica global, sin nuevas alteraciones ' +
+                       'de la motilidad parietal en ninguno de los territorios evaluados, pese a los cambios eléctricos ' +
+                       'descritos.{{acompanamiento}}',
 
     // ── HIPOQUINESIA GLOBAL / MIOCARDIOPATÍA DILATADA ─────────────────
     // Patrón no coronario: NO se enumeran segmentos ni se atribuyen territorios,
@@ -157,6 +174,11 @@ const NARRATIVA = {
                   'de compromiso no sigue una distribución coronaria, en relación con miocardiopatía dilatada{{vdConcl}}.' +
                   '{{capacidadDilatada}}',
 
+        discordancia: 'Conclusión: prueba de eco estrés con ejercicio con respuesta eléctrica positiva ({{descripcionST}}) y ' +
+                  'respuesta contráctil negativa, sin nuevas alteraciones de la motilidad parietal. Se trata de una ' +
+                  'discordancia eléctrico-ecográfica: la respuesta contráctil tiene mayor especificidad para isquemia ' +
+                  'miocárdica que el análisis del segmento ST. Se sugiere correlación clínica.',
+
         negativaConduccion: 'Conclusión: prueba negativa para isquemia miocárdica inducible en los territorios evaluables. ' +
                   'La presencia de {{trastorno}} limita la valoración de los segmentos septales y reduce la especificidad del ' +
                   'estudio en territorio de la descendente anterior, además de invalidar el análisis del segmento ST. ' +
@@ -201,6 +223,10 @@ const NARRATIVA = {
                      '{{pctFCadq}} % de la FC pico), lo que reduce la sensibilidad del estudio',
 
         caidaFey: '. La caída de la fracción de eyección con el esfuerzo constituye un marcador de alto riesgo',
+
+        // Discordancia sobre una rama que ya dice otra cosa (secuela, dilatada)
+        discordancia: '. Presentó además cambios isquémicos del segmento ST ({{descripcionST}}) sin correlato en la ' +
+                     'motilidad parietal, discordancia en la que la respuesta contráctil tiene mayor especificidad',
 
         // Un test diastólico positivo es un hallazgo con peso propio: no puede quedarse
         // sólo en la línea descriptiva del bloque post-esfuerzo.
