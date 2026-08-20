@@ -106,6 +106,8 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.chk-arr').forEach(el => el.addEventListener('change', avisarArritmias));
     document.getElementById('arr_sintomas').addEventListener('change', avisarArritmias);
     updateChecklistBadge();
+    renderBancos();
+    renderMedicacion();
     renderHistorial(true);
 
     // Autosave / recuperación del estudio en curso (al final, con todo ya construido)
@@ -408,37 +410,185 @@ function avisarArritmias() {
     }
 }
 
-// ── SUGERENCIA DE CATEGORIZACIÓN DE RIESGO ────
-// Sugiere, no impone: el desplegable lo decide el operador.
+// ══════════════════════════════════════════════
+//  LISTAS QUE APRENDEN (indicaciones y medicación)
+//  Se guardan en esta computadora y se ordenan por frecuencia:
+//  lo que más usás queda primero y a un clic.
+// ══════════════════════════════════════════════
+const BANCO_IND_KEY = 'eco-estres-indicaciones';
+const BANCO_MED_KEY = 'eco-estres-medicacion';
+const BANCO_TOPE = 14;
+
+let medicacionActual = [];   // [{nombre, dosis}] del estudio en curso
+
+function leerBanco(key) {
+    try { return JSON.parse(localStorage.getItem(key)) || []; }
+    catch (e) { return []; }
+}
+function guardarBanco(key, lista) {
+    try { localStorage.setItem(key, JSON.stringify(lista.slice(0, 60))); } catch (e) { /* noop */ }
+}
+
+// Suma un uso o lo crea si es nuevo, y reordena por frecuencia
+function registrarEnBanco(key, item) {
+    if (!item.nombre) return;
+    const lista = leerBanco(key);
+    const clave = item.nombre.trim().toLowerCase();
+    const yaEsta = lista.find(x => x.nombre.trim().toLowerCase() === clave);
+    if (yaEsta) {
+        yaEsta.usos = (yaEsta.usos || 0) + 1;
+        if (item.dosis) yaEsta.dosis = item.dosis;   // la última dosis usada manda
+    } else {
+        lista.push({ nombre: item.nombre.trim(), dosis: (item.dosis || '').trim(), usos: 1 });
+    }
+    lista.sort((a, b) => (b.usos || 0) - (a.usos || 0));
+    guardarBanco(key, lista);
+}
+
+function olvidarDelBanco(key, nombre) {
+    guardarBanco(key, leerBanco(key).filter(x => x.nombre.trim().toLowerCase() !== nombre.trim().toLowerCase()));
+    renderBancos();
+}
+
+function usarIndicacion(nombre) {
+    const el = document.getElementById('indicacion_libre');
+    const actual = el.value.trim();
+    if (actual.toLowerCase().includes(nombre.toLowerCase())) return;
+    el.value = actual ? actual.replace(/\.?\s*$/, '') + '. ' + nombre : nombre;
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
+function agregarMedicacion(nombre, dosis) {
+    const elN = document.getElementById('med_nombre'), elD = document.getElementById('med_dosis');
+    const n = (nombre !== undefined ? nombre : elN.value).trim();
+    const d = (dosis !== undefined ? dosis : elD.value).trim();
+    if (!n) { elN.focus(); return; }
+    if (!medicacionActual.some(m => m.nombre.toLowerCase() === n.toLowerCase()))
+        medicacionActual.push({ nombre: n, dosis: d });
+    registrarEnBanco(BANCO_MED_KEY, { nombre: n, dosis: d });
+    if (nombre === undefined) { elN.value = ''; elD.value = ''; elN.focus(); }
+    renderMedicacion(); renderBancos(); scheduleSave();
+}
+
+function quitarMedicacion(i) {
+    medicacionActual.splice(i, 1);
+    renderMedicacion(); scheduleSave();
+}
+
+function renderMedicacion() {
+    const cont = document.getElementById('med-lista');
+    if (!cont) return;
+    cont.innerHTML = medicacionActual.length
+        ? medicacionActual.map((m, i) =>
+            `<span class="med-item">${m.nombre}${m.dosis ? ' <em>' + m.dosis + '</em>' : ''}` +
+            `<button type="button" class="med-quitar" onclick="quitarMedicacion(${i})" title="Quitar">✕</button></span>`).join('')
+        : '<span class="firma-nota">Sin medicación cargada.</span>';
+}
+
+function medicacionEnTexto() {
+    return medicacionActual.map(m => m.nombre + (m.dosis ? ' ' + m.dosis : '')).join(', ');
+}
+
+function chipHTML(x, accion) {
+    return `<span class="chip" onclick="${accion}" title="${x.usos || 1} uso(s)">` +
+        `${x.nombre}${x.dosis ? ' <em>' + x.dosis + '</em>' : ''}</span>`;
+}
+
+function renderBancos() {
+    const esc = t => JSON.stringify(t).replace(/"/g, '&quot;');
+    const ind = document.getElementById('chips-indicacion');
+    if (ind) {
+        const lista = leerBanco(BANCO_IND_KEY).slice(0, BANCO_TOPE);
+        ind.innerHTML = lista.length
+            ? '<span class="chips-titulo">Usadas antes:</span>' +
+              lista.map(x => chipHTML(x, `usarIndicacion(${esc(x.nombre)})`)).join('')
+            : '';
+    }
+    const med = document.getElementById('chips-medicacion');
+    if (med) {
+        const lista = leerBanco(BANCO_MED_KEY).slice(0, BANCO_TOPE);
+        med.innerHTML = lista.length
+            ? '<span class="chips-titulo">Un clic para agregar:</span>' +
+              lista.map(x => chipHTML(x, `agregarMedicacion(${esc(x.nombre)},${esc(x.dosis || '')})`)).join('')
+            : '<span class="firma-nota">Los fármacos que cargues quedan acá, a un clic, ordenados por uso.</span>';
+    }
+}
+
+// La indicación escrita se aprende al generar el informe, no en cada tecla
+function aprenderIndicacion() {
+    const txt = v('indicacion_libre');
+    if (txt) registrarEnBanco(BANCO_IND_KEY, { nombre: txt });
+}
+
+// ══════════════════════════════════════════════
+//  CATEGORIZACIÓN DE RIESGO SUGERIDA
+//  Anclada en el WMSI pico, el predictor más validado del eco estrés:
+//  1,0 → 0,8-0,9 % de eventos/año · 1,1-1,7 → 2,6-3,1 % · >1,7 → 5,2-5,5 %.
+//  Sugiere y explica el porqué; la decisión es del operador.
+// ══════════════════════════════════════════════
+function evaluarCategorizacion() {
+    const H = recolectarHallazgos();
+    const alto = [], intermedio = [];
+    const wmsiPico = H.wmsiEstres !== null ? parseFloat(H.wmsiEstres) : null;
+
+    // ── Riesgo alto ──
+    if (wmsiPico !== null && wmsiPico > 1.7)
+        alto.push(`WMSI pico ${H.wmsiEstres} (>1,7): ~5 % de eventos cardíacos por año`);
+    if (H.feyReposo > 0 && H.feyReposo <= 45)
+        alto.push(`FEy en reposo ${H.feyReposo} % (≤45 %): marcador independiente de riesgo`);
+    if (H.caidaFey)
+        alto.push(`la FEy cae de ${H.feyReposo} % a ${H.feyEstres} % con el esfuerzo: sugiere isquemia extensa`);
+    if (H.territoriosIsquemia.length > 1)
+        alto.push(`isquemia en ${H.territoriosIsquemia.length} territorios coronarios`);
+    if (H.hipotension)
+        alto.push('respuesta hipotensiva al esfuerzo');
+    if (H.mets > 0 && H.mets < 5)
+        alto.push(`capacidad funcional ${H.mets} METs (<5): predictor independiente de mortalidad`);
+    if (H.isquemicos.length && H.dobleProducto > 0 && H.dobleProducto < 20000)
+        alto.push(`isquemia con doble producto ${H.dobleProducto.toLocaleString('es-AR')}: umbral isquémico bajo`);
+    if (H.arritmias.some(a => ['arr_tvns', 'arr_ev_poli', 'arr_dupletas'].includes(a.id)))
+        alto.push('arritmia ventricular compleja durante el estudio');
+
+    // ── Riesgo intermedio ──
+    if (wmsiPico !== null && wmsiPico > 1.0 && wmsiPico <= 1.7)
+        intermedio.push(`WMSI pico ${H.wmsiEstres} (1,1-1,7): ~3 % de eventos por año`);
+    if (H.isquemicos.length && H.territoriosIsquemia.length <= 1)
+        intermedio.push(`isquemia inducible en ${H.isquemicos.length} ` +
+            `${H.isquemicos.length === 1 ? 'segmento' : 'segmentos'} de un solo territorio`);
+    if (H.secuelas.length)
+        intermedio.push('secuela sin reserva contráctil regional');
+    if (H.diastResultado === 'positivo')
+        intermedio.push('test diastólico de esfuerzo positivo');
+    if (H.pctFCmax > 0 && H.pctFCmax < 85 && !H.betabloqueante)
+        intermedio.push(`respuesta cronotrópica ${H.pctFCmax} % sin betabloqueo: posible incompetencia cronotrópica`);
+
+    const nivel = alto.length ? 'alto' : intermedio.length ? 'intermedio' : 'bajo';
+    return {
+        nivel,
+        motivos: alto.length ? alto : intermedio,
+        noConcluyente: elegirRama(H) === 'noConcluyente',
+        hayDatos: H.wmsiEstres !== null || H.feyReposo > 0
+    };
+}
+
 function sugerirCategorizacion() {
     const el = document.getElementById('categorizacion-sugerida');
     if (!el) return;
-    const c = contarMotilidad();
-    const tasBasal = num('esf_basal_tas'), tasPico = num('esf_max_tas');
-    const hipotension = tasBasal > 0 && tasPico > 0 && (tasPico - tasBasal) <= -10;
-    const feyRep = num('fevi_reposo'), feyEst = num('fevi_pico');
-    const caidaFey = feyRep > 0 && feyEst > 0 && feyEst < feyRep;
+    let r;
+    try { r = evaluarCategorizacion(); }
+    catch (e) { el.textContent = ''; return; }
+    if (!r.hayDatos) { el.textContent = ''; el.className = 'hint-sugerida'; return; }
 
-    if (document.getElementById('ventana').value === 'limitada') {
-        el.textContent = 'Estudio no concluyente: la categorización de riesgo no es aplicable';
-        el.className = 'hint-sugerida';
-        return;
-    }
-
-    const motivos = [];
-    if (c.territorios.length > 1) motivos.push('isquemia multiterritorial');
-    if (c.isquemicos >= 5) motivos.push('isquemia extensa');
-    if (hipotension) motivos.push('respuesta hipotensiva');
-    if (caidaFey) motivos.push('caída de la FEy');
-
-    let sug;
-    if (motivos.length) sug = 'alto';
-    else if (c.isquemicos > 0) sug = 'intermedio';
-    else if (c.evalEst > 0) sug = 'bajo';
-    else { el.textContent = ''; return; }
-
-    el.textContent = `Sugerido: ${sug}${motivos.length ? ' — ' + motivos.join(', ') : ''}`;
-    el.className = 'hint-sugerida hint-' + sug;
+    const etiqueta = { bajo: '1 · Bajo', intermedio: '2 · Intermedio', alto: '3 · Alto' }[r.nivel];
+    let html = `<strong>Sugerido: ${etiqueta}</strong>`;
+    html += r.motivos.length
+        ? '<ul class="cat-motivos">' + r.motivos.map(m => `<li>${m}</li>`).join('') + '</ul>'
+        : '<div class="cat-motivos">Sin criterios de riesgo: WMSI pico normal, sin isquemia inducible ' +
+          'ni marcadores de mal pronóstico.</div>';
+    if (r.noConcluyente)
+        html += '<div class="cat-salvedad">⚠ El estudio es no concluyente: esta categoría no descarta isquemia.</div>';
+    el.innerHTML = html;
+    el.className = 'hint-sugerida cat-panel hint-' + r.nivel;
 }
 
 // ── CALCULADORA DOBUTAMINA ────────────────────
@@ -1205,7 +1355,7 @@ ${v('nc_descripcion') ? 'Descripción: ' + v('nc_descripcion') : ''}`;
           ((17 - cnt.evalEst) > 2 || (17 - cnt.evalRep) > 2 ? ' — más de 2 segmentos no visualizados: valorar con cautela.' : '.')
         : 'Motilidad segmentaria no cargada.';
     const extensionTxt = cnt.isquemicos > 0
-        ? `Isquemia inducible en ${cnt.isquemicos} segmento(s) — territorio ${cnt.territorios.join(' + ')}.`
+        ? `Isquemia inducible en ${cnt.isquemicos} ${cnt.isquemicos === 1 ? 'segmento' : 'segmentos'} — territorio ${cnt.territorios.join(' + ')}.`
         : (cnt.evalEst > 0 ? 'Sin isquemia inducible en los segmentos evaluados.' : '');
 
     // Motilidad en recuperación
@@ -1281,6 +1431,8 @@ ${indicacion}${indLibre ? '\n' + indLibre : ''}
 
 ANTECEDENTES CLÍNICOS
 ${ants.length > 0 ? ants.join(', ') : 'Sin antecedentes registrados'}
+${medicacionEnTexto() ? 'Medicación habitual: ' + medicacionEnTexto() : ''}
+${v('resumen_hc') ? '\nRESUMEN DE HISTORIA CLÍNICA\n' + v('resumen_hc') : ''}
 
 CALIDAD TÉCNICA
 Ventana Acústica: ${ventana}  |  Contraste: ${contraste}
@@ -1402,6 +1554,8 @@ function recolectarHallazgos() {
     // Capacidad funcional
     H.mets = num('ej_mets');
     H.capacidadFuncional = categoriaMETs(H.mets);
+    const metsPred = metsPredichos(edad, H.sexo);
+    H.pctMets = (H.mets > 0 && metsPred) ? Math.round((H.mets / metsPred) * 100) : null;
 
     // Función ventricular
     H.feyReposo = num('fevi_reposo');
@@ -1690,7 +1844,7 @@ function construirNarrativa(H) {
         fcPico: H.fcPico || nada,
         pctFCmax: H.pctFCmax || nada,
         dobleProducto: H.dobleProducto ? H.dobleProducto.toLocaleString('es-AR') : nada,
-        metsMetodo: H.mets ? `, con ${H.mets} METs` : '',
+        metsMetodo: H.mets ? `, con ${H.mets} METs${H.pctMets ? ` (${H.pctMets} % del predicho para edad y sexo)` : ''}` : '',
         causaDetencion: H.causaDetencionTxt
     };
     const metodo = [rellenar(H.cargaKgm ? T.metodo : T.metodoSinCarga, datosMetodo)];
@@ -1981,6 +2135,7 @@ function generarInforme() {
     const firma = firmaInforme();
     const informe = `${encabezado}\n\n${texto}\n${firma ? '\n' + firma + '\n' : ''}`;
 
+    aprenderIndicacion();
     validarEstudio(rama);
 
     const out = document.getElementById('reporte-output');
@@ -2001,7 +2156,6 @@ function validarEstudio(rama) {
 
     if (!v('paciente_id') && !v('paciente_nombre')) av.push({ nivel: 'warn', txt: 'Falta identificar al paciente (HC/ID o nombre).' });
     if (!edad) av.push({ nivel: 'error', txt: 'Falta la edad: sin ella no se calcula la FC máxima predicha ni la adecuación del estudio.' });
-    if (!v('peso')) av.push({ nivel: 'warn', txt: 'Falta el peso: no se pueden estimar los METs de la bicicleta.' });
     if (!document.getElementById('indicacion').value) av.push({ nivel: 'warn', txt: 'Falta la indicación del estudio.' });
     if (!v('fevi_reposo')) av.push({ nivel: 'warn', txt: 'Falta la FEy en reposo.' });
 
@@ -2082,9 +2236,6 @@ function validarEstudio(rama) {
             av.push({ nivel: 'info', txt: `${septalesAlterados.length} segmento(s) septal(es) quedan fuera del análisis isquémico por el trastorno de conducción. El WMSI de la tabla los sigue incluyendo.` });
     }
 
-    const preFaltantes = Array.from(document.querySelectorAll('.chk-pre')).filter(c => !c.checked).length;
-    if (preFaltantes > 0) av.push({ nivel: 'info', txt: `Checklist pre-estudio: ${preFaltantes} ítem(s) sin tildar.` });
-
     const panel = document.getElementById('validacion-panel');
     if (!av.length) {
         panel.style.display = 'block';
@@ -2158,12 +2309,13 @@ function guardarEnHistorial() {
 
     // Sin HC el estudio no se puede identificar después: se avisa y se pide confirmación
     // explícita en vez de dejarlo pasar sin más.
-    if (!v('paciente_id')) {
+    // Con el nombre alcanza para identificarlo: sólo se pregunta si no hay ni HC ni nombre.
+    if (!v('paciente_id') && !v('paciente_nombre')) {
         const campo = document.getElementById('paciente_id');
         campo.focus();
         campo.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        if (!confirm('Falta el número de HC / ID del paciente.\n\n' +
-                     'Sin HC no vas a poder distinguir este estudio de los demás en el historial.\n\n' +
+        if (!confirm('El estudio no tiene ni HC ni nombre.\n\n' +
+                     'No vas a poder distinguirlo de los demás en el historial.\n\n' +
                      '¿Guardar igual, sin identificar?')) return;
     }
 
@@ -2182,6 +2334,7 @@ function guardarEnHistorial() {
             protocol: currentProtocol,
             specialTab: currentSpecialTab,
             dobStages: captureDobStages(),
+            medicacion: medicacionActual.map(m => ({ ...m })),
         }
     });
     try {
@@ -2344,6 +2497,8 @@ function resetFormulario() {
     document.getElementById('resultado-banner').style.display = 'none';
     document.getElementById('validacion-panel').style.display = 'none';
     setFechaHoy();
+    medicacionActual = [];
+    renderMedicacion();
     diastolicoTocadoAMano = false;
     patronTocadoAMano = false;
     setProtocol('ejercicio');
@@ -2515,6 +2670,7 @@ function saveDraft() {
             protocol: currentProtocol,
             specialTab: currentSpecialTab,
             dobStages: captureDobStages(),
+            medicacion: medicacionActual.map(m => ({ ...m })),
             // El informe ya redactado también se guarda: si se cierra el navegador
             // después de generarlo, vuelve tal cual y no hay que rehacerlo.
             reporte: document.getElementById('reporte-output').textContent || ''
@@ -2622,6 +2778,9 @@ function aplicarEstudio(d) {
     updateResultBanner(); updateChecklistBadge();
     diastolicoTocadoAMano = !!(d.fields && d.fields.diast_resultado && d.fields.diast_resultado !== 'no_evaluado');
     patronTocadoAMano = !!(d.fields && d.fields.patron_motilidad === 'global');
+
+    medicacionActual = Array.isArray(d.medicacion) ? d.medicacion.map(m => ({ ...m })) : [];
+    renderMedicacion();
 
     // La planilla de dobutamina se restaura DESPUÉS de que calcDobutamina rearmó la tabla
     restoreDobStages(d.dobStages);

@@ -27,6 +27,18 @@
     </header>
 
     <!-- ══════════════════════════════════════
+         RESUMEN DE HISTORIA CLÍNICA
+         ══════════════════════════════════════ -->
+    <section class="card card-blue">
+        <h2 class="section-title">Resumen de Historia Clínica</h2>
+        <div class="form-group">
+            <textarea autocomplete="off" id="resumen_hc" rows="4"
+                placeholder="Antecedentes, motivo de derivación, estudios previos, contexto clínico. Se guarda junto con el estudio."></textarea>
+            <span class="firma-nota">Queda guardado con el estudio, para entender el contexto en el archivo sin releer todo. No sale en el informe.</span>
+        </div>
+    </section>
+
+    <!-- ══════════════════════════════════════
          SECCIÓN 1: DATOS DEL PACIENTE
          ══════════════════════════════════════ -->
     <section class="card">
@@ -111,7 +123,17 @@
             <div class="form-group">
                 <label for="indicacion_libre">Motivo / Detalle clínico</label>
                 <textarea autocomplete="off" id="indicacion_libre" rows="2" placeholder="Ej: disnea de esfuerzo, control post-IAM anterior..."></textarea>
+                <div id="chips-indicacion" class="chips-banco"></div>
             </div>
+        </div>
+
+        <h3 class="subsection-title" style="margin-top:1.25rem">Medicación Habitual</h3>
+        <div id="med-lista" class="med-lista"></div>
+        <div id="chips-medicacion" class="chips-banco"></div>
+        <div class="med-nueva">
+            <input autocomplete="off" type="text" id="med_nombre" placeholder="Fármaco">
+            <input autocomplete="off" type="text" id="med_dosis" placeholder="Dosis (opcional)">
+            <button type="button" class="btn btn-secondary btn-sm" onclick="agregarMedicacion()">+ Agregar</button>
         </div>
         <div class="grid grid-3col" style="margin-top:0.75rem">
             <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="ant_hta"><label for="ant_hta">HTA</label></div>
@@ -616,6 +638,11 @@
             </div>
         </div>
 
+        <div class="info-banner">
+            <strong>Criterio ECG de isquemia:</strong> infradesnivel del ST ≥1 mm horizontal o descendente a 80 ms del punto J.
+            &nbsp;|&nbsp; La <strong>discordancia</strong> entre ECG y motilidad es frecuente: la alteración de motilidad precede al ST en la cascada isquémica y manda en el informe del eco estrés.
+        </div>
+
         <h4 class="subsection-title" style="margin-top:1rem">Arritmias</h4>
         <div class="grid grid-3col">
             <div class="checkbox-group"><input autocomplete="off" type="checkbox" class="chk-arr" id="arr_esv"><label for="arr_esv">ESV / ESSV aisladas</label></div>
@@ -651,10 +678,6 @@
         </div>
         <div id="aviso-arritmias" class="aviso-adquisicion" style="display:none"></div>
 
-        <div class="info-banner" style="margin-top:0.75rem">
-            <strong>Criterio ECG de isquemia:</strong> infradesnivel del ST ≥1 mm horizontal o descendente a 80 ms del punto J.
-            &nbsp;|&nbsp; La <strong>discordancia</strong> entre ECG y motilidad es frecuente: la alteración de motilidad precede al ST en la cascada isquémica y manda en el informe del eco estrés.
-        </div>
     </section>
 
     <!-- ══════════════════════════════════════
