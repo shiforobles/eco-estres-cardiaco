@@ -305,11 +305,24 @@ function calcEjercicio() {
                 ok ? '✓ Adecuada (≥85%)'
                    : '✗ Sub-máxima — reduce la sensibilidad del estudio' + (bb ? ' (bajo betabloqueante)' : ''),
                 ok ? 'var(--color-success)' : 'var(--color-error)');
+            // En cicloergómetro la FC pico es ~10 lpm menor que en cinta a igual esfuerzo:
+            // el %FCMT crudo da falsos positivos. El índice cronotrópico y la reserva
+            // de FC discriminan mejor la incompetencia real.
+            const fcBasal = num('esf_basal_fc');
+            if (fcBasal > 0 && fcMax > fcBasal) {
+                const ic = (fcPico - fcBasal) / (fcMax - fcBasal);
+                const reserva = fcPico / fcBasal;
+                const okIC = ic >= 0.80, okRes = reserva >= 1.85;
+                set('ind_cronotrop',
+                    `IC ${ic.toFixed(2)} · reserva ${reserva.toFixed(2)} — ` +
+                    (okIC && okRes ? '✓ Normal' : '⚠ Sugiere incompetencia cronotrópica'),
+                    okIC && okRes ? 'var(--color-success)' : 'var(--color-warning)');
+            } else set('ind_cronotrop', '—');
         } else {
-            set('pct_fc', '—'); set('resp_cronotrop', '—');
+            set('pct_fc', '—'); set('resp_cronotrop', '—'); set('ind_cronotrop', '—');
         }
     } else {
-        ['fc_max_predicha', 'fc_85', 'pct_fc', 'resp_cronotrop'].forEach(id => set(id, '—'));
+        ['fc_max_predicha', 'fc_85', 'pct_fc', 'resp_cronotrop', 'ind_cronotrop'].forEach(id => set(id, '—'));
     }
 
     // Doble producto en el máximo esfuerzo
@@ -384,6 +397,7 @@ function calcEjercicio() {
 
     sugerirCategorizacion();
     avisarArritmias();
+    renderAvisosClinicos();
 }
 
 // Aviso de pantalla: qué arritmias van a pasar a la conclusión y cuáles no.
@@ -521,6 +535,96 @@ function aprenderIndicacion() {
 }
 
 // ══════════════════════════════════════════════
+//  AVISOS CLÍNICOS — sólo pantalla, nunca al informe
+//  Regla de diseño: un aviso entra si cruza datos que NO se leen juntos
+//  y si aparece poco. Todo lo que ya sale en el informe o en otro aviso
+//  queda afuera a propósito: un panel que grita quince cosas se ignora.
+// ══════════════════════════════════════════════
+function evaluarAvisosClinicos() {
+    const H = recolectarHallazgos();
+    const A = [];
+    const alto = (t, f) => A.push({ nivel: 'alto', titulo: t, fundamento: f });
+    const atencion = (t, f) => A.push({ nivel: 'atencion', titulo: t, fundamento: f });
+
+    // 1 · Caída de la FEy con el esfuerzo
+    if (H.caidaFey)
+        alto(`La FEy cae de ${H.feyReposo} % a ${H.feyEstres} % con el esfuerzo`,
+             'La caída de la FEy inducida por ejercicio es marcador de isquemia extensa.');
+
+    // 2 · Capacidad funcional reducida.
+    // Si la prueba se detuvo por causa no cardiovascular, el dato pronóstico no se lee igual.
+    if (H.mets > 0 && H.mets < 5) {
+        const muscular = ['fatiga', 'otro'].includes(H.causaDetencion);
+        atencion(`Capacidad funcional ${H.mets} METs`,
+            'Menos de 5 METs es predictor independiente de mortalidad, más allá del resultado del eco.' +
+            (muscular ? ` La prueba se detuvo por ${H.causaDetencionTxt}: si el límite fue muscular u ortopédico y no cardiovascular, el valor pronóstico es menor.` : ''));
+    }
+
+    // 3 · Recuperación de la FC al primer minuto
+    if (H.hrr1 !== null && H.hrr1 <= 12)
+        atencion(`HRR₁ de ${H.hrr1} lpm`,
+            'Una caída menor a 12 lpm en el primer minuto de recuperación se asocia a mayor mortalidad, con independencia de la isquemia.');
+
+    // 4 · Umbral isquémico bajo
+    if (H.isquemicos.length && H.dobleProducto > 0 && H.dobleProducto < 20000)
+        alto(`Isquemia a doble producto ${H.dobleProducto.toLocaleString('es-AR')}`,
+             'Umbral isquémico bajo: sugiere lesión severa o enfermedad de múltiples vasos.');
+
+    // 5 · Incompetencia cronotrópica. El %FCMT crudo da falsos positivos en bici:
+    // se usa el índice cronotrópico y la reserva de FC.
+    // Se exigen AMBOS por debajo del corte, no cualquiera: con "o" alcanza un índice
+    // apenas bajo para disparar en alguien que pedaleó bien, que es el falso positivo
+    // que se quería evitar.
+    if (!H.betabloqueante && H.indiceCronotropico !== null && H.reservaFC !== null &&
+        H.indiceCronotropico < 0.80 && H.reservaFC < 1.85) {
+        atencion(`Índice cronotrópico ${H.indiceCronotropico.toFixed(2)} · reserva de FC ${H.reservaFC.toFixed(2)}`,
+            'Sin betabloqueo, un índice <0,80 o una reserva <1,85 sugieren incompetencia cronotrópica, ' +
+            'que es un hallazgo pronóstico propio y no sólo un test submáximo.');
+    }
+
+    // 6 · Respuesta tensional plana: no dispara alarma porque técnicamente subió
+    if (H.tasBasal > 0 && H.tasPico > 0) {
+        const d = H.tasPico - H.tasBasal;
+        if (d > -10 && d < 20)
+            atencion(`La TA sistólica sube sólo ${d} mmHg (de ${H.tasBasal} a ${H.tasPico})`,
+                'Un incremento menor a 20 mmHg es una respuesta tensional plana: se asocia a disfunción ventricular ' +
+                'o enfermedad coronaria significativa, aunque no llegue a ser una caída franca.');
+    }
+
+    // 7 · Angina sin correlato. Abre la pregunta, no cierra el diagnóstico.
+    const hayAngina = /angina|precordial|opresi|dolor/i.test(H.sintomasEsfuerzo || '') ||
+                      H.causaDetencion === 'angina';
+    if (hayAngina && !H.isquemicos.length && !H.stIsquemico)
+        atencion('Angina durante el estudio sin isquemia por imagen ni cambios del ST',
+            'La discordancia obliga a reconsiderar: puede tratarse de enfermedad microvascular, de dolor no cardíaco, ' +
+            'o de isquemia perdida por una adquisición post-esfuerzo tardía. Conviene revisar los tiempos de adquisición.');
+
+    // 8 · Extensión de la isquemia. Cuenta segmentos NUEVOS, no anormales totales.
+    if (H.isquemicos.length >= 5)
+        alto(`Isquemia inducible en ${H.isquemicos.length} segmentos nuevos`,
+             'Cinco o más segmentos definen isquemia extensa, con indicación de evaluación invasiva. ' +
+             'La extensión suele subestimarse al contar sobre el bull\'s eye.');
+
+    return A;
+}
+
+function renderAvisosClinicos() {
+    const card = document.getElementById('card-avisos');
+    const cont = document.getElementById('avisos-clinicos');
+    if (!card || !cont) return;
+    let avisos;
+    try { avisos = evaluarAvisosClinicos(); }
+    catch (e) { card.style.display = 'none'; return; }
+    if (!avisos.length) { card.style.display = 'none'; cont.innerHTML = ''; return; }
+    card.style.display = 'block';
+    cont.innerHTML = avisos.map(a =>
+        `<div class="aviso-clinico aviso-${a.nivel}">` +
+        `<div class="aviso-titulo">${a.nivel === 'alto' ? 'Riesgo alto' : 'Atención'}: ${a.titulo}</div>` +
+        `<div class="aviso-fundamento">${a.fundamento}</div></div>`
+    ).join('');
+}
+
+// ══════════════════════════════════════════════
 //  CATEGORIZACIÓN DE RIESGO SUGERIDA
 //  Anclada en el WMSI pico, el predictor más validado del eco estrés:
 //  1,0 → 0,8-0,9 % de eventos/año · 1,1-1,7 → 2,6-3,1 % · >1,7 → 5,2-5,5 %.
@@ -542,8 +646,17 @@ function evaluarCategorizacion() {
         alto.push(`isquemia en ${H.territoriosIsquemia.length} territorios coronarios`);
     if (H.hipotension)
         alto.push('respuesta hipotensiva al esfuerzo');
-    if (H.mets > 0 && H.mets < 5)
-        alto.push(`capacidad funcional ${H.mets} METs (<5): predictor independiente de mortalidad`);
+    if (H.mets > 0 && H.mets < 5) {
+        // Si la prueba se detuvo por un límite muscular u ortopédico, los METs solos
+        // no describen riesgo cardiovascular: se señala pero no sube la categoría.
+        const limiteNoCV = ['fatiga', 'otro'].includes(H.causaDetencion);
+        const sinOtrosCriterios = alto.length === 0;
+        if (limiteNoCV && sinOtrosCriterios)
+            intermedio.push(`capacidad funcional ${H.mets} METs, con detención por ${H.causaDetencionTxt}: ` +
+                `verificar si el límite fue cardiovascular antes de subir la categoría`);
+        else
+            alto.push(`capacidad funcional ${H.mets} METs (<5): predictor independiente de mortalidad`);
+    }
     if (H.isquemicos.length && H.dobleProducto > 0 && H.dobleProducto < 20000)
         alto.push(`isquemia con doble producto ${H.dobleProducto.toLocaleString('es-AR')}: umbral isquémico bajo`);
     if (H.arritmias.some(a => ['arr_tvns', 'arr_ev_poli', 'arr_dupletas'].includes(a.id)))
@@ -579,14 +692,22 @@ function sugerirCategorizacion() {
     catch (e) { el.textContent = ''; return; }
     if (!r.hayDatos) { el.textContent = ''; el.className = 'hint-sugerida'; return; }
 
+    // Un "1 · Bajo" en pantalla se recuerda y el asterisco se pierde: si el estudio
+    // no es concluyente, no se muestra categoría en absoluto.
+    if (r.noConcluyente) {
+        el.innerHTML = '<strong>No categorizable</strong>' +
+            '<div class="cat-motivos">El estudio es no concluyente: no permite estimar el riesgo. ' +
+            'Categorizar acá daría una falsa tranquilidad.</div>';
+        el.className = 'hint-sugerida cat-panel';
+        return;
+    }
+
     const etiqueta = { bajo: '1 · Bajo', intermedio: '2 · Intermedio', alto: '3 · Alto' }[r.nivel];
     let html = `<strong>Sugerido: ${etiqueta}</strong>`;
     html += r.motivos.length
         ? '<ul class="cat-motivos">' + r.motivos.map(m => `<li>${m}</li>`).join('') + '</ul>'
         : '<div class="cat-motivos">Sin criterios de riesgo: WMSI pico normal, sin isquemia inducible ' +
           'ni marcadores de mal pronóstico.</div>';
-    if (r.noConcluyente)
-        html += '<div class="cat-salvedad">⚠ El estudio es no concluyente: esta categoría no descarta isquemia.</div>';
     el.innerHTML = html;
     el.className = 'hint-sugerida cat-panel hint-' + r.nivel;
 }
@@ -1540,6 +1661,9 @@ function recolectarHallazgos() {
     H.pctFCmax = (H.fcMaxPredicha > 0 && H.fcPico > 0) ? Math.round(H.fcPico / H.fcMaxPredicha * 100) : 0;
     H.fcSuboptima = H.pctFCmax > 0 && H.pctFCmax < 85;
     H.hrr1 = (H.fcPico > 0 && H.fcRec > 0) ? H.fcPico - H.fcRec : null;
+    H.indiceCronotropico = (H.fcBasal > 0 && H.fcMaxPredicha > H.fcBasal && H.fcPico > 0)
+        ? (H.fcPico - H.fcBasal) / (H.fcMaxPredicha - H.fcBasal) : null;
+    H.reservaFC = (H.fcBasal > 0 && H.fcPico > 0) ? H.fcPico / H.fcBasal : null;
 
     const deltaTAS = (H.tasBasal > 0 && H.tasPico > 0) ? H.tasPico - H.tasBasal : null;
     H.hipotension  = deltaTAS !== null && deltaTAS <= -10;

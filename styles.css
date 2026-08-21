@@ -953,3 +953,16 @@ details[open] summary::after { content: ' ▲'; }
 .cat-motivos { margin: 0.35rem 0 0 1rem; padding: 0; }
 .cat-motivos li { margin-bottom: 0.2rem; }
 .cat-salvedad { margin-top: 0.4rem; font-weight: 600; }
+
+/* ── Panel de avisos clínicos (sólo pantalla) ── */
+.aviso-clinico {
+    padding: 0.7rem 0.9rem;
+    border-radius: var(--radius-md);
+    border-left: 4px solid var(--color-warning);
+    background: var(--color-warning-bg);
+    margin-bottom: 0.6rem;
+}
+.aviso-clinico.aviso-alto { border-left-color: var(--color-error); background: var(--color-error-bg); }
+.aviso-titulo { font-weight: 700; font-size: var(--font-size-sm); margin-bottom: 0.2rem; }
+.aviso-fundamento { font-size: var(--font-size-xs); line-height: 1.55; color: var(--color-text-primary); opacity: 0.9; }
+@media print { #card-avisos { display: none !important; } }
