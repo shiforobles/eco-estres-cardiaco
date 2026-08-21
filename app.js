@@ -2470,6 +2470,55 @@ function guardarEnHistorial() {
     }
 }
 
+// ── Exportar la jornada ───────────────────────
+// Saca los estudios de esta computadora a un archivo que guardás donde quieras.
+// Sirve tanto si después se descartan como si se conservan.
+function exportarJornada(anonimo) {
+    const lista = leerHistorial();
+    if (!lista.length) { showNotice('No hay estudios para exportar.', 'warn'); return; }
+
+    const fecha = new Date().toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    const sep = '═'.repeat(70);
+    const partes = [`ECO ESTRÉS — ESTUDIOS DEL ${fecha}`, `${lista.length} estudio(s)`, ''];
+
+    lista.forEach((h, i) => {
+        const hora = new Date(h.ts).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+        let informe = h.reporte || '(sin informe generado)';
+        let encabezado = `${i + 1}. ${h.id}${h.nombre ? ' — ' + h.nombre : ''} · ${hora}`;
+        if (anonimo) {
+            // Se quitan los identificadores del encabezado y de la primera línea del informe
+            encabezado = `${i + 1}. Estudio ${i + 1} · ${hora}`;
+            informe = informe.split('\n').slice(2).join('\n').trim();
+            if (h.nombre) informe = informe.split(h.nombre).join('[paciente]');
+            if (h.id && h.id !== 's/ID') informe = informe.split(h.id).join('[HC]');
+        }
+        partes.push(sep, encabezado, sep, '', informe, '');
+    });
+
+    const nombreArchivo = `eco-estres-${new Date().toISOString().slice(0, 10)}${anonimo ? '-anonimo' : ''}.txt`;
+    descargarTexto(partes.join('\n'), nombreArchivo);
+    showNotice(`Exportados ${lista.length} estudio(s) a ${nombreArchivo}.`, 'ok');
+}
+
+function descargarTexto(texto, nombreArchivo) {
+    try {
+        const blob = new Blob([texto], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = nombreArchivo;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (e) {
+        // Si el navegador bloquea la descarga, al menos que el texto no se pierda
+        const w = window.open('', '_blank');
+        if (w) { w.document.write('<pre>' + texto.replace(/</g, '&lt;') + '</pre>'); w.document.title = nombreArchivo; }
+        else alert('No se pudo descargar el archivo. Copiá los informes desde el historial.');
+    }
+}
+
 function renderHistorial(avisarPurga) {
     const cont = document.getElementById('historial-lista');
     if (!cont) return;
