@@ -1192,6 +1192,7 @@
             <button class="btn btn-secondary" onclick="copiarReporte()">📋 Copiar al portapapeles</button>
             <button class="btn btn-secondary" onclick="imprimirReporte()">🖨️ Imprimir</button>
             <button class="btn btn-secondary" onclick="generarReporte()">📊 Planilla de datos</button>
+            <button class="btn btn-primary" onclick="guardarEnPlanilla()">📊 Guardar en planilla</button>
             <button class="btn btn-secondary" onclick="guardarEnHistorial()">💾 Guardar en Historial</button>
             <button class="btn btn-danger" onclick="limpiarFormulario()">🗑️ Nuevo Estudio</button>
         </div>
@@ -1202,6 +1203,30 @@
         </div>
         <div id="validacion-panel" class="validacion-panel" style="display:none"></div>
         <div id="reporte-output" class="reporte-output" style="display:none"></div>
+    </section>
+
+    <!-- ══════════════════════════════════════
+         PLANILLA DE ESTUDIOS (Google Sheets)
+         ══════════════════════════════════════ -->
+    <section class="card" id="card-planilla">
+        <details>
+            <summary class="section-title" style="cursor:pointer; list-style:none; display:flex; justify-content:space-between; align-items:center; margin-bottom:0">
+                Planilla de Estudios <span class="badge-secondary" id="planilla-badge">sin configurar</span>
+            </summary>
+            <p class="module-description" style="margin-top:0.75rem">
+                Cada estudio se agrega como una fila a una hoja de Google Sheets, con el informe completo en la última columna.
+                <strong>Se guarda una copia local antes de enviar.</strong> El navegador no permite leer la respuesta del script,
+                así que la app <em>no puede saber</em> si el estudio llegó: quedan en el respaldo hasta que mires la planilla
+                y confirmes. Si algo no llegó, se reenvía o se exporta a CSV.
+            </p>
+            <div class="historial-acciones">
+                <button class="btn btn-secondary btn-sm" onclick="abrirConfigPlanilla()">⚙ Configurar planilla</button>
+                <button class="btn btn-secondary btn-sm" onclick="reintentarPendientes()">↻ Reenviar</button>
+                <button class="btn btn-secondary btn-sm" onclick="exportarPlanillaCSV()">⬇ Exportar CSV</button>
+                <button class="btn btn-secondary btn-sm" onclick="confirmarEnviados()">✓ Confirmar recepción</button>
+            </div>
+            <div id="planilla-estado"></div>
+        </details>
     </section>
 
     <!-- ══════════════════════════════════════
@@ -1250,6 +1275,7 @@
 </div>
 <script src="pearls.js?v=1.3"></script>
 <script src="report-templates.js?v=1.3"></script>
+<script src="sheets-storage.js?v=1.3"></script>
 <script src="app.js?v=1.3"></script>
 <script>
 // Control de versión: si el navegador sirvió una mezcla de archivos viejos y nuevos,

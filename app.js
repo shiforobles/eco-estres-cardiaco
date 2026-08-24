@@ -110,6 +110,7 @@ document.addEventListener('DOMContentLoaded', () => {
     renderMedicacion();
     renderHistorial(true);
     renderCasuistica();
+    renderPendientes();
 
     // Autosave / recuperación del estudio en curso (al final, con todo ya construido)
     setupAutosave();
@@ -2577,6 +2578,162 @@ function borrarCasuistica() {
     try { localStorage.removeItem(CASUISTICA_KEY); } catch (e) { /* noop */ }
     renderCasuistica();
     showNotice('Casuística borrada.', 'ok');
+}
+
+// ══════════════════════════════════════════════
+//  GUARDADO EN LA PLANILLA
+// ══════════════════════════════════════════════
+async function guardarEnPlanilla() {
+    // El informe es lo que se quiere poder graficar y leer después:
+    // si no se generó, se genera antes de armar la fila.
+    let informe = document.getElementById('reporte-output').textContent.trim();
+    if (!informe) {
+        generarInforme();
+        informe = document.getElementById('reporte-output').textContent.trim();
+    }
+    if (!informe) { alert('No se pudo generar el informe: revisá los datos del estudio.'); return; }
+
+    if (!EstresSheets.estaConfigurado()) {
+        showNotice('Configurá la planilla primero con el botón ⚙ Configurar planilla.', 'warn');
+        abrirConfigPlanilla();
+        return;
+    }
+
+    let fila;
+    try { fila = EstresSheets.construirFila(informe); }
+    catch (e) { alert('No se pudo armar la fila del estudio: ' + e.message); return; }
+
+    // Primero al respaldo local, después al envío: el POST no-cors no permite
+    // confirmar la recepción, así que el estudio no puede depender de él.
+    const etiqueta = (v('paciente_id') || v('paciente_nombre') || 's/ID');
+    const ts = Date.now();
+    const cola = EstresSheets.leerCola();
+    cola.push({ ts, etiqueta, fila, enviado: false });
+    EstresSheets.guardarCola(cola);
+    renderPendientes();
+
+    try {
+        await EstresSheets.enviar(fila);
+        // NO se marca como confirmado: el modo no-cors hace que fetch resuelva
+        // aunque la URL no exista o el script falle. Comprobado: con una URL
+        // inexistente el envío "sale bien". La confirmación la da el operador
+        // después de ver la fila en el Sheet.
+        renderPendientes();
+        showNotice(`Enviado — ${etiqueta}. Verificá que aparezca en el Sheet y marcalo como confirmado.`, 'ok');
+    } catch (e) {
+        renderPendientes();
+        showNotice(`No se pudo enviar: ${e.message}. Quedó guardado localmente.`, 'warn');
+    }
+}
+
+async function reintentarPendientes() {
+    const pend = EstresSheets.pendientes();
+    if (!pend.length) { showNotice('No hay envíos pendientes.', 'ok'); return; }
+    let ok = 0;
+    for (const p of pend) {
+        try { await EstresSheets.enviar(p.fila); ok++; }
+        catch (e) { /* sigue sin confirmar */ }
+    }
+    renderPendientes();
+    showNotice(`Reenviados ${pend.length}. Verificá el Sheet y marcalos como confirmados.`, 'ok');
+}
+
+// Confirmar es un acto del operador: mirar el Sheet y decir "está".
+function confirmarEnviados() {
+    const cola = EstresSheets.leerCola();
+    if (!cola.length) { showNotice('No hay estudios en el respaldo.', 'ok'); return; }
+    if (!confirm(`¿Verificaste que los ${cola.length} estudio(s) aparecen en la planilla?\n\n` +
+                 `Al confirmar se quitan del respaldo local. Si alguno no llegó, reintentá primero.`)) return;
+    EstresSheets.guardarCola([]);
+    renderPendientes();
+    showNotice(`${cola.length} estudio(s) confirmados y quitados del respaldo local.`, 'ok');
+}
+
+function exportarPlanillaCSV() {
+    const cola = EstresSheets.leerCola();
+    if (!cola.length) { showNotice('No hay estudios para exportar.', 'warn'); return; }
+    EstresSheets.exportarCSV(cola.map(x => x.fila));
+    showNotice(`Exportados ${cola.length} estudio(s) a CSV.`, 'ok');
+}
+
+function renderPendientes() {
+    const cont = document.getElementById('planilla-estado');
+    if (!cont) return;
+    const cola = EstresSheets.leerCola();
+    const pend = cola.filter(x => !x.enviado);
+    const badge = document.getElementById('planilla-badge');
+    if (badge) badge.textContent = pend.length ? `${pend.length} pendiente(s)` : (EstresSheets.estaConfigurado() ? 'OK' : 'sin configurar');
+
+    if (!cola.length) {
+        cont.innerHTML = '<p class="module-description">Todavía no se envió ningún estudio a la planilla.</p>';
+        return;
+    }
+    cont.innerHTML = `<div class="calc-box">
+        <div class="calc-row"><span>Estudios en el respaldo local</span><span class="calc-value">${cola.length}</span></div>
+        <div class="calc-row"><span>Sin confirmar en el Sheet</span><span class="calc-value" style="color:var(--color-warning)">${pend.length}</span></div>
+        </div>
+        <p class="firma-nota" style="margin-top:0.5rem">El navegador no permite confirmar la recepción, así que la app no sabe
+        si llegaron. Mirá la planilla y usá <strong>✓ Confirmar recepción</strong> para vaciar el respaldo.</p>` +
+        (pend.length ? '<div class="med-lista" style="margin-top:0.5rem">' + pend.map(p =>
+            `<span class="med-item">${p.etiqueta} <em>${new Date(p.ts).toLocaleString('es-AR', {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</em></span>`
+        ).join('') + '</div>' : '');
+}
+
+// ── Configuración de la planilla ──
+function abrirConfigPlanilla() {
+    document.getElementById('modal-planilla')?.remove();
+    const m = document.createElement('div');
+    m.id = 'modal-planilla';
+    m.className = 'modal-fondo';
+    m.innerHTML = `
+      <div class="modal-caja">
+        <h3 class="section-title">Configurar la planilla</h3>
+        <p class="firma-nota">Los estudios se agregan a una hoja de Google Sheets mediante un Apps Script.
+        Si ya tenés el script del Eco Doppler, podés usar <strong>el mismo documento</strong> con otro nombre de hoja.</p>
+        <div class="form-group" style="margin-top:0.75rem">
+            <label for="cfg_url">URL del Apps Script (termina en /exec)</label>
+            <input type="text" id="cfg_url" placeholder="https://script.google.com/macros/s/.../exec" value="${EstresSheets.getUrl()}">
+        </div>
+        <div class="form-group">
+            <label for="cfg_hoja">Nombre de la hoja</label>
+            <input type="text" id="cfg_hoja" placeholder="Estrés" value="${EstresSheets.getHoja()}">
+        </div>
+        <div class="form-group">
+            <label for="cfg_sheet">URL del Sheet (opcional, para abrirlo rápido)</label>
+            <input type="text" id="cfg_sheet" placeholder="https://docs.google.com/spreadsheets/..." value="${EstresSheets.getSheetUrl()}">
+        </div>
+        <div class="report-controls" style="margin-top:1rem">
+            <button class="btn btn-primary btn-sm" onclick="guardarConfigPlanilla()">Guardar</button>
+            <button class="btn btn-secondary btn-sm" onclick="verCodigoScript()">Ver código del script</button>
+            <button class="btn btn-secondary btn-sm" onclick="probarPlanilla()">Probar conexión</button>
+            <button class="btn btn-secondary btn-sm" onclick="document.getElementById('modal-planilla').remove()">Cerrar</button>
+        </div>
+      </div>`;
+    document.body.appendChild(m);
+    m.addEventListener('click', ev => { if (ev.target === m) m.remove(); });
+}
+
+function guardarConfigPlanilla() {
+    EstresSheets.setUrl(document.getElementById('cfg_url').value);
+    EstresSheets.setHoja(document.getElementById('cfg_hoja').value);
+    EstresSheets.setSheetUrl(document.getElementById('cfg_sheet').value);
+    document.getElementById('modal-planilla').remove();
+    renderPendientes();
+    showNotice('Configuración guardada.', 'ok');
+}
+
+function verCodigoScript() {
+    const codigo = EstresSheets.codigoScript();
+    navigator.clipboard?.writeText(codigo).then(
+        () => showNotice('Código del script copiado. Pegalo en Extensiones → Apps Script de tu Sheet.', 'ok'),
+        () => descargarTexto(codigo, 'apps-script-eco-estres.gs')
+    );
+}
+
+function probarPlanilla() {
+    const u = EstresSheets.urlDePrueba();
+    if (!u) { showNotice('Primero cargá la URL del script.', 'warn'); return; }
+    window.open(u, '_blank');
 }
 
 // ── Exportar la jornada ───────────────────────
