@@ -109,6 +109,7 @@ document.addEventListener('DOMContentLoaded', () => {
     renderBancos();
     renderMedicacion();
     renderHistorial(true);
+    renderCasuistica();
 
     // Autosave / recuperación del estudio en curso (al final, con todo ya construido)
     setupAutosave();
@@ -2408,7 +2409,10 @@ function purgarHistorialVencido() {
     const limite = Date.now() - HIST_VIDA_MS;
     const vigentes = lista.filter(h => (h.ts || 0) >= limite);
     if (vigentes.length === lista.length) return 0;
+    // Antes de descartar, la parte clínica se conserva sin identificadores
+    archivarEnCasuistica(lista.filter(h => (h.ts || 0) < limite));
     try { localStorage.setItem(HIST_KEY, JSON.stringify(vigentes)); } catch (e) { return 0; }
+    renderCasuistica();
     return lista.length - vigentes.length;
 }
 
@@ -2422,9 +2426,11 @@ function cerrarJornada() {
         `\n(${nombres}${lista.length > 3 ? ', …' : ''}).\n\n` +
         `Los informes ya firmados en la historia clínica no se tocan.\n` +
         `Esta acción no se puede deshacer. ¿Cerrar la jornada?`)) return;
+    const archivados = archivarEnCasuistica(lista);
     try { localStorage.removeItem(HIST_KEY); } catch (e) { /* noop */ }
     renderHistorial();
-    showNotice('Historial vaciado. No quedan datos de pacientes en esta computadora.', 'ok');
+    renderCasuistica();
+    showNotice(`Historial vaciado. ${archivados} estudio(s) quedaron en la casuística, sin datos de pacientes.`, 'ok');
 }
 
 function guardarEnHistorial() {
@@ -2468,6 +2474,109 @@ function guardarEnHistorial() {
     } catch (e) {
         alert('No se pudo guardar en el historial (almacenamiento lleno).');
     }
+}
+
+// ══════════════════════════════════════════════
+//  CASUÍSTICA ANÓNIMA — no vence
+//  Cuando un estudio se descarta del historial, sus identificadores se
+//  borran pero los datos clínicos se conservan acá. Así el descarte a las
+//  12 h deja de llevarse la casuística sin volver a acumular nombres en
+//  una computadora compartida.
+// ══════════════════════════════════════════════
+const CASUISTICA_KEY = 'eco-estres-casuistica';
+const CASUISTICA_MAX = 500;
+
+function leerCasuistica() {
+    try { return JSON.parse(localStorage.getItem(CASUISTICA_KEY)) || []; }
+    catch (e) { return []; }
+}
+
+// Quita todo lo que identifica al paciente y deja lo clínicamente útil
+function anonimizarEstudio(h) {
+    const f = (h.estudio && h.estudio.fields) || {};
+    let informe = h.reporte || '';
+    // El encabezado del informe lleva nombre, HC y fecha: se descarta entero
+    informe = informe.split('\n').slice(2).join('\n').trim();
+    if (h.nombre) informe = informe.split(h.nombre).join('[paciente]');
+    if (h.id && h.id !== 's/ID') informe = informe.split(h.id).join('[HC]');
+
+    return {
+        ts: h.ts,
+        // Sin nombre, sin HC, sin resumen de historia clínica
+        edad: f.edad || '', sexo: f.sexo || '',
+        resultado: h.resultado || '—',
+        protocolo: h.protocolo || '',
+        categorizacion: f.categorizacion || '',
+        fey: f.fevi_reposo || '', feyPico: f.fevi_pico || '',
+        mets: f.ej_mets || '', carga: f.ej_carga || '',
+        causaDetencion: f.ej_causa_detencion || '',
+        conduccion: f.ecg_conduccion || '',
+        wm: h.estudio && h.estudio.wm ? h.estudio.wm : null,
+        informe
+    };
+}
+
+// Devuelve cuántos se archivaron
+function archivarEnCasuistica(estudios) {
+    if (!estudios || !estudios.length) return 0;
+    const casos = leerCasuistica();
+    const yaEstan = new Set(casos.map(c => c.ts));
+    const nuevos = estudios.filter(h => !yaEstan.has(h.ts)).map(anonimizarEstudio);
+    if (!nuevos.length) return 0;
+    try {
+        localStorage.setItem(CASUISTICA_KEY, JSON.stringify(nuevos.concat(casos).slice(0, CASUISTICA_MAX)));
+        return nuevos.length;
+    } catch (e) {
+        showNotice('La casuística está llena: exportala y borrala para seguir archivando.', 'warn');
+        return 0;
+    }
+}
+
+function renderCasuistica() {
+    const cont = document.getElementById('casuistica-resumen');
+    if (!cont) return;
+    const casos = leerCasuistica();
+    const badge = document.getElementById('casuistica-badge');
+    if (badge) badge.textContent = casos.length;
+    if (!casos.length) {
+        cont.innerHTML = '<p class="module-description">Todavía no hay estudios archivados. ' +
+            'Los estudios pasan acá, sin datos del paciente, cuando se descartan del historial.</p>';
+        return;
+    }
+    const porResultado = {};
+    casos.forEach(c => { porResultado[c.resultado] = (porResultado[c.resultado] || 0) + 1; });
+    const filas = Object.entries(porResultado).sort((a, b) => b[1] - a[1])
+        .map(([r, n]) => `<div class="calc-row"><span>${r}</span><span class="calc-value">${n}</span></div>`).join('');
+    const desde = new Date(Math.min(...casos.map(c => c.ts))).toLocaleDateString('es-AR');
+    cont.innerHTML = `<div class="calc-box"><div class="calc-row"><span><strong>Total archivado</strong> (desde ${desde})</span>` +
+        `<span class="calc-value"><strong>${casos.length}</strong></span></div>${filas}</div>`;
+}
+
+function exportarCasuistica() {
+    const casos = leerCasuistica();
+    if (!casos.length) { showNotice('No hay casuística para exportar.', 'warn'); return; }
+    const sep = '═'.repeat(70);
+    const partes = [`CASUÍSTICA ECO ESTRÉS — ${casos.length} estudio(s)`,
+                    'Sin datos identificatorios de pacientes.', ''];
+    casos.forEach((c, i) => {
+        const f = new Date(c.ts).toLocaleDateString('es-AR');
+        partes.push(sep,
+            `${i + 1}. ${f} · ${c.edad || '—'} años · ${c.sexo === 'F' ? 'femenino' : 'masculino'} · ${c.resultado}`,
+            sep, '', c.informe || '(sin informe)', '');
+    });
+    descargarTexto(partes.join('\n'), `casuistica-eco-estres-${new Date().toISOString().slice(0, 10)}.txt`);
+    showNotice(`Exportados ${casos.length} estudio(s) de la casuística.`, 'ok');
+}
+
+function borrarCasuistica() {
+    const casos = leerCasuistica();
+    if (!casos.length) { showNotice('La casuística ya está vacía.', 'ok'); return; }
+    if (!confirm(`Se van a borrar ${casos.length} estudio(s) de la casuística anónima.\n\n` +
+                 `No contienen datos de pacientes, pero sí tu registro clínico acumulado.\n` +
+                 `Esta acción no se puede deshacer. ¿Continuar?`)) return;
+    try { localStorage.removeItem(CASUISTICA_KEY); } catch (e) { /* noop */ }
+    renderCasuistica();
+    showNotice('Casuística borrada.', 'ok');
 }
 
 // ── Exportar la jornada ───────────────────────

@@ -1205,6 +1205,26 @@
     </section>
 
     <!-- ══════════════════════════════════════
+         CASUÍSTICA ANÓNIMA (no vence)
+         ══════════════════════════════════════ -->
+    <section class="card" id="card-casuistica">
+        <details>
+            <summary class="section-title" style="cursor:pointer; list-style:none; display:flex; justify-content:space-between; align-items:center; margin-bottom:0">
+                Casuística <span class="badge-secondary" id="casuistica-badge">0</span>
+            </summary>
+            <p class="module-description" style="margin-top:0.75rem">
+                Cuando un estudio se descarta del historial, sus datos identificatorios se borran y la parte clínica queda acá.
+                <strong>No vence.</strong> Sirve para revisar tu serie y para compartir casos sin tener que anonimizar a mano.
+            </p>
+            <div class="historial-acciones">
+                <button class="btn btn-secondary btn-sm" onclick="exportarCasuistica()">⬇ Exportar casuística</button>
+                <button class="btn btn-danger btn-sm" onclick="borrarCasuistica()">🗑 Borrar casuística</button>
+            </div>
+            <div id="casuistica-resumen"></div>
+        </details>
+    </section>
+
+    <!-- ══════════════════════════════════════
          SECCIÓN 10: HISTORIAL DE ESTUDIOS
          ══════════════════════════════════════ -->
     <section class="card" id="card-historial">
