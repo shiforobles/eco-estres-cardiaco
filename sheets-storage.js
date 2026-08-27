@@ -106,10 +106,14 @@ const EstresSheets = {
         const H = recolectarHallazgos();
         const nada = '-';
         const t = x => (x === null || x === undefined || x === '' || Number.isNaN(x)) ? nada : x;
-        // Los ratios van como número real: si van como texto, Sheets los lee como fecha
-        const num_ = (x, dec = 2) => {
+        // Los ratios van como número real: si van como texto, Sheets los lee como fecha.
+        // Un campo sin cargar vale '-', no 0: un cero cuenta como dato y ensucia
+        // los promedios. Los deltas sí pueden ser cero de verdad (ceroVale).
+        const num_ = (x, ceroVale = false) => {
             const p = typeof x === 'number' ? x : parseFloat(String(x).replace(',', '.'));
-            return Number.isFinite(p) ? Math.round(p * 10 ** dec) / 10 ** dec : nada;
+            if (!Number.isFinite(p)) return nada;
+            if (p === 0 && !ceroVale) return nada;
+            return Math.round(p * 100) / 100;
         };
 
         const fechaEst = v('fecha_estudio')
@@ -141,7 +145,7 @@ const EstresSheets = {
             t(H.feyReposo), t(H.feyEstres), H.deltaFey === null ? nada : H.deltaFey,
             H.vd ? textoSelect('vd_funcion') : nada,
 
-            num_(H.wmsiReposo), num_(H.wmsiEstres), num_(H.deltaWMSI),
+            num_(H.wmsiReposo), num_(H.wmsiEstres), num_(H.deltaWMSI, true),
             H.isquemicos.length, H.secuelas.length,
             H.territoriosIsquemia.join('+') || nada,
             H.patronGlobal ? 'Global' : 'Segmentaria',
