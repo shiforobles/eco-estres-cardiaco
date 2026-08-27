@@ -1,11 +1,20 @@
 // ══════════════════════════════════════════════════════════════════
 //  APPS SCRIPT ÚNICO — Eco Doppler + Eco Estrés
-//  Reemplaza al anterior. Enruta por el nombre de hoja que manda cada app.
+//  Reemplaza al anterior, que tenía la hoja fija en 'Estudios' e ignoraba
+//  el destino: los estudios de estrés habrían caído mezclados con los de
+//  Doppler, con 59 valores en un encabezado de otra app.
 //
 //  Pegar en: el Google Sheet → Extensiones → Apps Script
 //  Después:  Implementar → Nueva implementación → Aplicación web
 //            Ejecutar como: Yo | Quién tiene acceso: Cualquier usuario
 //  Copiar la URL /exec y ponerla en LAS DOS apps.
+//
+//  IMPORTANTE: el encabezado sólo se escribe cuando la hoja está VACÍA.
+//  'Estudios' ya tiene datos, así que su encabezado (83 columnas, hasta
+//  'PE Distribución') no se actualiza solo. Para que se llenen las
+//  columnas nuevas —entre ellas 'Informe'— hay que escribirlas a mano en
+//  la fila 1. La hoja 'Estrés' no existe todavía: esa sí se crea sola y
+//  con el encabezado completo.
 // ══════════════════════════════════════════════════════════════════
 
 const HOJA_DOPPLER = 'Estudios';
@@ -84,7 +93,22 @@ const HEADERS_DOPPLER = [
   "ASIA Excursión",
   "ASIA Shunt",
   "PE Tamaño",
-  "PE Compromiso"
+  "PE Compromiso",
+  "Onda E",
+  "Onda A",
+  "e' Septal",
+  "e' Lateral",
+  "TRIV",
+  "TD",
+  "LARS",
+  "IM VC",
+  "IT Vmax",
+  "PE Distribución",
+  "Informe",
+  "ATC/Stent",
+  "Recambio Ao",
+  "Recambio Mitral",
+  "Observaciones"
 ];
 
 const HEADERS_ESTRES = [
@@ -149,24 +173,24 @@ const HEADERS_ESTRES = [
   "Informe"
 ];
 
-// Columnas numéricas: se les fuerza formato para que Sheets no las lea como
-// fechas. Es lo que arruinó IMC y E/e' en la planilla de Doppler.
-const NUM_DOPPLER = [7,8,21,22,24,28,29,30,32,33,34,35,37,38,39,40,44,45,47,48,50,52,53,54,55,57,58,59,65,66,67,68,70,72];
+// Columnas numéricas: se les fuerza formato para que Sheets no las lea
+// como fechas, que es lo que invirtió los dígitos de IMC y E/e'.
+const NUM_DOPPLER = [7,8,21,22,24,28,29,30,32,33,34,35,37,38,39,40,44,45,47,48,50,52,53,54,55,57,58,59,65,66,67,68,70,72,74,75,76,77,78,79,80,81,82];
 const NUM_ESTRES  = [23,24,36,37,38,51,52,53,54,47,26,7];
 
 function doPost(e) {
   try {
-    const data   = JSON.parse(e.postData.contents);
-    const ss     = SpreadsheetApp.getActiveSpreadsheet();
+    const data = JSON.parse(e.postData.contents);
+    const ss   = SpreadsheetApp.getActiveSpreadsheet();
 
     // La app de estrés manda data.hoja; la de Doppler no manda nada.
-    const nombre = data.hoja || HOJA_DOPPLER;
+    const nombre   = data.hoja || HOJA_DOPPLER;
     const esEstres = (nombre === HOJA_ESTRES);
     const headers  = esEstres ? HEADERS_ESTRES : HEADERS_DOPPLER;
     const numCols  = esEstres ? NUM_ESTRES : NUM_DOPPLER;
 
     let sheet = ss.getSheetByName(nombre);
-    if (!sheet) sheet = ss.insertSheet(nombre);   // se crea sola la primera vez
+    if (!sheet) sheet = ss.insertSheet(nombre);
 
     if (sheet.getLastRow() === 0) {
       sheet.appendRow(headers);
