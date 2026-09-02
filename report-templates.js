@@ -207,9 +207,7 @@ const NARRATIVA = {
     // ── MODIFICADORES DE LA CONCLUSIÓN ────────────────────────────────
     // Se insertan antes del punto final de la conclusión elegida.
     modificadores: {
-        hipertensiva: ', con respuesta hipertensiva al esfuerzo. Se sugiere optimización del control tensional',
-
-        fcSuboptima: ' al doble producto alcanzado, con la limitación de no haberse alcanzado la FC objetivo, lo que reduce la sensibilidad ' +
+        fcSuboptima:' al doble producto alcanzado, con la limitación de no haberse alcanzado la FC objetivo, lo que reduce la sensibilidad ' +
                      'del estudio. De persistir la sospecha clínica, considerar apremio farmacológico',
 
         // Versión oración, para engancharse después de un núcleo que ya cerró con punto
@@ -218,11 +216,11 @@ const NARRATIVA = {
         fcSuboptimaOracion: ' El estudio se realizó con la limitación de no haberse alcanzado la FC objetivo, ' +
                      'lo que reduce su sensibilidad; de persistir la sospecha clínica, considerar apremio farmacológico.',
 
-        // Esta frase NO está en el Word: la redacté siguiendo el criterio de la versión 9.
-        adquisicionTardia: ', con la limitación de una adquisición post-esfuerzo tardía ({{segImagen}} segundos, FC al adquirir ' +
-                     '{{pctFCadq}} % de la FC pico), lo que reduce la sensibilidad del estudio',
-
-        caidaFey: '. La caída de la fracción de eyección con el esfuerzo constituye un marcador de alto riesgo',
+        // La adquisición tardía y la caída de la FEy salían acá como coletillas sueltas.
+        // Ahora: la adquisición tardía es control de calidad del operador y se queda en
+        // pantalla (el párrafo de calidad ya informa los segundos y la FC de adquisición),
+        // y la caída de la FEy pasó al bloque `pronostico`, junto con el resto de lo que
+        // le cambia la conducta al clínico que lee el informe.
 
         // Discordancia sobre una rama que ya dice otra cosa (secuela, dilatada)
         discordancia: '. Presentó además cambios isquémicos del segmento ST ({{descripcionST}}) sin correlato en la ' +
@@ -233,9 +231,8 @@ const NARRATIVA = {
         diastolicoPositivo: '. El estudio diastólico de esfuerzo resultó positivo, con aumento de las presiones de llenado ' +
                      'inducido por el ejercicio',
 
-        // Sólo las arritmias con peso pronóstico propio llegan hasta acá.
-        arritmiaRelevante: '. Se constató la presencia de {{arritmias}}{{momento}}{{sintomas}}, hallazgo de significación ' +
-                     'pronóstica que amerita seguimiento',
+        // La arritmia relevante también se mudó a `pronostico`: es de las cosas que le
+        // cambian la conducta al que lee, y ahí sale junto al resto en una sola oración.
 
         // Limitación septal para ramas que NO son la negativa.
         // Versión completa: no se demostró isquemia en la DA, así que su especificidad queda comprometida.
@@ -248,6 +245,32 @@ const NARRATIVA = {
         // así que hablar de especificidad reducida en ese territorio contradiría el hallazgo.
         conduccionSeptalAcotado: '. La presencia de {{trastorno}} limita la valoración de los segmentos septales e ' +
                      'invalida el análisis del segmento ST'
+    },
+
+    // ── HALLAZGOS DE VALOR PRONÓSTICO ─────────────────────────────────
+    // El médico que pide el estudio no ve la pantalla del operador, y estos datos le
+    // cambian la conducta. Van todos en UNA sola oración al final de la conclusión,
+    // ordenados por relevancia, en prosa y no como lista de alertas.
+    // El control de calidad de la adquisición (imagen tardía, doble producto en el
+    // borde, WMSI inflado por conducción) NO entra acá: es del operador.
+    pronostico: {
+        oracionUna:    ' Merece señalarse, con valor pronóstico propio e independiente del resultado del estudio, ' +
+                       '{{hallazgos}}.',
+        oracionVarias: ' Merecen señalarse, con valor pronóstico propio e independiente del resultado del estudio, ' +
+                       '{{hallazgos}}.',
+
+        // Sintagmas nominales: se encadenan solos en la enumeración. Los matices van
+        // ENTRE PARÉNTESIS y nunca con coma: en una enumeración de tres, una coma
+        // interna hace leer el último "y" como parte del ítem anterior.
+        hipotension:  'la respuesta hipotensiva al esfuerzo',
+        caidaFey:     'la caída de la fracción de eyección de {{feyReposo}} % a {{feyEstres}} % con el esfuerzo',
+        arritmia:     'la presencia de {{arritmias}}{{momento}}{{sintomas}}',
+        mets:         'una capacidad funcional de {{mets}} METs',
+        // Si la prueba se detuvo por un límite muscular u ortopédico, el número no
+        // describe riesgo cardiovascular: se dice por qué se detuvo y el que lee decide.
+        metsLimiteNoCV: 'una capacidad funcional de {{mets}} METs (prueba detenida por {{causa}})',
+        hrr1:         'una recuperación de la frecuencia cardíaca al primer minuto de {{hrr1}} lpm',
+        hipertension: 'la respuesta hipertensiva al esfuerzo (amerita optimizar el control tensional)'
     },
 
     // ── FRASE DE ACOMPAÑAMIENTO (ST-T y síntomas) ─────────────────────

@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=1.4">
+    <link rel="stylesheet" href="styles.css?v=1.5">
 </head>
 <body>
 <div class="container">
@@ -17,7 +17,7 @@
     <header class="app-header">
         <div>
             <h1>Eco Estrés Cardíaco</h1>
-            <p class="version">v1.4 — Carga por momento clínico · cicloergómetro post-esfuerzo</p>
+            <p class="version">v1.5 — Carga por momento clínico · bull's eye alineado · pronóstico en la conclusión</p>
         </div>
         <div class="header-controls">
             <button id="btn-theme-toggle" class="btn btn-icon" title="Cambiar Tema">
@@ -1342,15 +1342,15 @@
 
 
 </div>
-<script src="pearls.js?v=1.4"></script>
-<script src="report-templates.js?v=1.4"></script>
-<script src="sheets-storage.js?v=1.4"></script>
-<script src="app.js?v=1.4"></script>
+<script src="pearls.js?v=1.5"></script>
+<script src="report-templates.js?v=1.5"></script>
+<script src="sheets-storage.js?v=1.5"></script>
+<script src="app.js?v=1.5"></script>
 <script>
 // Control de versión: si el navegador sirvió una mezcla de archivos viejos y nuevos,
 // los botones fallan en silencio. Esto lo convierte en un aviso visible.
 (function () {
-    var APP_VERSION = '1.4';
+    var APP_VERSION = '1.5';
     var faltan = ['generarInforme', 'recolectarHallazgos', 'calcEjercicio'].filter(function (f) {
         return typeof window[f] !== 'function';
     });

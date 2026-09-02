@@ -562,8 +562,14 @@ function evaluarAvisosClinicos() {
             (muscular ? ` La prueba se detuvo por ${H.causaDetencionTxt}: si el límite fue muscular u ortopédico y no cardiovascular, el valor pronóstico es menor.` : ''));
     }
 
-    // 3 · Recuperación de la FC al primer minuto
-    if (H.hrr1 !== null && H.hrr1 <= 12)
+    // 3 · Recuperación de la FC al primer minuto.
+    //     Si sale negativo la FC de recuperación cargada supera a la del pico: eso es
+    //     un dato mal cargado, no un hallazgo, y hay que decirlo así.
+    if (H.hrr1 !== null && H.hrr1 < 0)
+        atencion(`La FC de recuperación (${H.fcRec} lpm) es mayor que la del pico (${H.fcPico} lpm)`,
+            'Revisá los dos valores: mientras la diferencia sea negativa no se puede calcular el HRR₁, ' +
+            'y el dato queda fuera del informe.');
+    else if (H.hrr1 !== null && H.hrr1 <= 12)
         atencion(`HRR₁ de ${H.hrr1} lpm`,
             'Una caída menor a 12 lpm en el primer minuto de recuperación se asocia a mayor mortalidad, con independencia de la isquemia.');
 
@@ -833,6 +839,14 @@ function polar2cart(r, angleDeg) {
     return [CX + r * Math.cos(rad), CY + r * Math.sin(rad)];
 }
 
+// Medio sector de corrimiento, igual que motility-svg.js de la app de Doppler: sin
+// esto el primer segmento arranca EN las 12 en punto en vez de estar CENTRADO ahí,
+// y el eje vertical parte al 1 y al 2 en lugar de alinear el 1 con el 4.
+// Basales y medios (6 sectores de 60°) arrancan en −30°; los apicales (4 de 90°), en −45°.
+function ringOffset(ring) {
+    return -180 / RING_COUNTS[ring];
+}
+
 function makeSegPath(ring, pos) {
     const [r1, r2] = RING_RADII[ring];
     const count = RING_COUNTS[ring];
@@ -842,8 +856,9 @@ function makeSegPath(ring, pos) {
     }
 
     const step = 360 / count;
-    const a1 = pos * step;
-    const a2 = (pos + 1) * step;
+    const off = ringOffset(ring);
+    const a1 = pos * step + off;
+    const a2 = (pos + 1) * step + off;
     const [x1i, y1i] = polar2cart(r1, a1);
     const [x1o, y1o] = polar2cart(r2, a1);
     const [x2i, y2i] = polar2cart(r1, a2);
@@ -857,7 +872,7 @@ function getSegLabelPos(seg) {
     const [r1, r2] = RING_RADII[seg.ring];
     const rMid = (r1 + r2) / 2;
     const step = 360 / RING_COUNTS[seg.ring];
-    const aMid = (seg.pos + 0.5) * step;
+    const aMid = (seg.pos + 0.5) * step + ringOffset(seg.ring);
     return polar2cart(rMid, aMid);
 }
 
@@ -943,16 +958,18 @@ function renderBullsEye(svgId, stateKey) {
     addRingLabels(svg, NS);
 }
 
-// Las etiquetas van en el ángulo 0 (las 12 en punto), que es línea divisoria en los
-// tres anillos y el único ángulo sin ningún número: en 272° caían justo encima de
-// los segmentos 3 y 9, cuyos centros están en 270°. El radio las apoya contra el
-// borde externo de su propio anillo, lejos de los números, que van al radio medio.
-// El apical mide 30 px de espesor y no le entra la palabra completa.
+// Cada etiqueta va sobre una divisoria de SU anillo, apoyada contra el borde externo:
+// los números caen en el radio medio del sector, así que ahí quedan lejos de todos.
+// Depende de la rotación: con el corrimiento de medio sector, las divisorias están
+// en 30·k para basales y medios, y en 45+90·k para los apicales — el ángulo 0 pasó
+// a ser el CENTRO de los segmentos 1, 7 y 13, y ya no sirve. Distancia al número más
+// cercano: 67 px el basal, 40 el medio, 28 el apical.
+// El anillo apical mide 30 px de espesor y no le entra la palabra completa.
 function addRingLabels(svg, NS) {
     const labels = [
-        { text: 'Basal', r: 133, a: 0 },
-        { text: 'Mid',   r: 79,  a: 0 },
-        { text: 'Ap.',   r: 40,  a: 0 }
+        { text: 'Basal', r: 133, a: 330 },
+        { text: 'Mid',   r: 79,  a: 330 },
+        { text: 'Ap.',   r: 40,  a: 315 }
     ];
     labels.forEach(l => {
         const [x, y] = polar2cart(l.r, l.a);
@@ -2072,6 +2089,63 @@ function rellenar(plantilla, datos) {
 }
 
 // ── Capa 3: armado del informe ────────────────
+// ══════════════════════════════════════════════
+//  HALLAZGOS DE VALOR PRONÓSTICO EN LA CONCLUSIÓN
+//  El filtro NO es el del panel de pantalla. Acá la pregunta es otra: ¿esto cambia
+//  lo que va a hacer el clínico que lee el informe? El que pide el estudio no ve la
+//  pantalla del operador, y estos datos le cambian la conducta.
+//  Queda afuera el control de calidad de la adquisición —imagen tardía, doble
+//  producto en el borde, WMSI inflado por conducción—: eso es del operador.
+//  Salen todos en UNA oración ordenada por relevancia, no apilados como alertas.
+// ══════════════════════════════════════════════
+function oracionPronostica(H, rama) {
+    const P = NARRATIVA.pronostico;
+    const items = [];
+
+    // 1 · Hipotensión: es criterio de suspensión, el de mayor peso.
+    //     En la rama hipotensiva ya es el núcleo de la conclusión.
+    if (H.hipotension && rama !== 'hipotensiva') items.push(P.hipotension);
+
+    // 2 · Caída de la FEy. En multivaso e hipotensiva la conclusión ya la explica.
+    if (H.caidaFey && rama !== 'positivaMulti' && rama !== 'hipotensiva')
+        items.push(rellenar(P.caidaFey, { feyReposo: H.feyReposo, feyEstres: H.feyEstres }));
+
+    // 3 · Arritmia ventricular compleja (o cualquiera que haya sido sintomática)
+    if (H.hayArritmiaRelevante) {
+        const lista = H.arritmiasRelevantes.length
+            ? listarEnProsa(H.arritmiasRelevantes.map(a => a.txt))
+            : listarEnProsa(H.arritmias.map(a => a.txt));
+        items.push(rellenar(P.arritmia, {
+            arritmias: lista,
+            momento: (H.arrMomentoTxt && H.arrMomentoTxt !== '—') ? ' ' + H.arrMomentoTxt : '',
+            // Entre paréntesis y no con coma: ver la nota en NARRATIVA.pronostico
+            sintomas: H.arrSintomatica ? ' (con síntomas asociados)' : ''
+        }));
+    }
+
+    // 4 · Capacidad funcional por debajo de 5 METs
+    if (H.mets > 0 && H.mets < 5) {
+        const limiteNoCV = ['fatiga', 'otro'].includes(H.causaDetencion);
+        items.push(rellenar(limiteNoCV ? P.metsLimiteNoCV : P.mets,
+            { mets: H.mets, causa: H.causaDetencionTxt }));
+    }
+
+    // 5 · Recuperación de la FC al primer minuto.
+    //     Un HRR₁ negativo significa que la FC de recuperación cargada es MAYOR que la
+    //     del pico: es un error de carga, no un hallazgo. No puede irse en un informe
+    //     firmado como dato pronóstico; se avisa en pantalla, que es donde se corrige.
+    if (H.hrr1 !== null && H.hrr1 >= 0 && H.hrr1 <= 12)
+        items.push(rellenar(P.hrr1, { hrr1: H.hrr1 }));
+
+    // 6 · Respuesta hipertensiva: el de menor peso inmediato de los seis, pero cambia
+    //     el tratamiento. En un no concluyente no se afirma nada sobre el esfuerzo.
+    if (H.hipertension && rama !== 'noConcluyente') items.push(P.hipertension);
+
+    if (!items.length) return '';
+    return rellenar(items.length === 1 ? P.oracionUna : P.oracionVarias,
+        { hallazgos: listarEnProsa(items) });
+}
+
 function construirNarrativa(H) {
     const T = NARRATIVA;
     const rama = elegirRama(H);
@@ -2279,37 +2353,31 @@ function construirNarrativa(H) {
     // Modificadores: se insertan antes del punto final
     const extras = [];            // coletillas: se enganchan antes del punto final
     const oracionesFinales = [];  // oraciones completas: van después
-    if (H.hipertension && rama !== 'noConcluyente') extras.push(T.modificadores.hipertensiva);
     if (H.fcSuboptima && rama === 'negativa') extras.push(T.modificadores.fcSuboptima);
     // En un positivo la isquemia ya quedó demostrada y la FC insuficiente no lo invalida;
     // en un estudio sin isquemia, sí: no es un negativo pleno.
     const sinIsquemiaDemostrada = ['secuela', 'diastolico', 'dilatada'].includes(rama);
     if (H.fcSuboptima && sinIsquemiaDemostrada) oracionesFinales.push(T.modificadores.fcSuboptimaOracion);
-    if (H.adquisicionTardia && rama !== 'noConcluyente')
-        extras.push(rellenar(T.modificadores.adquisicionTardia, { segImagen: H.segImagen, pctFCadq: H.pctFCadq }));
-    if (H.caidaFey && rama !== 'positivaMulti' && rama !== 'hipotensiva') extras.push(T.modificadores.caidaFey);
+    // La adquisición tardía ya no se cuela en la conclusión: es control de calidad del
+    // operador, sale en el panel de pantalla, y el párrafo de calidad informa igual los
+    // segundos y la FC de adquisición. La caída de la FEy, la hipertensiva, la
+    // hipotensiva, la arritmia, los METs bajos y el HRR₁ salen juntos más abajo.
     // La conclusión no puede negar lo que el bloque de ECG describe
     if (H.stIsquemico && !H.hayConduccion && ['secuela', 'dilatada'].includes(rama))
         extras.push(rellenar(T.modificadores.discordancia, { descripcionST: descripcionSTEnProsa(H) }));
     // En la rama de HFpEF ya está en el núcleo de la conclusión: no se repite
     if (H.diastResultado === 'positivo' && rama !== 'diastolico')
         extras.push(T.modificadores.diastolicoPositivo);
-    if (H.hayArritmiaRelevante) {
-        const lista = H.arritmiasRelevantes.length
-            ? listarEnProsa(H.arritmiasRelevantes.map(a => a.txt))
-            : listarEnProsa(H.arritmias.map(a => a.txt));
-        extras.push(rellenar(T.modificadores.arritmiaRelevante, {
-            arritmias: lista,
-            momento: (H.arrMomentoTxt && H.arrMomentoTxt !== '—') ? ' ' + H.arrMomentoTxt : '',
-            sintomas: H.arrSintomatica ? ', con síntomas asociados' : ''
-        }));
-    }
     if (H.hayConduccion && rama !== 'negativa') {
         // Si ya se demostró isquemia en la DA con segmentos valorables, hablar de
         // especificidad reducida en ese territorio contradiría el propio hallazgo.
         const clave = H.territoriosIsquemia.includes('DA') ? 'conduccionSeptalAcotado' : 'conduccionSeptal';
         extras.push(rellenar(T.modificadores[clave], datosConduccion));
     }
+
+    // Todo lo que le cambia la conducta al clínico, en una sola oración al cierre
+    const pronostico = oracionPronostica(H, rama);
+    if (pronostico) oracionesFinales.push(pronostico);
 
     if (extras.length) conclusion = conclusion.replace(/\.$/, '') + extras.join('') + '.';
     if (oracionesFinales.length) conclusion += oracionesFinales.join('');
