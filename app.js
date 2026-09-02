@@ -902,20 +902,40 @@ function renderBullsEye(svgId, stateKey) {
             title.textContent = `${seg.id}. ${seg.name} (${seg.territory}) — ${SCORE_LABELS[WM[stateKey][seg.id]]}`;
         });
 
-        // Número
+        // Número y territorio. El apex (ring 3) es demasiado chico para dos
+        // renglones: ahí va sólo el número.
         const [lx, ly] = getSegLabelPos(seg);
+        const conTerritorio = seg.ring !== 3;
+        const tinta = [2,3].includes(seg.id) || WM[stateKey][seg.id] === 0 ? '#374151' : '#fff';
+
         const txt = document.createElementNS(NS, 'text');
-        txt.setAttribute('x', lx); txt.setAttribute('y', ly);
+        txt.setAttribute('x', lx);
+        txt.setAttribute('y', conTerritorio ? ly - 4 : ly);
         txt.setAttribute('text-anchor', 'middle');
         txt.setAttribute('dominant-baseline', 'middle');
         txt.setAttribute('font-size', seg.ring === 3 ? '11' : '9');
         txt.setAttribute('font-weight', 'bold');
-        txt.setAttribute('fill', [2,3].includes(seg.id) || WM[stateKey][seg.id] === 0 ? '#374151' : '#fff');
+        txt.setAttribute('fill', tinta);
         txt.style.pointerEvents = 'none';
         txt.textContent = seg.id;
 
         g.appendChild(path);
         g.appendChild(txt);
+
+        if (conTerritorio) {
+            const terr = document.createElementNS(NS, 'text');
+            terr.setAttribute('x', lx);
+            terr.setAttribute('y', ly + 6);
+            terr.setAttribute('text-anchor', 'middle');
+            terr.setAttribute('dominant-baseline', 'middle');
+            terr.setAttribute('font-size', '7');
+            terr.setAttribute('font-weight', '600');
+            terr.setAttribute('fill', tinta);
+            terr.style.pointerEvents = 'none';
+            terr.textContent = seg.territory;
+            g.appendChild(terr);
+        }
+
         svg.appendChild(g);
     });
 
@@ -923,11 +943,16 @@ function renderBullsEye(svgId, stateKey) {
     addRingLabels(svg, NS);
 }
 
+// Las etiquetas van en el ángulo 0 (las 12 en punto), que es línea divisoria en los
+// tres anillos y el único ángulo sin ningún número: en 272° caían justo encima de
+// los segmentos 3 y 9, cuyos centros están en 270°. El radio las apoya contra el
+// borde externo de su propio anillo, lejos de los números, que van al radio medio.
+// El apical mide 30 px de espesor y no le entra la palabra completa.
 function addRingLabels(svg, NS) {
     const labels = [
-        { text: 'Basal', r: 115, a: 272 },
-        { text: 'Mid', r: 65, a: 272 },
-        { text: 'Ap.', r: 30, a: 272 }
+        { text: 'Basal', r: 133, a: 0 },
+        { text: 'Mid',   r: 79,  a: 0 },
+        { text: 'Ap.',   r: 40,  a: 0 }
     ];
     labels.forEach(l => {
         const [x, y] = polar2cart(l.r, l.a);
@@ -935,9 +960,12 @@ function addRingLabels(svg, NS) {
         txt.setAttribute('x', x); txt.setAttribute('y', y);
         txt.setAttribute('text-anchor', 'middle');
         txt.setAttribute('dominant-baseline', 'middle');
-        txt.setAttribute('font-size', '7');
+        txt.setAttribute('font-size', '7.5');
         txt.setAttribute('fill', 'var(--color-text-secondary)');
         txt.setAttribute('font-style', 'italic');
+        txt.setAttribute('stroke', 'var(--color-bg-card)');
+        txt.setAttribute('stroke-width', '2.5');
+        txt.setAttribute('paint-order', 'stroke');
         txt.style.pointerEvents = 'none';
         txt.textContent = l.text;
         svg.appendChild(txt);
@@ -1016,7 +1044,93 @@ function contarMotilidad() {
     return { evalRep, evalEst, isquemicos, viables, cicatriz, sinPar, territorios: [...terrIsq] };
 }
 
+// ── RESUMEN COMPACTO DEBAJO DEL BULL'S EYE ──
+// Replica el criterio de recolectarHallazgos(): con trastorno de conducción los
+// segmentos septales se apartan ANTES de clasificar y quedan fuera del WMSI. El
+// resumen es lo único que se mira en la carga habitual, así que tiene que decir
+// lo mismo que el informe que se firma, no el número crudo de la tabla.
+function motilidadComoEnInforme() {
+    const sel = document.getElementById('ecg_conduccion');
+    const hayConduccion = CONDUCCION_LIMITA_SEPTUM.includes(sel ? sel.value : 'ninguno');
+
+    const isq = [], secuela = [], sinPar = [], septales = [];
+    let evalRep = 0, evalEst = 0;
+    SEGMENTS.forEach(s => {
+        const r = WM.reposo[s.id], e = WM.estres[s.id];
+        if (r > 0) evalRep++;
+        if (e > 0) evalEst++;
+        if (hayConduccion && SEGMENTOS_SEPTALES.includes(s.id)) {
+            if (r > 1 || e > 1) septales.push(s.id);
+            return;
+        }
+        const c = classifyResponse(r, e);
+        if (c.key === 'isquemia' || c.key === 'isquemia_necrosis') isq.push(s);
+        else if (c.key === 'cicatriz') secuela.push(s);
+        else if (c.key === 'parcial') sinPar.push(s);
+    });
+    const porId = (a, b) => a.id - b.id;
+    isq.sort(porId); secuela.sort(porId); sinPar.sort(porId);
+
+    const excluir = hayConduccion ? SEGMENTOS_SEPTALES : null;
+    return {
+        hayConduccion, septales, isq, secuela, sinPar, evalRep, evalEst,
+        wmsiRep: calcWMSI('reposo', excluir),
+        wmsiEst: calcWMSI('estres', excluir)
+    };
+}
+
+// "7, 8, 13 (DA)" — los números de segmento con el/los territorios entre paréntesis
+function listarSegmentos(segs) {
+    if (!segs.length) return '—';
+    const terr = [...new Set(segs.map(s => s.territory))].join(' + ');
+    return `${segs.map(s => s.id).join(', ')} <span class="mot-terr">(${terr})</span>`;
+}
+
+function pintarResumenMotilidad() {
+    const l1 = document.getElementById('mot-linea-wmsi');
+    const l2 = document.getElementById('mot-linea-seg');
+    if (!l1 || !l2) return;
+
+    const M = motilidadComoEnInforme();
+
+    // ── Línea 1: WMSI reposo → post (Δ) + calidad de la evaluación
+    if (M.wmsiRep === null && M.wmsiEst === null) {
+        l1.innerHTML = '<span class="mot-vacio">Sin motilidad cargada</span>';
+    } else {
+        const rep = M.wmsiRep !== null ? M.wmsiRep : '—';
+        const est = M.wmsiEst !== null ? M.wmsiEst : '—';
+        let delta = '';
+        if (M.wmsiRep !== null && M.wmsiEst !== null) {
+            const d = parseFloat(M.wmsiEst) - parseFloat(M.wmsiRep);
+            const cls = d > 0.1 ? 'mot-mal' : 'mot-bien';
+            delta = ` <span class="${cls}">Δ ${d >= 0 ? '+' : ''}${d.toFixed(2)}</span>`;
+        }
+        const peor = M.wmsiEst !== null ? parseFloat(M.wmsiEst) : parseFloat(M.wmsiRep);
+        const palabra = peor <= 1.0 ? 'normal'
+            : peor <= 1.6 ? 'alteración leve-moderada'
+            : 'alteración extensa';
+        const noEval = Math.max(17 - M.evalRep, 17 - M.evalEst);
+        const calidad = noEval > 2
+            ? `<span class="mot-ojo">⚠ ${noEval} segmento(s) no visualizados</span>`
+            : `<span class="mot-bien">evaluados ${M.evalRep}/17 → ${M.evalEst}/17</span>`;
+
+        l1.innerHTML = `<strong>WMSI</strong> ${rep} → ${est}${delta} · ${palabra} · ${calidad}` +
+            (M.hayConduccion ? ' <span class="mot-terr">(septales excluidos)</span>' : '');
+    }
+
+    // ── Línea 2: qué segmentos, por categoría
+    const trozo = (etiqueta, segs, clase) =>
+        `<span class="${segs.length ? clase : ''}">${etiqueta}: ${listarSegmentos(segs)}</span>`;
+    l2.innerHTML = [
+        trozo('Isquémicos', M.isq, 'mot-mal'),
+        trozo('Secuela', M.secuela, 'mot-ojo'),
+        trozo('Sin par', M.sinPar, 'mot-ojo')
+    ].join(' &nbsp;·&nbsp; ');
+}
+
 function updateMotilidadResumen(wmsiRep, wmsiEst) {
+    pintarResumenMotilidad();
+
     const c = contarMotilidad();
     const elSeg = document.getElementById('seg-evaluados');
     if (!elSeg) return;
@@ -1066,7 +1180,9 @@ function avisarWMSIConduccion() {
     if (!aviso) return;
     const sel = document.getElementById('ecg_conduccion');
     const conduccion = sel ? sel.value : 'ninguno';
-    if (!conduccion || conduccion === 'ninguno') { aviso.style.display = 'none'; return; }
+    // Sólo BCRI, marcapasos y preexcitación excluyen el septum del informe. Avisar
+    // con un BCRD prometía una exclusión que el informe nunca hacía.
+    if (!CONDUCCION_LIMITA_SEPTUM.includes(conduccion)) { aviso.style.display = 'none'; return; }
 
     const alterados = SEGMENTOS_SEPTALES.filter(id => WM.reposo[id] > 1 || WM.estres[id] > 1);
     if (!alterados.length) { aviso.style.display = 'none'; return; }

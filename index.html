@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=1.3">
+    <link rel="stylesheet" href="styles.css?v=1.4">
 </head>
 <body>
 <div class="container">
@@ -17,7 +17,7 @@
     <header class="app-header">
         <div>
             <h1>Eco Estrés Cardíaco</h1>
-            <p class="version">v1.3 — Cicloergómetro post-esfuerzo · informe narrativo</p>
+            <p class="version">v1.4 — Carga por momento clínico · cicloergómetro post-esfuerzo</p>
         </div>
         <div class="header-controls">
             <button id="btn-theme-toggle" class="btn btn-icon" title="Cambiar Tema">
@@ -25,6 +25,12 @@
             </button>
         </div>
     </header>
+
+    <div class="bloque-sep">
+        <span class="bloque-num">1</span>
+        <span class="bloque-nombre">Identificación</span>
+        <span class="bloque-hint">paciente, contexto e indicación</span>
+    </div>
 
     <!-- ══════════════════════════════════════
          RESUMEN DE HISTORIA CLÍNICA
@@ -78,21 +84,6 @@
             <div class="form-group">
                 <label>Superficie Corporal (m²)</label>
                 <input autocomplete="off" type="text" id="sc_display" class="calculated-value" disabled>
-            </div>
-            <div class="form-group">
-                <label for="ventana">Calidad Ventana Acústica</label>
-                <select autocomplete="off" id="ventana" onchange="calcEjercicio()">
-                    <option value="buena">Buena</option>
-                    <option value="regular">Regular</option>
-                    <option value="limitada">Limitada</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label for="contraste_usado">Contraste Ecocardiográfico</label>
-                <select autocomplete="off" id="contraste_usado">
-                    <option value="no">No utilizado</option>
-                    <option value="si">Sí (SonoVue / Definity)</option>
-                </select>
             </div>
         </div>
     </section>
@@ -151,54 +142,125 @@
         </div>
     </section>
 
-    <!-- ══════════════════════════════════════
-         PRESETS DE CARGA RÁPIDA
-         ══════════════════════════════════════ -->
-    <section class="card preset-section">
-        <h2 class="section-title">Carga Rápida — Presets</h2>
-        <div class="preset-buttons">
-            <button type="button" class="preset-btn preset-btn-green" onclick="applyPreset('negativo_normal')" title="Estudio negativo, ejercicio, FEy 60%, todos los segmentos normales">Negativo Normal</button>
-            <button type="button" class="preset-btn preset-btn-green" onclick="applyPreset('negativo_submax')" title="Estudio no concluyente por FC submáxima">Submáximo (NC)</button>
-            <div class="preset-sep"></div>
-            <button type="button" class="preset-btn preset-btn-red" onclick="applyPreset('isquemia_da')" title="Isquemia inducible en territorio DA">Isquemia DA</button>
-            <button type="button" class="preset-btn preset-btn-red" onclick="applyPreset('isquemia_cd')" title="Isquemia en territorio Coronaria Derecha">Isquemia CD</button>
-            <button type="button" class="preset-btn preset-btn-red" onclick="applyPreset('isquemia_multi')" title="Isquemia multivaso (DA+CD)">Multivaso</button>
-            <div class="preset-sep"></div>
-            <button type="button" class="preset-btn preset-btn-yellow" onclick="applyPreset('viabilidad_bifasica')" title="Respuesta bifásica — viabilidad + isquemia">Viabilidad Bifásica</button>
-            <button type="button" class="preset-btn preset-btn-yellow" onclick="applyPreset('cicatriz')" title="Necrosis/cicatriz sin viabilidad">Cicatriz (No Viable)</button>
-            <div class="preset-sep"></div>
-            <button type="button" class="preset-btn preset-btn-purple" onclick="applyPreset('diastolico_pos')" title="Disfunción diastólica inducible">Diastólico (+)</button>
-            <button type="button" class="preset-btn preset-btn-purple" onclick="applyPreset('mch_latente')" title="MCH con obstrucción latente inducida">MCH Latente</button>
-            <button type="button" class="preset-btn preset-btn-purple" onclick="applyPreset('eao_bajo_flujo')" title="EAo verdadera — bajo flujo/bajo gradiente">EAo Bajo Flujo</button>
+    <div class="bloque-sep">
+        <span class="bloque-num">2</span>
+        <span class="bloque-nombre">Reposo</span>
+        <span class="bloque-hint">eco basal y ECG basal</span>
+    </div>
+
+
+    <section class="card">
+        <h2 class="section-title">Eco basal en reposo</h2>
+        <div class="grid">
+            <div class="form-group">
+                <label for="fevi_reposo">FEy Reposo (%) — Simpson</label>
+                <input autocomplete="off" type="number" id="fevi_reposo" placeholder="%" min="10" max="80" oninput="calcFEVI()">
+            </div>
+            <div class="form-group">
+                <label for="volvi_reposo">Volumen AI (mL) — Reposo</label>
+                <input autocomplete="off" type="number" id="volvi_reposo" placeholder="mL" min="10" max="200">
+            </div>
+            <div class="form-group">
+                <label for="pp_reposo">Presión Pulm. estimada (mmHg)</label>
+                <input autocomplete="off" type="number" id="pp_reposo" placeholder="mmHg" min="15" max="120">
+            </div>
+            <div class="form-group">
+                <label for="vd_funcion">Función del ventrículo derecho</label>
+                <select autocomplete="off" id="vd_funcion">
+                    <option value="">No evaluada</option>
+                    <option value="normal">Normal</option>
+                    <option value="leve">Disfunción leve</option>
+                    <option value="moderada">Disfunción moderada</option>
+                    <option value="severa">Disfunción severa</option>
+                </select>
+            </div>
+        </div>
+
+        <h3 class="subsection-title" style="margin-top:1.25rem">Función diastólica en reposo</h3>
+        <div class="grid">
+            <div class="form-group">
+                <label for="e_onda_rep">E onda Reposo (cm/s)</label>
+                <input autocomplete="off" type="number" id="e_onda_rep" placeholder="cm/s" step="0.1" oninput="calcDiastolico()">
+            </div>
+            <div class="form-group">
+                <label for="e_prima_rep">e' septal Reposo (cm/s)</label>
+                <input autocomplete="off" type="number" id="e_prima_rep" placeholder="cm/s" step="0.1" oninput="calcDiastolico()">
+            </div>
+            <div class="form-group">
+                <label for="e_prima_lat_rep">e' lateral Reposo (cm/s)</label>
+                <input autocomplete="off" type="number" id="e_prima_lat_rep" placeholder="cm/s" step="0.1" oninput="calcDiastolico()">
+            </div>
+            <div class="form-group">
+                <label>E/e' promedio Reposo</label>
+                <input autocomplete="off" type="text" id="ee_reposo" class="calculated-value" disabled>
+            </div>
+            <div class="form-group">
+                <label for="vrt_rep">VRT Reposo (m/s)</label>
+                <input autocomplete="off" type="number" id="vrt_rep" placeholder="m/s" step="0.1" min="0" max="6" oninput="calcDiastolico()">
+            </div>
+        </div>
+
+        <div class="form-group" style="margin-top:1rem">
+            <label for="reposo_libre">Descripción del estudio en reposo — texto libre</label>
+            <textarea autocomplete="off" id="reposo_libre" rows="5"
+                placeholder="Pegá acá la descripción completa del eco en reposo (masa indexada, RWT, e' promedio, LAVI, cavidades derechas, válvulas...). Si cargás algo, este texto reemplaza el párrafo de reposo del informe."></textarea>
+            <span class="firma-nota">Reemplaza la <strong>redacción</strong> del párrafo de reposo, no los datos: el bull's eye, la FEy y el E/e' siguen decidiendo la lógica del resto del informe.</span>
         </div>
     </section>
 
     <!-- ══════════════════════════════════════
-         CHECKLIST PRE-ESTUDIO
+         ECG BASAL
          ══════════════════════════════════════ -->
     <section class="card">
-        <details id="checklist-details">
-            <summary class="section-title" style="cursor:pointer; list-style:none; display:flex; justify-content:space-between; align-items:center; margin-bottom:0">
-                Checklist Pre-Estudio <span class="badge-secondary" id="checklist-badge">0 / 10</span>
-            </summary>
-            <div class="grid grid-2col" style="margin-top:1rem">
-                <div class="checkbox-group"><input autocomplete="off" type="checkbox" class="chk-pre" id="pre_consent"><label for="pre_consent">Consentimiento informado firmado</label></div>
-                <div class="checkbox-group"><input autocomplete="off" type="checkbox" class="chk-pre" id="pre_ayuno"><label for="pre_ayuno">Ayuno ≥3 h / sin cafeína 12–24 h</label></div>
-                <div class="checkbox-group"><input autocomplete="off" type="checkbox" class="chk-pre" id="pre_bb"><label for="pre_bb">Beta-bloqueante suspendido 24–48 h (si el objetivo es diagnóstico de isquemia)</label></div>
-                <div class="checkbox-group"><input autocomplete="off" type="checkbox" class="chk-pre" id="pre_ecg"><label for="pre_ecg">ECG de 12 derivaciones basal registrado</label></div>
-                <div class="checkbox-group"><input autocomplete="off" type="checkbox" class="chk-pre" id="pre_via"><label for="pre_via">Vía EV permeable</label></div>
-                <div class="checkbox-group"><input autocomplete="off" type="checkbox" class="chk-pre" id="pre_carro"><label for="pre_carro">Carro de paro y desfibrilador operativos</label></div>
-                <div class="checkbox-group"><input autocomplete="off" type="checkbox" class="chk-pre" id="pre_contra"><label for="pre_contra">Contraindicaciones descartadas</label></div>
-                <div class="checkbox-group"><input autocomplete="off" type="checkbox" class="chk-pre" id="pre_basal"><label for="pre_basal">Eco basal completo adquirido (4 vistas + preset de estrés)</label></div>
-                <div class="checkbox-group"><input autocomplete="off" type="checkbox" class="chk-pre" id="pre_calibracion"><label for="pre_calibracion">Bicicleta calibrada / sillín y manubrio ajustados</label></div>
-                <div class="checkbox-group"><input autocomplete="off" type="checkbox" class="chk-pre" id="pre_operador"><label for="pre_operador">Segundo operador disponible (ecografista + médico)</label></div>
+        <h2 class="section-title">ECG basal</h2>
+        <div class="grid">
+            <div class="form-group">
+                <label for="ecg_ritmo">Ritmo de base</label>
+                <select autocomplete="off" id="ecg_ritmo">
+                    <option value="sinusal">Ritmo sinusal</option>
+                    <option value="fa">Fibrilación auricular</option>
+                    <option value="aleteo">Aleteo auricular</option>
+                    <option value="marcapasos">Ritmo de marcapasos</option>
+                    <option value="otro">Otro</option>
+                </select>
             </div>
-            <div class="info-banner" style="margin-top:0.75rem">
-                <strong>Secuencia de adquisición en bicicleta:</strong> basal → carga baja/intermedia → <strong>pico</strong> (durante el pedaleo) → recuperación 1–2 min.
-                Las 4 vistas (PEL, PEC, A4C, A2C) en cada punto. En bicicleta el pico se filma <em>durante</em> el esfuerzo: no hay ventana de 90 s como en cinta.
+            <div class="form-group">
+                <label for="ecg_conduccion">Trastorno de conducción</label>
+                <select autocomplete="off" id="ecg_conduccion" onchange="calcEjercicio()">
+                    <option value="ninguno">Ninguno</option>
+                    <option value="bcri">BCRI — bloqueo completo de rama izquierda</option>
+                    <option value="marcapasos">Estimulación por marcapasos</option>
+                    <option value="preexcitacion">Preexcitación ventricular</option>
+                    <option value="bcrd">BCRD — bloqueo completo de rama derecha</option>
+                    <option value="hbai">Hemibloqueo anterior izquierdo</option>
+                    <option value="hbpi">Hemibloqueo posterior izquierdo</option>
+                    <option value="bcrd_hbai">BCRD + hemibloqueo anterior izquierdo</option>
+                </select>
+                <span class="firma-nota">Sólo BCRI, marcapasos y preexcitación limitan la valoración septal.</span>
             </div>
-        </details>
+            <div class="form-group">
+                <label for="ecg_st_basal">ST-T basal</label>
+                <select autocomplete="off" id="ecg_st_basal">
+                    <option value="normal">Normal</option>
+                    <option value="repol">Alteraciones inespecíficas de la repolarización</option>
+                    <option value="hvi">HVI con sobrecarga</option>
+                    <option value="infra_basal">Infradesnivel del ST basal</option>
+                    <option value="no_interpretable">No interpretable para isquemia</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="ecg_otros_basal">Otros hallazgos del ECG basal</label>
+                <input autocomplete="off" type="text" id="ecg_otros_basal" placeholder="Ej: imagen de secuela inferolateral">
+            </div>
+        </div>
     </section>
+
+
+    <div class="bloque-sep">
+        <span class="bloque-num">3</span>
+        <span class="bloque-nombre">Esfuerzo</span>
+        <span class="bloque-hint">hemodinamia, ECG, eco post-esfuerzo y motilidad</span>
+    </div>
 
     <!-- ══════════════════════════════════════
          SECCIÓN 3: PROTOCOLO DE ESTRÉS
@@ -302,6 +364,21 @@
                     <label for="ej_fc_img">FC al adquirir 1.ª imagen (lpm)</label>
                     <input autocomplete="off" type="number" id="ej_fc_img" placeholder="lpm" min="30" max="250" oninput="calcEjercicio()">
                 </div>
+            <div class="form-group">
+                <label for="ventana">Calidad Ventana Acústica</label>
+                <select autocomplete="off" id="ventana" onchange="calcEjercicio()">
+                    <option value="buena">Buena</option>
+                    <option value="regular">Regular</option>
+                    <option value="limitada">Limitada</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="contraste_usado">Contraste Ecocardiográfico</label>
+                <select autocomplete="off" id="contraste_usado">
+                    <option value="no">No utilizado</option>
+                    <option value="si">Sí (SonoVue / Definity)</option>
+                </select>
+            </div>
             </div>
 
             <div class="calc-box">
@@ -494,113 +571,12 @@
         </div>
     </section>
 
-    <!-- ══════════════════════════════════════
-         SECCIÓN 4: FUNCIÓN VI EN REPOSO
-         ══════════════════════════════════════ -->
-    <section class="card">
-        <h2 class="section-title">Función Ventricular Izquierda</h2>
-        <div class="grid">
-            <div class="form-group">
-                <label for="fevi_reposo">FEy Reposo (%) — Simpson</label>
-                <input autocomplete="off" type="number" id="fevi_reposo" placeholder="%" min="10" max="80" oninput="calcFEVI()">
-            </div>
-            <div class="form-group">
-                <label for="fevi_pico">FEy Pico Estrés (%)</label>
-                <input autocomplete="off" type="number" id="fevi_pico" placeholder="%" min="10" max="80" oninput="calcFEVI()">
-            </div>
-            <div class="form-group">
-                <label for="fevi_recup">FEy Recuperación (%)</label>
-                <input autocomplete="off" type="number" id="fevi_recup" placeholder="%" min="10" max="80">
-            </div>
-            <div class="form-group">
-                <label>ΔFEy (Reposo → Pico)</label>
-                <input autocomplete="off" type="text" id="delta_fevi" class="calculated-value" disabled>
-            </div>
-            <div class="form-group">
-                <label for="volvi_reposo">Volumen AI (mL) — Reposo</label>
-                <input autocomplete="off" type="number" id="volvi_reposo" placeholder="mL" min="10" max="200">
-            </div>
-            <div class="form-group">
-                <label for="pp_reposo">Presión Pulm. estimada (mmHg)</label>
-                <input autocomplete="off" type="number" id="pp_reposo" placeholder="mmHg" min="15" max="120">
-            </div>
-            <div class="form-group">
-                <label for="vd_funcion">Función del ventrículo derecho</label>
-                <select autocomplete="off" id="vd_funcion">
-                    <option value="">No evaluada</option>
-                    <option value="normal">Normal</option>
-                    <option value="leve">Disfunción leve</option>
-                    <option value="moderada">Disfunción moderada</option>
-                    <option value="severa">Disfunción severa</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label for="patron_motilidad">Patrón de la alteración</label>
-                <select autocomplete="off" id="patron_motilidad" onchange="marcarPatronManual()">
-                    <option value="segmentaria">Segmentaria (distribución coronaria)</option>
-                    <option value="global">Global (no coronaria)</option>
-                </select>
-                <span class="firma-nota" id="patron_origen">Se propone solo según extensión, territorios y FEy.</span>
-            </div>
-        </div>
-
-        <div class="form-group" style="margin-top:1rem">
-            <label for="reposo_libre">Descripción del estudio en reposo — texto libre</label>
-            <textarea autocomplete="off" id="reposo_libre" rows="5"
-                placeholder="Pegá acá la descripción completa del eco en reposo (masa indexada, RWT, e' promedio, LAVI, cavidades derechas, válvulas...). Si cargás algo, este texto reemplaza el párrafo de reposo del informe."></textarea>
-            <span class="firma-nota">Reemplaza la <strong>redacción</strong> del párrafo de reposo, no los datos: el bull's eye, la FEy y el E/e' siguen decidiendo la lógica del resto del informe.</span>
-        </div>
-    </section>
 
     <!-- ══════════════════════════════════════
-         SECCIÓN 4b: ECG
+         ECG POST-ESFUERZO Y ARRITMIAS
          ══════════════════════════════════════ -->
     <section class="card">
-        <h2 class="section-title">ECG</h2>
-
-        <h3 class="subsection-title">ECG en reposo</h3>
-        <div class="grid">
-            <div class="form-group">
-                <label for="ecg_ritmo">Ritmo de base</label>
-                <select autocomplete="off" id="ecg_ritmo">
-                    <option value="sinusal">Ritmo sinusal</option>
-                    <option value="fa">Fibrilación auricular</option>
-                    <option value="aleteo">Aleteo auricular</option>
-                    <option value="marcapasos">Ritmo de marcapasos</option>
-                    <option value="otro">Otro</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label for="ecg_conduccion">Trastorno de conducción</label>
-                <select autocomplete="off" id="ecg_conduccion" onchange="calcEjercicio()">
-                    <option value="ninguno">Ninguno</option>
-                    <option value="bcri">BCRI — bloqueo completo de rama izquierda</option>
-                    <option value="marcapasos">Estimulación por marcapasos</option>
-                    <option value="preexcitacion">Preexcitación ventricular</option>
-                    <option value="bcrd">BCRD — bloqueo completo de rama derecha</option>
-                    <option value="hbai">Hemibloqueo anterior izquierdo</option>
-                    <option value="hbpi">Hemibloqueo posterior izquierdo</option>
-                    <option value="bcrd_hbai">BCRD + hemibloqueo anterior izquierdo</option>
-                </select>
-                <span class="firma-nota">Sólo BCRI, marcapasos y preexcitación limitan la valoración septal.</span>
-            </div>
-            <div class="form-group">
-                <label for="ecg_st_basal">ST-T basal</label>
-                <select autocomplete="off" id="ecg_st_basal">
-                    <option value="normal">Normal</option>
-                    <option value="repol">Alteraciones inespecíficas de la repolarización</option>
-                    <option value="hvi">HVI con sobrecarga</option>
-                    <option value="infra_basal">Infradesnivel del ST basal</option>
-                    <option value="no_interpretable">No interpretable para isquemia</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label for="ecg_otros_basal">Otros hallazgos del ECG basal</label>
-                <input autocomplete="off" type="text" id="ecg_otros_basal" placeholder="Ej: imagen de secuela inferolateral">
-            </div>
-        </div>
-
-        <h3 class="subsection-title" style="margin-top:1.25rem">ECG post-esfuerzo</h3>
+        <h2 class="section-title">ECG post-esfuerzo</h2>
         <div class="grid">
             <div class="form-group">
                 <label for="ecg_st_tipo">Cambios del ST-T</label>
@@ -678,11 +654,81 @@
             </div>
         </div>
         <div id="aviso-arritmias" class="aviso-adquisicion" style="display:none"></div>
-
     </section>
 
     <!-- ══════════════════════════════════════
-         SECCIÓN 5: MOTILIDAD PARIETAL — 17 SEG
+         ECO POST-ESFUERZO
+         ══════════════════════════════════════ -->
+    <section class="card">
+        <h2 class="section-title">Eco post-esfuerzo</h2>
+        <div class="grid">
+            <div class="form-group">
+                <label for="fevi_pico">FEy Pico Estrés (%)</label>
+                <input autocomplete="off" type="number" id="fevi_pico" placeholder="%" min="10" max="80" oninput="calcFEVI()">
+            </div>
+            <div class="form-group">
+                <label for="fevi_recup">FEy Recuperación (%)</label>
+                <input autocomplete="off" type="number" id="fevi_recup" placeholder="%" min="10" max="80">
+            </div>
+            <div class="form-group">
+                <label>ΔFEy (Reposo → Pico)</label>
+                <input autocomplete="off" type="text" id="delta_fevi" class="calculated-value" disabled>
+            </div>
+        </div>
+
+        <h3 class="subsection-title" style="margin-top:1.25rem">Estrés diastólico</h3>
+        <div class="pearl-container" data-pearl="diastolico"></div>
+        <p class="module-description">
+            Evalúa la presión de llenado inducida por el ejercicio. E/e' &gt;14 con estrés sugiere disfunción diastólica inducible. Criterio positivo: E/e' &gt;14 + PSAP &gt;50 mmHg o e' &lt;7 cm/s con ejercicio.
+        </p>
+        <div class="grid">
+            <div class="form-group">
+                <label for="e_onda_est">E onda Estrés (cm/s)</label>
+                <input autocomplete="off" type="number" id="e_onda_est" placeholder="cm/s" step="0.1" oninput="calcDiastolico()">
+            </div>
+            <div class="form-group">
+                <label for="e_prima_est">e' septal Estrés (cm/s)</label>
+                <input autocomplete="off" type="number" id="e_prima_est" placeholder="cm/s" step="0.1" oninput="calcDiastolico()">
+            </div>
+            <div class="form-group">
+                <label for="e_prima_lat_est">e' lateral Estrés (cm/s)</label>
+                <input autocomplete="off" type="number" id="e_prima_lat_est" placeholder="cm/s" step="0.1" oninput="calcDiastolico()">
+            </div>
+            <div class="form-group">
+                <label>E/e' promedio Estrés</label>
+                <input autocomplete="off" type="text" id="ee_estres" class="calculated-value" disabled>
+            </div>
+            <div class="form-group">
+                <label for="vrt_est">VRT Estrés (m/s)</label>
+                <input autocomplete="off" type="number" id="vrt_est" placeholder="m/s" step="0.1" min="0" max="6" oninput="calcDiastolico()">
+            </div>
+        </div>
+        <div class="calc-box" style="margin-top:0.75rem">
+            <div class="calc-row"><span>E/e' Reposo:</span><span id="diast_rep_interp" class="calc-value">—</span></div>
+            <div class="calc-row"><span>E/e' Estrés:</span><span id="diast_est_interp" class="calc-value">—</span></div>
+            <div class="calc-row"><span>Respuesta de e' al esfuerzo:</span><span id="diast_eprima_resp" class="calc-value">—</span></div>
+            <div class="calc-row"><span>Test diastólico de esfuerzo:</span><span id="diast_respuesta" class="calc-value">—</span></div>
+        </div>
+        <div class="grid" style="margin-top:0.75rem">
+            <div class="form-group">
+                <label for="diast_resultado">Estudio diastólico de esfuerzo — resultado que va al informe</label>
+                <select autocomplete="off" id="diast_resultado" onchange="marcarDiastolicoManual()">
+                    <option value="no_evaluado">No evaluado</option>
+                    <option value="negativo">Negativo</option>
+                    <option value="positivo">Positivo</option>
+                </select>
+                <span class="firma-nota" id="diast_origen">Se completa solo desde E/e' y VRT; podés corregirlo.</span>
+            </div>
+        </div>
+        <p class="table-note">
+            Criterio de test diastólico positivo (ASE): E/e' promedio &gt;14 con el esfuerzo <em>y</em> VRT &gt;2,8 m/s, con e' septal &lt;7 cm/s en reposo.
+            Si sólo se cargó e' septal, el E/e' se calcula con ese valor.
+        </p>
+    </section>
+
+
+    <!-- ══════════════════════════════════════
+         MOTILIDAD PARIETAL — 17 SEGMENTOS
          ══════════════════════════════════════ -->
     <section class="card">
         <h2 class="section-title">Motilidad Parietal Segmentaria — Modelo AHA 17 Segmentos</h2>
@@ -698,12 +744,18 @@
         </div>
 
         <p style="font-size:0.78rem; color:var(--color-text-secondary); margin-bottom:1rem">
-            Carga rápida por territorio o haga clic directamente en cada segmento del diagrama / botones de la tabla.
+            Hacé clic en cada segmento del diagrama para ir cambiando el puntaje. Los botones de abajo cargan todo de una vez.
         </p>
 
-        <!-- CARGA RÁPIDA POR TERRITORIO -->
         <div class="territory-ctrl-box">
-            <div class="tc-title">⚡ Carga Rápida por Territorio</div>
+            <div class="tc-quick-btns">
+                <button class="tc-quick-btn" onclick="setAllNormal('reposo')">✓ Todo Normal — Reposo</button>
+                <button class="tc-quick-btn" onclick="setAllNormal('estres')">✓ Todo Normal — Estrés</button>
+                <button class="tc-quick-btn danger" onclick="resetAllScores()">✕ Limpiar todo</button>
+            </div>
+            <details class="carga-territorio">
+                <summary class="tc-title" style="cursor:pointer; list-style:none">⚡ Carga rápida por territorio</summary>
+                <div style="margin-top:0.75rem">
             <table class="tc-table">
                 <thead>
                     <tr>
@@ -775,11 +827,8 @@
                     </tr>
                 </tbody>
             </table>
-            <div class="tc-quick-btns">
-                <button class="tc-quick-btn" onclick="setAllNormal('reposo')">✓ Todo Normal — Reposo</button>
-                <button class="tc-quick-btn" onclick="setAllNormal('estres')">✓ Todo Normal — Estrés</button>
-                <button class="tc-quick-btn danger" onclick="resetAllScores()">✕ Limpiar todo</button>
-            </div>
+                </div>
+            </details>
         </div>
 
         <div class="bulls-eye-container">
@@ -796,6 +845,16 @@
             </div>
         </div>
 
+        <!-- Resumen compacto: reemplaza a la tabla de 17 filas como lectura habitual -->
+        <div id="mot-resumen" class="mot-resumen">
+            <div class="mot-resumen-linea" id="mot-linea-wmsi">—</div>
+            <div class="mot-resumen-linea" id="mot-linea-seg">—</div>
+        </div>
+
+        <div id="aviso-conduccion" class="aviso-adquisicion" style="display:none"></div>
+
+        <details class="tabla-detallada">
+            <summary class="subsection-title" style="cursor:pointer; list-style:none; margin-bottom:0">Ver tabla detallada</summary>
         <div class="segments-table-wrap">
             <table class="segments-table">
                 <thead><tr>
@@ -819,8 +878,18 @@
             <div class="calc-row"><span>Segmentos con isquemia inducible:</span><span id="seg-isquemicos" class="calc-value">—</span></div>
             <div class="calc-row"><span>Territorios comprometidos (sugerido):</span><span id="territorios-sugeridos" class="calc-value">—</span></div>
         </div>
+        </details>
 
-        <div id="aviso-conduccion" class="aviso-adquisicion" style="display:none"></div>
+        <div class="grid" style="margin-top:1.25rem">
+            <div class="form-group">
+                <label for="patron_motilidad">Patrón de la alteración</label>
+                <select autocomplete="off" id="patron_motilidad" onchange="marcarPatronManual()">
+                    <option value="segmentaria">Segmentaria (distribución coronaria)</option>
+                    <option value="global">Global (no coronaria)</option>
+                </select>
+                <span class="firma-nota" id="patron_origen">Se propone solo según extensión, territorios y FEy.</span>
+            </div>
+        </div>
 
         <h3 class="subsection-title" style="margin-top:1.25rem">Motilidad en Recuperación</h3>
         <div class="grid">
@@ -841,161 +910,12 @@
         </div>
     </section>
 
-    <!-- ══════════════════════════════════════
-         SECCIÓN 6: ESTRÉS DIASTÓLICO
-         ══════════════════════════════════════ -->
-    <section class="card">
-        <h2 class="section-title">Estrés Diastólico</h2>
-        <div class="pearl-container" data-pearl="diastolico"></div>
-        <p class="module-description">
-            Evalúa la presión de llenado inducida por el ejercicio. E/e' &gt;14 con estrés sugiere disfunción diastólica inducible. Criterio positivo: E/e' &gt;14 + PSAP &gt;50 mmHg o e' &lt;7 cm/s con ejercicio.
-        </p>
-        <div class="grid">
-            <div class="form-group">
-                <label for="e_onda_rep">E onda Reposo (cm/s)</label>
-                <input autocomplete="off" type="number" id="e_onda_rep" placeholder="cm/s" step="0.1" oninput="calcDiastolico()">
-            </div>
-            <div class="form-group">
-                <label for="e_prima_rep">e' septal Reposo (cm/s)</label>
-                <input autocomplete="off" type="number" id="e_prima_rep" placeholder="cm/s" step="0.1" oninput="calcDiastolico()">
-            </div>
-            <div class="form-group">
-                <label for="e_prima_lat_rep">e' lateral Reposo (cm/s)</label>
-                <input autocomplete="off" type="number" id="e_prima_lat_rep" placeholder="cm/s" step="0.1" oninput="calcDiastolico()">
-            </div>
-            <div class="form-group">
-                <label>E/e' promedio Reposo</label>
-                <input autocomplete="off" type="text" id="ee_reposo" class="calculated-value" disabled>
-            </div>
-            <div class="form-group">
-                <label for="vrt_rep">VRT Reposo (m/s)</label>
-                <input autocomplete="off" type="number" id="vrt_rep" placeholder="m/s" step="0.1" min="0" max="6" oninput="calcDiastolico()">
-            </div>
-            <div class="form-group">
-                <label for="e_onda_est">E onda Estrés (cm/s)</label>
-                <input autocomplete="off" type="number" id="e_onda_est" placeholder="cm/s" step="0.1" oninput="calcDiastolico()">
-            </div>
-            <div class="form-group">
-                <label for="e_prima_est">e' septal Estrés (cm/s)</label>
-                <input autocomplete="off" type="number" id="e_prima_est" placeholder="cm/s" step="0.1" oninput="calcDiastolico()">
-            </div>
-            <div class="form-group">
-                <label for="e_prima_lat_est">e' lateral Estrés (cm/s)</label>
-                <input autocomplete="off" type="number" id="e_prima_lat_est" placeholder="cm/s" step="0.1" oninput="calcDiastolico()">
-            </div>
-            <div class="form-group">
-                <label>E/e' promedio Estrés</label>
-                <input autocomplete="off" type="text" id="ee_estres" class="calculated-value" disabled>
-            </div>
-            <div class="form-group">
-                <label for="vrt_est">VRT Estrés (m/s)</label>
-                <input autocomplete="off" type="number" id="vrt_est" placeholder="m/s" step="0.1" min="0" max="6" oninput="calcDiastolico()">
-            </div>
-        </div>
-        <div class="calc-box" style="margin-top:0.75rem">
-            <div class="calc-row"><span>E/e' Reposo:</span><span id="diast_rep_interp" class="calc-value">—</span></div>
-            <div class="calc-row"><span>E/e' Estrés:</span><span id="diast_est_interp" class="calc-value">—</span></div>
-            <div class="calc-row"><span>Respuesta de e' al esfuerzo:</span><span id="diast_eprima_resp" class="calc-value">—</span></div>
-            <div class="calc-row"><span>Test diastólico de esfuerzo:</span><span id="diast_respuesta" class="calc-value">—</span></div>
-        </div>
-        <div class="grid" style="margin-top:0.75rem">
-            <div class="form-group">
-                <label for="diast_resultado">Estudio diastólico de esfuerzo — resultado que va al informe</label>
-                <select autocomplete="off" id="diast_resultado" onchange="marcarDiastolicoManual()">
-                    <option value="no_evaluado">No evaluado</option>
-                    <option value="negativo">Negativo</option>
-                    <option value="positivo">Positivo</option>
-                </select>
-                <span class="firma-nota" id="diast_origen">Se completa solo desde E/e' y VRT; podés corregirlo.</span>
-            </div>
-        </div>
-        <p class="table-note">
-            Criterio de test diastólico positivo (ASE): E/e' promedio &gt;14 con el esfuerzo <em>y</em> VRT &gt;2,8 m/s, con e' septal &lt;7 cm/s en reposo.
-            Si sólo se cargó e' septal, el E/e' se calcula con ese valor.
-        </p>
-    </section>
 
-    <!-- ══════════════════════════════════════
-         AVISOS CLÍNICOS (sólo pantalla)
-         ══════════════════════════════════════ -->
-    <section class="card" id="card-avisos" style="display:none">
-        <h2 class="section-title">Para mirar de nuevo</h2>
-        <p class="firma-nota" style="margin-bottom:0.75rem">
-            Hallazgos que pueden pasarse por alto, con el fundamento a la vista. <strong>No salen en el informe</strong> y no deciden nada:
-            están para que los evalúes vos.
-        </p>
-        <div id="avisos-clinicos"></div>
-    </section>
-
-    <!-- ══════════════════════════════════════
-         SECCIÓN 7: INTERPRETACIÓN
-         ══════════════════════════════════════ -->
-    <section class="card card-result">
-        <h2 class="section-title">Interpretación y Resultado</h2>
-        <div class="pearl-container" data-pearl="errores"></div>
-        <div class="grid">
-            <div class="form-group">
-                <label for="resultado_estudio">Resultado del Estudio</label>
-                <select autocomplete="off" id="resultado_estudio" onchange="updateResultBanner()">
-                    <option value="">Seleccionar...</option>
-                    <option value="negativo">NEGATIVO para Isquemia</option>
-                    <option value="positivo">POSITIVO para Isquemia</option>
-                    <option value="no_concluyente">NO CONCLUYENTE</option>
-                    <option value="hta_respuesta">Respuesta Hipertensiva (sin isquemia)</option>
-                    <option value="viabilidad_positiva">VIABILIDAD POSITIVA</option>
-                    <option value="viabilidad_negativa">VIABILIDAD NEGATIVA (cicatriz transmural)</option>
-                    <option value="diastolico_positivo">DISFUNCIÓN DIASTÓLICA INDUCIBLE</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label for="territorio_afectado">Territorio Comprometido</label>
-                <select autocomplete="off" id="territorio_afectado">
-                    <option value="ninguno">Ninguno / N/A</option>
-                    <option value="da">DA (Descendente Anterior)</option>
-                    <option value="cd">CD (Coronaria Derecha)</option>
-                    <option value="cx">Cx (Circunfleja)</option>
-                    <option value="da_cd">DA + CD</option>
-                    <option value="da_cx">DA + Cx</option>
-                    <option value="cd_cx">CD + Cx</option>
-                    <option value="trivascular">Trivascular</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label for="categorizacion">Categorización de riesgo</label>
-                <select autocomplete="off" id="categorizacion">
-                    <option value="">Seleccionar...</option>
-                    <option value="bajo">Riesgo bajo</option>
-                    <option value="intermedio">Riesgo intermedio</option>
-                    <option value="alto">Riesgo alto</option>
-                </select>
-                <span id="categorizacion-sugerida" class="hint-sugerida"></span>
-            </div>
-            <div class="form-group">
-                <label for="extension_isquemia">Extensión Isquemia</label>
-                <select autocomplete="off" id="extension_isquemia">
-                    <option value="">N/A</option>
-                    <option value="leve">Leve (1–2 segmentos)</option>
-                    <option value="moderada">Moderada (3–4 segmentos)</option>
-                    <option value="extensa">Extensa (≥5 segmentos)</option>
-                </select>
-            </div>
-        </div>
-        <div id="resultado-banner" class="resultado-banner" style="display:none"></div>
-        <div class="grid grid-3col" style="margin-top:1rem">
-            <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="hal_angina"><label for="hal_angina">Angina durante el estudio</label></div>
-            <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="hal_disnea"><label for="hal_disnea">Disnea de esfuerzo</label></div>
-            <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="hal_st_dep"><label for="hal_st_dep">Descenso ST en ECG</label></div>
-            <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="hal_st_ele"><label for="hal_st_ele">Elevación ST en ECG</label></div>
-            <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="hal_arritmia"><label for="hal_arritmia">Arritmia significativa</label></div>
-            <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="hal_hipotension"><label for="hal_hipotension">Respuesta hipotensora (&gt;10 mmHg caída)</label></div>
-            <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="hal_hipertensiva"><label for="hal_hipertensiva">Respuesta hipertensiva (≥210/110)</label></div>
-            <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="hal_extrasistoles"><label for="hal_extrasistoles">Extrasístoles ventriculares frecuentes</label></div>
-        </div>
-        <div class="form-group" style="margin-top:1rem">
-            <label for="conclusion_libre">Conclusión clínica (texto libre)</label>
-            <textarea autocomplete="off" id="conclusion_libre" rows="3" placeholder="Descripción interpretativa del estudio para el informe final..."></textarea>
-        </div>
-    </section>
+    <div class="bloque-sep">
+        <span class="bloque-num">4</span>
+        <span class="bloque-nombre">Situaciones especiales</span>
+        <span class="bloque-hint">viabilidad, estenosis aórtica, CFR, strain, MCH</span>
+    </div>
 
     <!-- ══════════════════════════════════════
          SECCIÓN 8: MÓDULOS ESPECIALES
@@ -1182,6 +1102,94 @@
         </details>
     </section>
 
+    <div class="bloque-sep">
+        <span class="bloque-num">5</span>
+        <span class="bloque-nombre">Informe</span>
+        <span class="bloque-hint">avisos, interpretación y texto generado</span>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         AVISOS CLÍNICOS (sólo pantalla)
+         ══════════════════════════════════════ -->
+    <section class="card" id="card-avisos" style="display:none">
+        <h2 class="section-title">Para mirar de nuevo</h2>
+        <p class="firma-nota" style="margin-bottom:0.75rem">
+            Hallazgos que pueden pasarse por alto, con el fundamento a la vista. <strong>No salen en el informe</strong> y no deciden nada:
+            están para que los evalúes vos.
+        </p>
+        <div id="avisos-clinicos"></div>
+    </section>
+
+    <!-- ══════════════════════════════════════
+         SECCIÓN 7: INTERPRETACIÓN
+         ══════════════════════════════════════ -->
+    <section class="card card-result">
+        <h2 class="section-title">Interpretación y Resultado</h2>
+        <div class="pearl-container" data-pearl="errores"></div>
+        <div class="grid">
+            <div class="form-group">
+                <label for="resultado_estudio">Resultado del Estudio</label>
+                <select autocomplete="off" id="resultado_estudio" onchange="updateResultBanner()">
+                    <option value="">Seleccionar...</option>
+                    <option value="negativo">NEGATIVO para Isquemia</option>
+                    <option value="positivo">POSITIVO para Isquemia</option>
+                    <option value="no_concluyente">NO CONCLUYENTE</option>
+                    <option value="hta_respuesta">Respuesta Hipertensiva (sin isquemia)</option>
+                    <option value="viabilidad_positiva">VIABILIDAD POSITIVA</option>
+                    <option value="viabilidad_negativa">VIABILIDAD NEGATIVA (cicatriz transmural)</option>
+                    <option value="diastolico_positivo">DISFUNCIÓN DIASTÓLICA INDUCIBLE</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="territorio_afectado">Territorio Comprometido</label>
+                <select autocomplete="off" id="territorio_afectado">
+                    <option value="ninguno">Ninguno / N/A</option>
+                    <option value="da">DA (Descendente Anterior)</option>
+                    <option value="cd">CD (Coronaria Derecha)</option>
+                    <option value="cx">Cx (Circunfleja)</option>
+                    <option value="da_cd">DA + CD</option>
+                    <option value="da_cx">DA + Cx</option>
+                    <option value="cd_cx">CD + Cx</option>
+                    <option value="trivascular">Trivascular</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="categorizacion">Categorización de riesgo</label>
+                <select autocomplete="off" id="categorizacion">
+                    <option value="">Seleccionar...</option>
+                    <option value="bajo">Riesgo bajo</option>
+                    <option value="intermedio">Riesgo intermedio</option>
+                    <option value="alto">Riesgo alto</option>
+                </select>
+                <span id="categorizacion-sugerida" class="hint-sugerida"></span>
+            </div>
+            <div class="form-group">
+                <label for="extension_isquemia">Extensión Isquemia</label>
+                <select autocomplete="off" id="extension_isquemia">
+                    <option value="">N/A</option>
+                    <option value="leve">Leve (1–2 segmentos)</option>
+                    <option value="moderada">Moderada (3–4 segmentos)</option>
+                    <option value="extensa">Extensa (≥5 segmentos)</option>
+                </select>
+            </div>
+        </div>
+        <div id="resultado-banner" class="resultado-banner" style="display:none"></div>
+        <div class="grid grid-3col" style="margin-top:1rem">
+            <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="hal_angina"><label for="hal_angina">Angina durante el estudio</label></div>
+            <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="hal_disnea"><label for="hal_disnea">Disnea de esfuerzo</label></div>
+            <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="hal_st_dep"><label for="hal_st_dep">Descenso ST en ECG</label></div>
+            <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="hal_st_ele"><label for="hal_st_ele">Elevación ST en ECG</label></div>
+            <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="hal_arritmia"><label for="hal_arritmia">Arritmia significativa</label></div>
+            <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="hal_hipotension"><label for="hal_hipotension">Respuesta hipotensora (&gt;10 mmHg caída)</label></div>
+            <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="hal_hipertensiva"><label for="hal_hipertensiva">Respuesta hipertensiva (≥210/110)</label></div>
+            <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="hal_extrasistoles"><label for="hal_extrasistoles">Extrasístoles ventriculares frecuentes</label></div>
+        </div>
+        <div class="form-group" style="margin-top:1rem">
+            <label for="conclusion_libre">Conclusión clínica (texto libre)</label>
+            <textarea autocomplete="off" id="conclusion_libre" rows="3" placeholder="Descripción interpretativa del estudio para el informe final..."></textarea>
+        </div>
+    </section>
+
     <!-- ══════════════════════════════════════
          SECCIÓN 9: REPORTE FINAL
          ══════════════════════════════════════ -->
@@ -1203,6 +1211,66 @@
         </div>
         <div id="validacion-panel" class="validacion-panel" style="display:none"></div>
         <div id="reporte-output" class="reporte-output" style="display:none"></div>
+    </section>
+
+    <div class="bloque-sep">
+        <span class="bloque-num">·</span>
+        <span class="bloque-nombre">Herramientas</span>
+        <span class="bloque-hint">presets, checklist y archivo</span>
+    </div>
+
+
+    <!-- ══════════════════════════════════════
+         PRESETS DE CARGA RÁPIDA (sólo para probar)
+         ══════════════════════════════════════ -->
+    <section class="card preset-section">
+        <details>
+            <summary class="section-title" style="cursor:pointer; list-style:none; display:flex; justify-content:space-between; align-items:center; margin-bottom:0">
+                Carga Rápida — Presets <span class="badge-secondary">para probar</span>
+            </summary>
+            <div class="preset-buttons" style="margin-top:1rem">
+            <button type="button" class="preset-btn preset-btn-green" onclick="applyPreset('negativo_normal')" title="Estudio negativo, ejercicio, FEy 60%, todos los segmentos normales">Negativo Normal</button>
+            <button type="button" class="preset-btn preset-btn-green" onclick="applyPreset('negativo_submax')" title="Estudio no concluyente por FC submáxima">Submáximo (NC)</button>
+            <div class="preset-sep"></div>
+            <button type="button" class="preset-btn preset-btn-red" onclick="applyPreset('isquemia_da')" title="Isquemia inducible en territorio DA">Isquemia DA</button>
+            <button type="button" class="preset-btn preset-btn-red" onclick="applyPreset('isquemia_cd')" title="Isquemia en territorio Coronaria Derecha">Isquemia CD</button>
+            <button type="button" class="preset-btn preset-btn-red" onclick="applyPreset('isquemia_multi')" title="Isquemia multivaso (DA+CD)">Multivaso</button>
+            <div class="preset-sep"></div>
+            <button type="button" class="preset-btn preset-btn-yellow" onclick="applyPreset('viabilidad_bifasica')" title="Respuesta bifásica — viabilidad + isquemia">Viabilidad Bifásica</button>
+            <button type="button" class="preset-btn preset-btn-yellow" onclick="applyPreset('cicatriz')" title="Necrosis/cicatriz sin viabilidad">Cicatriz (No Viable)</button>
+            <div class="preset-sep"></div>
+            <button type="button" class="preset-btn preset-btn-purple" onclick="applyPreset('diastolico_pos')" title="Disfunción diastólica inducible">Diastólico (+)</button>
+            <button type="button" class="preset-btn preset-btn-purple" onclick="applyPreset('mch_latente')" title="MCH con obstrucción latente inducida">MCH Latente</button>
+            <button type="button" class="preset-btn preset-btn-purple" onclick="applyPreset('eao_bajo_flujo')" title="EAo verdadera — bajo flujo/bajo gradiente">EAo Bajo Flujo</button>
+            </div>
+        </details>
+    </section>
+
+    <!-- ══════════════════════════════════════
+         CHECKLIST PRE-ESTUDIO
+         ══════════════════════════════════════ -->
+    <section class="card">
+        <details id="checklist-details">
+            <summary class="section-title" style="cursor:pointer; list-style:none; display:flex; justify-content:space-between; align-items:center; margin-bottom:0">
+                Checklist Pre-Estudio <span class="badge-secondary" id="checklist-badge">0 / 10</span>
+            </summary>
+            <div class="grid grid-2col" style="margin-top:1rem">
+                <div class="checkbox-group"><input autocomplete="off" type="checkbox" class="chk-pre" id="pre_consent"><label for="pre_consent">Consentimiento informado firmado</label></div>
+                <div class="checkbox-group"><input autocomplete="off" type="checkbox" class="chk-pre" id="pre_ayuno"><label for="pre_ayuno">Ayuno ≥3 h / sin cafeína 12–24 h</label></div>
+                <div class="checkbox-group"><input autocomplete="off" type="checkbox" class="chk-pre" id="pre_bb"><label for="pre_bb">Beta-bloqueante suspendido 24–48 h (si el objetivo es diagnóstico de isquemia)</label></div>
+                <div class="checkbox-group"><input autocomplete="off" type="checkbox" class="chk-pre" id="pre_ecg"><label for="pre_ecg">ECG de 12 derivaciones basal registrado</label></div>
+                <div class="checkbox-group"><input autocomplete="off" type="checkbox" class="chk-pre" id="pre_via"><label for="pre_via">Vía EV permeable</label></div>
+                <div class="checkbox-group"><input autocomplete="off" type="checkbox" class="chk-pre" id="pre_carro"><label for="pre_carro">Carro de paro y desfibrilador operativos</label></div>
+                <div class="checkbox-group"><input autocomplete="off" type="checkbox" class="chk-pre" id="pre_contra"><label for="pre_contra">Contraindicaciones descartadas</label></div>
+                <div class="checkbox-group"><input autocomplete="off" type="checkbox" class="chk-pre" id="pre_basal"><label for="pre_basal">Eco basal completo adquirido (4 vistas + preset de estrés)</label></div>
+                <div class="checkbox-group"><input autocomplete="off" type="checkbox" class="chk-pre" id="pre_calibracion"><label for="pre_calibracion">Bicicleta calibrada / sillín y manubrio ajustados</label></div>
+                <div class="checkbox-group"><input autocomplete="off" type="checkbox" class="chk-pre" id="pre_operador"><label for="pre_operador">Segundo operador disponible (ecografista + médico)</label></div>
+            </div>
+            <div class="info-banner" style="margin-top:0.75rem">
+                <strong>Secuencia de adquisición en bicicleta:</strong> basal → carga baja/intermedia → <strong>pico</strong> (durante el pedaleo) → recuperación 1–2 min.
+                Las 4 vistas (PEL, PEC, A4C, A2C) en cada punto. En bicicleta el pico se filma <em>durante</em> el esfuerzo: no hay ventana de 90 s como en cinta.
+            </div>
+        </details>
     </section>
 
     <!-- ══════════════════════════════════════
@@ -1272,16 +1340,17 @@
         </details>
     </section>
 
+
 </div>
-<script src="pearls.js?v=1.3"></script>
-<script src="report-templates.js?v=1.3"></script>
-<script src="sheets-storage.js?v=1.3"></script>
-<script src="app.js?v=1.3"></script>
+<script src="pearls.js?v=1.4"></script>
+<script src="report-templates.js?v=1.4"></script>
+<script src="sheets-storage.js?v=1.4"></script>
+<script src="app.js?v=1.4"></script>
 <script>
 // Control de versión: si el navegador sirvió una mezcla de archivos viejos y nuevos,
 // los botones fallan en silencio. Esto lo convierte en un aviso visible.
 (function () {
-    var APP_VERSION = '1.3';
+    var APP_VERSION = '1.4';
     var faltan = ['generarInforme', 'recolectarHallazgos', 'calcEjercicio'].filter(function (f) {
         return typeof window[f] !== 'function';
     });

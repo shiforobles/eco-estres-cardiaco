@@ -982,3 +982,75 @@ details[open] summary::after { content: ' ▲'; }
     box-shadow: var(--shadow-lg);
 }
 .modal-caja .form-group { margin-bottom: 0.75rem; }
+
+/* ========================================
+   REORGANIZACIÓN POR MOMENTO CLÍNICO (v1.4)
+   ======================================== */
+
+/* Separador de bloque: marca en qué momento del estudio estás */
+.bloque-sep {
+    display: flex;
+    align-items: baseline;
+    gap: var(--spacing-sm);
+    margin: var(--spacing-xl) 0 var(--spacing-md);
+    padding-bottom: var(--spacing-sm);
+    border-bottom: 2px solid var(--color-primary);
+}
+.bloque-sep:first-of-type { margin-top: var(--spacing-lg); }
+.bloque-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.6rem;
+    height: 1.6rem;
+    border-radius: 50%;
+    background: var(--color-primary);
+    color: #fff;
+    font-size: var(--font-size-sm);
+    font-weight: 700;
+}
+.bloque-nombre {
+    font-size: var(--font-size-lg);
+    font-weight: 700;
+    color: var(--color-text-primary);
+    letter-spacing: -0.01em;
+}
+.bloque-hint {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-secondary);
+}
+
+/* Resumen compacto de motilidad: reemplaza a la tabla de 17 filas */
+.mot-resumen {
+    margin-top: var(--spacing-md);
+    padding: 0.6rem 0.85rem;
+    background: var(--color-bg-main);
+    border: 1px solid var(--color-border);
+    border-left: 3px solid var(--color-primary);
+    border-radius: var(--radius-md);
+}
+.mot-resumen-linea {
+    font-size: var(--font-size-sm);
+    line-height: 1.7;
+    color: var(--color-text-primary);
+}
+.mot-resumen-linea + .mot-resumen-linea { margin-top: 0.15rem; }
+.mot-terr  { color: var(--color-text-secondary); font-size: var(--font-size-xs); }
+.mot-mal   { color: var(--color-error); font-weight: 600; }
+.mot-bien  { color: var(--color-success); }
+.mot-ojo   { color: var(--color-warning); font-weight: 600; }
+.mot-vacio { color: var(--color-text-secondary); font-style: italic; }
+
+/* Plegables de motilidad */
+.carga-territorio > summary,
+.tabla-detallada > summary {
+    padding: 0.35rem 0;
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-sm);
+}
+.carga-territorio > summary:hover,
+.tabla-detallada > summary:hover { color: var(--color-primary); }
+.tabla-detallada { margin-top: var(--spacing-md); }
+
+/* Los botones de "todo normal" quedan visibles; la grilla de 30, plegada */
+.territory-ctrl-box .tc-quick-btns { margin-bottom: 0.5rem; }
