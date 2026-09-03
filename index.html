@@ -184,6 +184,10 @@
                 <input autocomplete="off" type="number" id="e_onda_rep" placeholder="cm/s" step="0.1" oninput="calcDiastolico()">
             </div>
             <div class="form-group">
+                <label for="a_onda_rep">A onda Reposo (cm/s)</label>
+                <input autocomplete="off" type="number" id="a_onda_rep" placeholder="cm/s" step="0.1" oninput="calcDiastolico()">
+            </div>
+            <div class="form-group">
                 <label for="e_prima_rep">e' septal Reposo (cm/s)</label>
                 <input autocomplete="off" type="number" id="e_prima_rep" placeholder="cm/s" step="0.1" oninput="calcDiastolico()">
             </div>
@@ -198,6 +202,30 @@
             <div class="form-group">
                 <label for="vrt_rep">VRT Reposo (m/s)</label>
                 <input autocomplete="off" type="number" id="vrt_rep" placeholder="m/s" step="0.1" min="0" max="6" oninput="calcDiastolico()">
+            </div>
+            <div class="form-group">
+                <label>E/A</label>
+                <input autocomplete="off" type="text" id="ea_reposo" class="calculated-value" disabled>
+            </div>
+            <div class="form-group">
+                <label for="lavi_reposo">Volumen AI indexado — LAVi (mL/m²)</label>
+                <input autocomplete="off" type="text" id="lavi_reposo" class="calculated-value" disabled>
+            </div>
+        </div>
+
+        <div class="grid" style="margin-top:1rem">
+            <div class="form-group" style="grid-column: 1 / -1">
+                <label for="diast_grado">Función diastólica en reposo</label>
+                <select autocomplete="off" id="diast_grado">
+                    <option value="">No evaluada</option>
+                    <option value="normal">Normal</option>
+                    <option value="g1">Disfunción diastólica grado I (alteración de la relajación)</option>
+                    <option value="g2">Disfunción diastólica grado II (pseudonormal)</option>
+                    <option value="g3">Disfunción diastólica grado III (restrictivo)</option>
+                    <option value="indeterminada">Indeterminada</option>
+                </select>
+                <span class="firma-nota" id="diast_grado_origen"></span>
+                <div id="diast_grado_criterios" class="criterios-ase" style="display:none"></div>
             </div>
         </div>
 

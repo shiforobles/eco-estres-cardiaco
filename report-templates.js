@@ -72,12 +72,23 @@ const NARRATIVA = {
 
     // ── REPOSO ────────────────────────────────────────────────────────
     reposoNormalLargo: 'En reposo no se observaron alteraciones de la motilidad parietal, con función sistólica del ventrículo izquierdo ' +
-                       'conservada (FEy {{fey}} %) y relación E/e\' de {{ee}}, sin datos de aumento de las presiones de llenado.',
+                       'conservada (FEy {{fey}} %) y relación E/e\' de {{ee}}{{presionesLlenado}}.',
     reposoNormalCorto: 'En reposo la motilidad parietal fue normal, con FEy {{fey}} % y relación E/e\' de {{ee}}.',
     reposoSecuela:     'En reposo se observó {{gradoSecuela}} {{deSegmentosSecuela}} ({{territorioSecuelaFrase}}), ' +
                        'en relación con evento previo, con FEy {{fey}} % y relación E/e\' de {{ee}}.',
-    reposoDiastolico:  'En reposo la motilidad parietal fue normal, con FEy {{fey}} % conservada, relación E/e\' de {{ee}} y VRT de {{vrt}} m/s, ' +
-                       'sin datos concluyentes de aumento de las presiones de llenado.',
+    reposoDiastolico:  'En reposo la motilidad parietal fue normal, con FEy {{fey}} % conservada, relación E/e\' de {{ee}} y VRT de {{vrt}} m/s' +
+                       '{{presionesLlenado}}.',
+
+    // Se agrega al bloque de reposo SÓLO cuando hay disfunción diastólica real: el
+    // grado normal ya está dicho en las plantillas de arriba.
+    diastolicaGrado:   'La función diastólica en reposo corresponde a {{grado}}, según el algoritmo de la ASE.',
+
+    // Coletilla de presiones de llenado. Antes era una afirmación fija dentro de la
+    // plantilla ("sin datos de aumento") y contradecía al grado diastólico cuando el
+    // algoritmo detectaba presiones elevadas. Ahora la elige el grado.
+    presionesNormales:       ', sin datos de aumento de las presiones de llenado',
+    presionesElevadas:       ', con aumento de las presiones de llenado en reposo',
+    presionesNoClasificable: ', sin poder clasificar la función diastólica por discordancia entre los parámetros',
 
     // ── ESFUERZO ──────────────────────────────────────────────────────
     esfuerzoNegativo:  'Con el esfuerzo se objetivó adecuada respuesta hiperdinámica global, sin nuevas alteraciones de la motilidad parietal ' +

@@ -218,6 +218,150 @@ function marcarDiastolicoManual() {
 }
 
 // ══════════════════════════════════════════════
+//  FUNCIÓN DIASTÓLICA EN REPOSO — ALGORITMO ASE/EACVI 2016
+//  Dos algoritmos encadenados. El primero decide SI hay disfunción; el segundo, de
+//  qué grado. Con FEy reducida se va derecho al segundo: ahí la disfunción se asume.
+//  Devuelve `indeterminada` cuando los criterios empatan, que no es una falla del
+//  algoritmo sino su respuesta: en esos casos la guía dice explícitamente que no se
+//  puede clasificar. Y devuelve null cuando faltan datos, que es distinto.
+// ══════════════════════════════════════════════
+const LAVI_ALTO = 34;      // mL/m²
+const VRT_ALTO  = 2.8;     // m/s
+const EE_ALTO   = 14;      // E/e' promedio
+
+function datosDiastolicos() {
+    const nn = id => { const x = num(id); return x > 0 ? x : null; };
+    const E   = nn('e_onda_rep');
+    const A   = nn('a_onda_rep');
+    const sep = nn('e_prima_rep');
+    const lat = nn('e_prima_lat_rep');
+    const vrt = nn('vrt_rep');
+    const volAI = nn('volvi_reposo');
+    const peso = num('peso'), altura = num('altura');
+    const bsa = (peso > 0 && altura > 0)
+        ? 0.007184 * Math.pow(altura, 0.725) * Math.pow(peso, 0.425) : null;
+    const lavi = (volAI !== null && bsa) ? volAI / bsa : null;
+    // E/e' promedio si están los dos; si sólo hay uno, ese
+    const ePrima = (sep !== null && lat !== null) ? (sep + lat) / 2 : (sep !== null ? sep : lat);
+    const ee = (E !== null && ePrima) ? E / ePrima : null;
+    const ea = (E !== null && A !== null) ? E / A : null;
+    return { E, A, sep, lat, vrt, lavi, bsa, ee, ea, fey: nn('fevi_reposo') };
+}
+
+// Los tres criterios que comparten los dos algoritmos
+function criteriosPresionLlenado(D) {
+    const c = [];
+    if (D.ee !== null)   c.push({ nombre: `E/e' ${nProsa(D.ee, 1)}`, alto: D.ee > EE_ALTO, corte: `>${EE_ALTO}` });
+    if (D.vrt !== null)  c.push({ nombre: `VRT ${nProsa(D.vrt, 1)} m/s`, alto: D.vrt > VRT_ALTO, corte: `>${nProsa(VRT_ALTO, 1)} m/s` });
+    if (D.lavi !== null) c.push({ nombre: `LAVi ${nProsa(D.lavi, 0)} mL/m²`, alto: D.lavi > LAVI_ALTO, corte: `>${LAVI_ALTO} mL/m²` });
+    return c;
+}
+
+function clasificarDiastolica() {
+    const D = datosDiastolicos();
+    const feyReducida = D.fey !== null && D.fey < 50;
+
+    // ── Algoritmo 1: ¿hay disfunción? (sólo con FEy conservada)
+    if (!feyReducida) {
+        const c1 = [];
+        if (D.sep !== null || D.lat !== null) {
+            const bajo = (D.sep !== null && D.sep < 7) || (D.lat !== null && D.lat < 10);
+            c1.push({ nombre: `e' ${D.sep !== null ? 'septal ' + nProsa(D.sep, 1) : ''}${D.sep !== null && D.lat !== null ? ' / ' : ''}${D.lat !== null ? 'lateral ' + nProsa(D.lat, 1) : ''} cm/s`,
+                      alto: bajo, corte: 'septal <7 o lateral <10 cm/s' });
+        }
+        criteriosPresionLlenado(D).forEach(c => c1.push(c));
+
+        // Con menos de tres criterios medidos la proporción no significa nada:
+        // se dice qué falta en vez de arriesgar una clasificación.
+        if (c1.length < 3) return { grado: null, criterios: c1, faltan: faltantesDiastolicos(D) };
+
+        const positivos = c1.filter(c => c.alto).length;
+        const mitad = c1.length / 2;
+        if (positivos < mitad)  return { grado: 'normal', criterios: c1, positivos, total: c1.length };
+        if (positivos === mitad) return { grado: 'indeterminada', criterios: c1, positivos, total: c1.length, empate: true };
+        // más de la mitad: hay disfunción, se pasa a graduarla
+    }
+
+    // ── Algoritmo 2: grado
+    const c2 = criteriosPresionLlenado(D);
+    const base = { criterios: c2, feyReducida, ea: D.ea, E: D.E };
+
+    if (D.ea === null) {
+        // Sin E/A no se puede entrar al algoritmo de graduación
+        if (!feyReducida) return { grado: 'indeterminada', ...base, faltan: ['la onda A (para el cociente E/A)'] };
+        return { grado: null, ...base, faltan: faltantesDiastolicos(D) };
+    }
+    if (D.ea <= 0.8 && D.E !== null && D.E <= 50) return { grado: 'g1', ...base, via: 'E/A ≤0,8 con E ≤50 cm/s' };
+    if (D.ea >= 2) return { grado: 'g3', ...base, via: 'E/A ≥2' };
+
+    // Zona intermedia: mandan los tres criterios de presión de llenado
+    if (c2.length < 2) return { grado: 'indeterminada', ...base, faltan: faltantesDiastolicos(D) };
+    const pos = c2.filter(c => c.alto).length;
+    if (c2.length === 2 && pos === 1) return { grado: 'indeterminada', ...base, empate: true };
+    return { grado: pos >= 2 ? 'g2' : 'g1', ...base, positivos: pos, total: c2.length };
+}
+
+function faltantesDiastolicos(D) {
+    const f = [];
+    if (D.E === null) f.push('la onda E');
+    if (D.A === null) f.push('la onda A');
+    if (D.sep === null && D.lat === null) f.push("el e' tisular");
+    if (D.vrt === null) f.push('la VRT');
+    if (D.lavi === null) f.push(D.bsa ? 'el volumen de la aurícula izquierda' : 'el peso y la altura (para indexar el volumen auricular)');
+    return f;
+}
+
+const DIAST_GRADO_PROSA = {
+    normal: 'normal',
+    g1: 'disfunción diastólica grado I (alteración de la relajación)',
+    g2: 'disfunción diastólica grado II (patrón pseudonormal)',
+    g3: 'disfunción diastólica grado III (patrón restrictivo)',
+    indeterminada: 'indeterminada'
+};
+
+// Qué se afirma sobre las presiones de llenado. El grado I cursa con presiones
+// normales; el II y el III, elevadas. Sin grado o con grado normal se mantiene la
+// frase original del Word.
+function presionesLlenadoEnProsa(grado) {
+    const T = NARRATIVA;
+    if (grado === 'g2' || grado === 'g3') return T.presionesElevadas;
+    if (grado === 'indeterminada') return T.presionesNoClasificable;
+    return T.presionesNormales;   // '', 'normal' y 'g1'
+}
+
+function autocompletarDiastolicaReposo() {
+    const R = clasificarDiastolica();
+    sugerir('diast_grado', R.grado === null ? undefined : R.grado, notaDiastolica(R));
+
+    // Los criterios, uno por uno, con su corte: es la parte que permite discutir
+    // el veredicto en vez de aceptarlo.
+    const box = document.getElementById('diast_grado_criterios');
+    if (!box) return;
+    if (!R.criterios || !R.criterios.length) { box.style.display = 'none'; return; }
+    box.style.display = 'block';
+    box.innerHTML = R.criterios.map(c =>
+        `<div class="criterio-ase ${c.alto ? 'criterio-alto' : 'criterio-normal'}">` +
+        `${c.alto ? '▲' : '✓'} ${c.nombre} <span class="criterio-corte">(corte ${c.corte})</span></div>`
+    ).join('');
+}
+
+function notaDiastolica(R) {
+    if (R.grado === null)
+        return R.faltan && R.faltan.length
+            ? `Falta ${listarEnProsa(R.faltan)} para clasificar por ASE.`
+            : 'Sin datos suficientes para clasificar.';
+    if (R.empate)
+        return 'Indeterminada por criterios de la ASE: los parámetros disponibles empatan. ' +
+               'No es un dato faltante, es que el algoritmo no permite decidir.';
+    if (R.feyReducida)
+        return 'FEy <50 %: por ASE se gradúa directamente, sin el paso previo. Podés corregirlo.';
+    if (R.via) return `Por ASE: ${R.via}. Podés corregirlo.`;
+    if (R.positivos !== undefined)
+        return `Por ASE: ${R.positivos} de ${R.total} criterios por encima del corte. Podés corregirlo.`;
+    return 'Deducido por el algoritmo ASE. Podés corregirlo.';
+}
+
+// ══════════════════════════════════════════════
 //  INTERPRETACIÓN DEDUCIDA
 //  Resultado, territorio, extensión y hallazgos repetían a mano un juicio que el
 //  motor del informe ya hacía. Tanto, que buena parte de validarEstudio() existía
@@ -326,7 +470,7 @@ function autocompletarInterpretacion() {
 
 // Campos que la app deduce: al tocarlos, el operador toma el control del campo.
 const CAMPOS_DEDUCIDOS = [
-    'patron_motilidad', 'diast_resultado', 'resultado_estudio', 'territorio_afectado',
+    'patron_motilidad', 'diast_resultado', 'diast_grado', 'resultado_estudio', 'territorio_afectado',
     'extension_isquemia', 'categorizacion', 'pp_reposo', 'hal_st_dep', 'hal_st_ele',
     'hal_hipotension', 'hal_hipertensiva', 'hal_arritmia', 'hal_extrasistoles'
 ];
@@ -1485,6 +1629,13 @@ function calcDiastolico() {
 
     document.getElementById('ee_reposo').value = rep ? rep.valor.toFixed(1) : '';
     document.getElementById('ee_estres').value = est ? est.valor.toFixed(1) : '';
+
+    // E/A y LAVi: los dos derivados que pide el algoritmo ASE
+    const D = datosDiastolicos();
+    const setVal2 = (id, txt) => { const el = document.getElementById(id); if (el) el.value = txt; };
+    setVal2('ea_reposo', D.ea !== null ? nProsa(D.ea, 2) : '');
+    setVal2('lavi_reposo', D.lavi !== null ? nProsa(D.lavi, 1) + ' mL/m²' : '');
+    autocompletarDiastolicaReposo();
     set('diast_rep_interp', rep ? `E/e' ${rep.valor.toFixed(1)}${rep.promedio ? ' (promedio)' : ' (septal)'} — ${interp(rep.valor)}` : '—');
     set('diast_est_interp', est ? `E/e' ${est.valor.toFixed(1)}${est.promedio ? ' (promedio)' : ' (septal)'} — ${interp(est.valor)}` : '—');
 
@@ -1996,6 +2147,9 @@ function recolectarHallazgos() {
     H.caidaFey = H.feyReposo > 0 && H.feyEstres > 0 && H.feyEstres < H.feyReposo;
 
     // Diastólico
+    // Grado de función diastólica en reposo. Se lee del CAMPO y no del algoritmo, así
+    // una corrección manual pesa igual que la deducción.
+    H.diastGrado = document.getElementById('diast_grado').value;
     H.eeReposo = v('ee_reposo');
     H.eeEstres = v('ee_estres');
     H.vrtReposo = v('vrt_rep');
@@ -2410,6 +2564,7 @@ function construirNarrativa(H) {
         territorioSecuela: territoriosEnProsa(H.territoriosSecuela),
         territorioSecuelaFrase: territorioFrase(H.territoriosSecuela),
         gradoFey: gradoFeyEnProsa(H.feyReposo),
+        presionesLlenado: presionesLlenadoEnProsa(H.diastGrado),
         vd: H.vdProsa ? ', ' + H.vdProsa : ''
     };
     let plantillaReposo;
@@ -2430,6 +2585,12 @@ function construirNarrativa(H) {
         // Secuela real en un territorio + asincronía septal por conducción: van las dos cosas
         if (H.secuelas.length && hayAsincronia) {
             parrafoReposo += ' ' + rellenar(T.asincroniaSeptalSuelta, datosConduccion);
+        }
+        // Lo normal se comprime: la plantilla ya dice que no hay aumento de las presiones
+        // de llenado. Sólo la disfunción real agrega una oración con su grado.
+        if (['g1', 'g2', 'g3'].includes(H.diastGrado)) {
+            parrafoReposo += ' ' + rellenar(T.diastolicaGrado,
+                { grado: DIAST_GRADO_PROSA[H.diastGrado] });
         }
     }
     parrafos.push(parrafoReposo);
