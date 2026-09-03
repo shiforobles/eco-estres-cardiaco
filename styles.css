@@ -1054,3 +1054,11 @@ details[open] summary::after { content: ' ▲'; }
 
 /* Los botones de "todo normal" quedan visibles; la grilla de 30, plegada */
 .territory-ctrl-box .tc-quick-btns { margin-bottom: 0.5rem; }
+
+/* Nota de origen de un campo deducido: se resalta cuando el valor lo corrigió
+   el operador, para que se vea de un vistazo qué puso la app y qué pusiste vos. */
+.origen-manual {
+    color: var(--color-primary-dark) !important;
+    font-weight: 600;
+}
+[data-theme="dark"] .origen-manual { color: var(--color-primary-light) !important; }

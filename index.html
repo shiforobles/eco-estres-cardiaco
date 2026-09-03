@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=1.5">
+    <link rel="stylesheet" href="styles.css?v=1.6">
 </head>
 <body>
 <div class="container">
@@ -17,7 +17,7 @@
     <header class="app-header">
         <div>
             <h1>Eco Estrés Cardíaco</h1>
-            <p class="version">v1.5 — Carga por momento clínico · bull's eye alineado · pronóstico en la conclusión</p>
+            <p class="version">v1.6 — La app deduce, vos corregís</p>
         </div>
         <div class="header-controls">
             <button id="btn-theme-toggle" class="btn btn-icon" title="Cambiar Tema">
@@ -163,6 +163,7 @@
             <div class="form-group">
                 <label for="pp_reposo">Presión Pulm. estimada (mmHg)</label>
                 <input autocomplete="off" type="number" id="pp_reposo" placeholder="mmHg" min="15" max="120">
+                <span class="firma-nota" id="pp_reposo_origen"></span>
             </div>
             <div class="form-group">
                 <label for="vd_funcion">Función del ventrículo derecho</label>
@@ -712,12 +713,12 @@
         <div class="grid" style="margin-top:0.75rem">
             <div class="form-group">
                 <label for="diast_resultado">Estudio diastólico de esfuerzo — resultado que va al informe</label>
-                <select autocomplete="off" id="diast_resultado" onchange="marcarDiastolicoManual()">
+                <select autocomplete="off" id="diast_resultado">
                     <option value="no_evaluado">No evaluado</option>
                     <option value="negativo">Negativo</option>
                     <option value="positivo">Positivo</option>
                 </select>
-                <span class="firma-nota" id="diast_origen">Se completa solo desde E/e' y VRT; podés corregirlo.</span>
+                <span class="firma-nota" id="diast_resultado_origen">Se completa solo desde E/e' y VRT; podés corregirlo.</span>
             </div>
         </div>
         <p class="table-note">
@@ -883,11 +884,11 @@
         <div class="grid" style="margin-top:1.25rem">
             <div class="form-group">
                 <label for="patron_motilidad">Patrón de la alteración</label>
-                <select autocomplete="off" id="patron_motilidad" onchange="marcarPatronManual()">
+                <select autocomplete="off" id="patron_motilidad">
                     <option value="segmentaria">Segmentaria (distribución coronaria)</option>
                     <option value="global">Global (no coronaria)</option>
                 </select>
-                <span class="firma-nota" id="patron_origen">Se propone solo según extensión, territorios y FEy.</span>
+                <span class="firma-nota" id="patron_motilidad_origen">Se propone solo según extensión, territorios y FEy.</span>
             </div>
         </div>
 
@@ -1139,6 +1140,7 @@
                     <option value="viabilidad_negativa">VIABILIDAD NEGATIVA (cicatriz transmural)</option>
                     <option value="diastolico_positivo">DISFUNCIÓN DIASTÓLICA INDUCIBLE</option>
                 </select>
+                <span class="firma-nota" id="resultado_estudio_origen"></span>
             </div>
             <div class="form-group">
                 <label for="territorio_afectado">Territorio Comprometido</label>
@@ -1152,6 +1154,7 @@
                     <option value="cd_cx">CD + Cx</option>
                     <option value="trivascular">Trivascular</option>
                 </select>
+                <span class="firma-nota" id="territorio_afectado_origen"></span>
             </div>
             <div class="form-group">
                 <label for="categorizacion">Categorización de riesgo</label>
@@ -1171,6 +1174,7 @@
                     <option value="moderada">Moderada (3–4 segmentos)</option>
                     <option value="extensa">Extensa (≥5 segmentos)</option>
                 </select>
+                <span class="firma-nota" id="extension_isquemia_origen"></span>
             </div>
         </div>
         <div id="resultado-banner" class="resultado-banner" style="display:none"></div>
@@ -1184,6 +1188,7 @@
             <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="hal_hipertensiva"><label for="hal_hipertensiva">Respuesta hipertensiva (≥210/110)</label></div>
             <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="hal_extrasistoles"><label for="hal_extrasistoles">Extrasístoles ventriculares frecuentes</label></div>
         </div>
+        <span class="firma-nota">Todos se marcan solos desde el ECG, la hemodinamia y las arritmias ya cargadas, salvo <strong>angina</strong> y <strong>disnea</strong>, que son síntomas que observás vos. Si destildás alguno, la app deja de tocarlo.</span>
         <div class="form-group" style="margin-top:1rem">
             <label for="conclusion_libre">Conclusión clínica (texto libre)</label>
             <textarea autocomplete="off" id="conclusion_libre" rows="3" placeholder="Descripción interpretativa del estudio para el informe final..."></textarea>
@@ -1342,15 +1347,15 @@
 
 
 </div>
-<script src="pearls.js?v=1.5"></script>
-<script src="report-templates.js?v=1.5"></script>
-<script src="sheets-storage.js?v=1.5"></script>
-<script src="app.js?v=1.5"></script>
+<script src="pearls.js?v=1.6"></script>
+<script src="report-templates.js?v=1.6"></script>
+<script src="sheets-storage.js?v=1.6"></script>
+<script src="app.js?v=1.6"></script>
 <script>
 // Control de versión: si el navegador sirvió una mezcla de archivos viejos y nuevos,
 // los botones fallan en silencio. Esto lo convierte en un aviso visible.
 (function () {
-    var APP_VERSION = '1.5';
+    var APP_VERSION = '1.6';
     var faltan = ['generarInforme', 'recolectarHallazgos', 'calcEjercicio'].filter(function (f) {
         return typeof window[f] !== 'function';
     });

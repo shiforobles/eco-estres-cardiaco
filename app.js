@@ -102,6 +102,15 @@ document.addEventListener('DOMContentLoaded', () => {
     initFirma();
 
     calcEjercicio();
+    // Tocar un campo deducido = el operador toma el control de ese campo
+    CAMPOS_DEDUCIDOS.forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        const tomar = () => marcarManual(id);
+        el.addEventListener('change', tomar);
+        if (el.type === 'number' || el.type === 'text') el.addEventListener('input', tomar);
+    });
+
     document.querySelectorAll('.chk-pre').forEach(el => el.addEventListener('change', updateChecklistBadge));
     document.querySelectorAll('.chk-arr').forEach(el => el.addEventListener('change', avisarArritmias));
     document.getElementById('arr_sintomas').addEventListener('change', avisarArritmias);
@@ -130,16 +139,61 @@ function toggleTheme() {
     localStorage.setItem('eco-estres-theme', next);
 }
 
-// ── PATRÓN DE LA ALTERACIÓN: autocompletado con override ──
+// ══════════════════════════════════════════════
+//  CAMPOS DEDUCIDOS CON OVERRIDE
+//  La app carga el valor y muestra de dónde salió; el operador lo corrige y su
+//  criterio manda a partir de ahí.
+//
+//  La marca de "esto lo toqué a mano" VIAJA DENTRO DEL BORRADOR. Cuando vivía sólo
+//  en memoria pasaba esto: el borrador guardaba bien el valor corregido, pero al
+//  restaurarlo la bandera arrancaba en falso y el primer recálculo lo pisaba. La
+//  corrección se perdía en silencio y la nota volvía a decir "podés corregirlo".
+// ══════════════════════════════════════════════
+let camposCorregidos = {};   // { [idCampo]: true }
+
+function fueCorregido(id) { return camposCorregidos[id] === true; }
+
+// onchange/oninput de todo campo deducido: a partir de acá manda el operador
+function marcarManual(id, nota) {
+    camposCorregidos[id] = true;
+    notaOrigen(id, nota || 'Corregido a mano: la app ya no lo modifica.', true);
+    scheduleSave();
+}
+
+const NOTA_MANUAL = 'Corregido a mano: la app ya no lo modifica.';
+
+// Al restaurar un estudio, las notas tienen que volver a distinguir lo que puso la
+// app de lo que corregiste vos. Los recálculos reescriben las suyas; ésta reescribe
+// las manuales, que ningún recálculo toca justamente por estar marcadas.
+function refrescarNotasOrigen() {
+    Object.keys(camposCorregidos).forEach(id => {
+        if (camposCorregidos[id]) notaOrigen(id, NOTA_MANUAL, true);
+    });
+}
+
+function notaOrigen(id, texto, manual) {
+    const el = document.getElementById(id + '_origen');
+    if (!el) return;
+    el.textContent = texto;
+    el.classList.toggle('origen-manual', !!manual);
+}
+
+// Escribe el valor deducido salvo que el operador ya lo haya corregido.
+// `valor` null significa "no hay datos para deducirlo": no se toca el campo.
+function sugerir(id, valor, nota) {
+    const el = document.getElementById(id);
+    if (!el || fueCorregido(id)) return;
+    if (valor === null || valor === undefined) { notaOrigen(id, nota || ''); return; }
+    if (el.type === 'checkbox') el.checked = !!valor;
+    else el.value = valor;
+    notaOrigen(id, nota || '');
+}
+
+// ── PATRÓN DE LA ALTERACIÓN ───────────────────
 // Global = hipoquinesia difusa sin distribución coronaria (miocardiopatía dilatada).
 // Criterio: ≥12 de 17 segmentos alterados en reposo, los tres territorios y FEy ≤40%.
-let patronTocadoAMano = false;
-
 function marcarPatronManual() {
-    patronTocadoAMano = true;
-    const nota = document.getElementById('patron_origen');
-    if (nota) nota.textContent = 'Elegido a mano: la app ya no lo modifica.';
-    scheduleSave();
+    marcarManual('patron_motilidad', 'Elegido a mano: la app ya no lo modifica.');
 }
 
 function detectarPatronGlobal() {
@@ -152,35 +206,142 @@ function detectarPatronGlobal() {
 }
 
 function autocompletarPatron() {
-    const el = document.getElementById('patron_motilidad');
-    if (!el || patronTocadoAMano) return;
     const global = detectarPatronGlobal();
-    el.value = global ? 'global' : 'segmentaria';
-    const nota = document.getElementById('patron_origen');
-    if (nota) nota.textContent = global
+    sugerir('patron_motilidad', global ? 'global' : 'segmentaria', global
         ? 'Propuesto global: ≥12 segmentos, los tres territorios y FEy ≤40 %. Podés corregirlo.'
-        : 'Se propone solo según extensión, territorios y FEy.';
+        : 'Se propone solo según extensión, territorios y FEy.');
 }
 
-// ── ESTUDIO DIASTÓLICO: autocompletado con override ───
-// El select arranca con lo que dio el cálculo; si el operador lo toca, manda su criterio.
-let diastolicoTocadoAMano = false;
-
+// ── ESTUDIO DIASTÓLICO ────────────────────────
 function marcarDiastolicoManual() {
-    diastolicoTocadoAMano = true;
-    const nota = document.getElementById('diast_origen');
-    if (nota) nota.textContent = 'Corregido a mano: el cálculo ya no lo modifica.';
-    scheduleSave();
+    marcarManual('diast_resultado', 'Corregido a mano: el cálculo ya no lo modifica.');
+}
+
+// ══════════════════════════════════════════════
+//  INTERPRETACIÓN DEDUCIDA
+//  Resultado, territorio, extensión y hallazgos repetían a mano un juicio que el
+//  motor del informe ya hacía. Tanto, que buena parte de validarEstudio() existía
+//  para avisar cuando el valor manual NO coincidía con la deducción de la app.
+//  Ahora los escribe la app y esa validación queda para cuando la corregís a propósito.
+// ══════════════════════════════════════════════
+
+// Un único origen de verdad: lo usa el autocompletado Y la validación, así no
+// pueden contradecirse entre sí.
+function resultadoSugerido(H, rama) {
+    if (!rama) return null;
+
+    // En un estudio pedido por viabilidad, las ramas de isquemia no describen lo que
+    // se fue a buscar: un "negativo" ahí se lee como "no hay isquemia" cuando la
+    // pregunta era si el miocardio es recuperable. Se responde esa pregunta.
+    if (document.getElementById('indicacion').value === 'viabilidad') {
+        const c = contarMotilidad();
+        if (c.viables > 0) return 'viabilidad_positiva';
+        if (c.cicatriz > 0) return 'viabilidad_negativa';
+        return null;   // todavía no hay motilidad suficiente para responder
+    }
+
+    // Sin isquemia y con respuesta hipertensiva, la opción específica describe el
+    // estudio mejor que un "negativo" a secas.
+    if (rama === 'negativa' && H.hipertension) return 'hta_respuesta';
+    return {
+        negativa: 'negativo', secuela: 'negativo', dilatada: 'negativo',
+        discordancia: 'negativo', positivaUnico: 'positivo', positivaMulti: 'positivo',
+        hipotensiva: 'positivo', noConcluyente: 'no_concluyente',
+        diastolico: 'diastolico_positivo'
+    }[rama] || null;
+}
+
+// Los valores del select combinan los territorios en orden alfabético de la sigla
+const TERRITORIOS_A_VALOR = {
+    'DA': 'da', 'CD': 'cd', 'Cx': 'cx',
+    'CD+DA': 'da_cd', 'Cx+DA': 'da_cx', 'CD+Cx': 'cd_cx'
+};
+
+function territorioSugerido(H) {
+    const t = [...H.territoriosIsquemia].sort();
+    if (!t.length) return 'ninguno';
+    if (t.length >= 3) return 'trivascular';
+    return TERRITORIOS_A_VALOR[t.join('+')] || 'ninguno';
+}
+
+// Las propias opciones del select dicen la regla: 1-2 / 3-4 / ≥5 segmentos
+function extensionSugerida(H) {
+    const n = H.isquemicos.length;
+    if (!n) return '';
+    return n <= 2 ? 'leve' : n <= 4 ? 'moderada' : 'extensa';
+}
+
+// PSAP = 4 × VRT² + PAD. Sin medición de la vena cava se asume una PAD normal, y la
+// nota lo dice: es un valor que se corrige, no un dato medido.
+const PAD_ASUMIDA = 5;
+function psapSugerida(H) {
+    const vrt = parseFloat(String(H.vrtReposo || '').replace(',', '.'));
+    if (!Number.isFinite(vrt) || vrt <= 0) return null;
+    return Math.round(4 * vrt * vrt + PAD_ASUMIDA);
+}
+
+function autocompletarInterpretacion() {
+    let H, rama;
+    try { H = recolectarHallazgos(); rama = elegirRama(H); }
+    catch (e) { return; }   // formulario a medio cargar: no se propone nada
+
+    // ── Resultado del estudio
+    const res = resultadoSugerido(H, rama);
+    sugerir('resultado_estudio', res,
+        res ? 'Deducido de la motilidad, el ECG y la hemodinamia. Podés corregirlo.' : '');
+    updateResultBanner();   // el cambio fue por código: el cartel no se entera solo
+
+    // ── Territorio comprometido
+    const terr = territorioSugerido(H);
+    sugerir('territorio_afectado', terr, H.territoriosIsquemia.length
+        ? `Deducido de los segmentos con isquemia inducible (${H.territoriosIsquemia.join(' + ')}). Podés corregirlo.`
+        : 'Sin isquemia inducible en el bull\'s eye. Podés corregirlo.');
+
+    // ── Extensión de la isquemia
+    const n = H.isquemicos.length;
+    sugerir('extension_isquemia', extensionSugerida(H), n
+        ? `${n} ${n === 1 ? 'segmento' : 'segmentos'} con isquemia inducible. Podés corregirlo.`
+        : 'Sin isquemia inducible. Podés corregirlo.');
+
+    // ── Presión pulmonar estimada
+    const psap = psapSugerida(H);
+    if (psap !== null) sugerir('pp_reposo', psap,
+        `4 × VRT² + ${PAD_ASUMIDA} mmHg de PAD asumida (sin medir la cava). Corregila si estimaste otra PAD.`);
+
+    // ── Hallazgos que ya están cargados en otro lado del formulario.
+    //    Angina y disnea quedan afuera: son síntomas que observa el operador.
+    const hayEV = H.arritmias.some(a =>
+        ['arr_ev_mono', 'arr_ev_poli', 'arr_bigeminia', 'arr_dupletas'].includes(a.id));
+    sugerir('hal_st_dep',        H.stTipo === 'infra');
+    sugerir('hal_st_ele',        H.stTipo === 'supra');
+    sugerir('hal_hipotension',   H.hipotension);
+    sugerir('hal_hipertensiva',  H.hipertension);
+    sugerir('hal_arritmia',      H.hayArritmiaRelevante);
+    sugerir('hal_extrasistoles', hayEV);
+
+    // Va acá y no sólo en calcEjercicio(): está anclada en el WMSI pico, y antes
+    // cambiar el bull's eye dejaba en pantalla una categoría de riesgo vieja.
+    sugerirCategorizacion();
+}
+
+// Campos que la app deduce: al tocarlos, el operador toma el control del campo.
+const CAMPOS_DEDUCIDOS = [
+    'patron_motilidad', 'diast_resultado', 'resultado_estudio', 'territorio_afectado',
+    'extension_isquemia', 'categorizacion', 'pp_reposo', 'hal_st_dep', 'hal_st_ele',
+    'hal_hipotension', 'hal_hipertensiva', 'hal_arritmia', 'hal_extrasistoles'
+];
+
+// recolectarHallazgos() recorre todo el formulario: no conviene una vez por tecla.
+let deducirTimer = null;
+function refrescarDeducidos() {
+    if (deducirTimer) clearTimeout(deducirTimer);
+    deducirTimer = setTimeout(autocompletarInterpretacion, 250);
 }
 
 function autocompletarDiastolico(veredicto) {
-    const el = document.getElementById('diast_resultado');
-    if (!el || diastolicoTocadoAMano) return;
-    el.value = veredicto;
-    const nota = document.getElementById('diast_origen');
-    if (nota) nota.textContent = veredicto === 'no_evaluado'
+    sugerir('diast_resultado', veredicto, veredicto === 'no_evaluado'
         ? 'Se completa solo desde E/e\' y VRT; podés corregirlo.'
-        : `Completado desde E/e' y VRT; podés corregirlo.`;
+        : 'Completado desde E/e\' y VRT; podés corregirlo.');
 }
 
 // ── FIRMA DEL INFORME ─────────────────────────
@@ -700,6 +861,18 @@ function sugerirCategorizacion() {
     catch (e) { el.textContent = ''; return; }
     if (!r.hayDatos) { el.textContent = ''; el.className = 'hint-sugerida'; return; }
 
+    // El campo se rellena, no sólo se sugiere. Si el estudio no es concluyente se
+    // deja vacío a propósito: categorizar ahí daría una falsa tranquilidad.
+    const sel = document.getElementById('categorizacion');
+    if (sel && !fueCorregido('categorizacion')) sel.value = r.noConcluyente ? '' : r.nivel;
+    if (fueCorregido('categorizacion')) {
+        el.innerHTML = '<strong>Categoría puesta a mano</strong>' +
+            `<div class="cat-motivos">La app habría sugerido ${r.noConcluyente ? 'no categorizar' :
+              ({ bajo: 'riesgo bajo', intermedio: 'riesgo intermedio', alto: 'riesgo alto' }[r.nivel])}.</div>`;
+        el.className = 'hint-sugerida cat-panel';
+        return;
+    }
+
     // Un "1 · Bajo" en pantalla se recuerda y el asterisco se pierde: si el estudio
     // no es concluyente, no se muestra categoría en absoluto.
     if (r.noConcluyente) {
@@ -1188,6 +1361,7 @@ function updateMotilidadResumen(wmsiRep, wmsiEst) {
 
     avisarWMSIConduccion();
     autocompletarPatron();
+    refrescarDeducidos();   // el resultado, el territorio y la categoría dependen de esto
 }
 
 // Aviso de pantalla: con trastorno de conducción los segmentos septales inflan el WMSI
@@ -1980,12 +2154,25 @@ function elegirRama(H) {
 function descripcionSTEnProsa(H) {
     if (!H.stIsquemico) return '';
     const tipo = H.stTipo === 'supra' ? 'supradesnivel del ST' : 'infradesnivel del ST';
-    return tipo + (H.stMm ? ` de ${H.stMm} mm` : '') +
+    return tipo + (H.stMm ? ` de ${nProsa(H.stMm)} mm` : '') +
         (H.stMorfologiaTxt ? `, ${H.stMorfologiaTxt}` : '') +
         (H.stDeriv ? ` en ${H.stDeriv}` : '');
 }
 
 // ── Utilidades de prosa ───────────────────────
+// En un informe en castellano el decimal va con coma. Sin esto el mismo párrafo
+// mezclaba "doble producto 27.000" con "WMSI 1.00" y "4.2 METs": el mismo separador
+// para miles y para decimales, y el que lee tiene que adivinar por la magnitud.
+// Devuelve el valor tal cual si no es un número, para no romper los `|| nada`.
+function nProsa(x, decimales) {
+    if (x === null || x === undefined || x === '') return x;
+    const n = typeof x === 'number' ? x : parseFloat(String(x).replace(',', '.'));
+    if (!Number.isFinite(n)) return x;
+    return n.toLocaleString('es-AR', decimales != null
+        ? { minimumFractionDigits: decimales, maximumFractionDigits: decimales }
+        : { maximumFractionDigits: 2 });
+}
+
 function listarEnProsa(items) {
     if (!items.length) return '';
     if (items.length === 1) return items[0];
@@ -2054,7 +2241,7 @@ function ecgEsfuerzoEnProsa(H) {
     const partes = [];
     if (H.stTipo) {
         const tipo = H.stTipo === 'supra' ? 'Supradesnivel del ST' : 'Infradesnivel del ST';
-        partes.push(tipo + (H.stMm ? ` de ${H.stMm} mm` : '') + (H.stDeriv ? ` en ${H.stDeriv}` : '') +
+        partes.push(tipo + (H.stMm ? ` de ${nProsa(H.stMm)} mm` : '') + (H.stDeriv ? ` en ${H.stDeriv}` : '') +
             (H.stAparicion ? `, desde ${H.stAparicion}` : '') +
             (H.stResolucion ? `, con resolución en ${H.stResolucion}` : '') + '.');
     } else if (H.hayConduccion) {
@@ -2127,7 +2314,7 @@ function oracionPronostica(H, rama) {
     if (H.mets > 0 && H.mets < 5) {
         const limiteNoCV = ['fatiga', 'otro'].includes(H.causaDetencion);
         items.push(rellenar(limiteNoCV ? P.metsLimiteNoCV : P.mets,
-            { mets: H.mets, causa: H.causaDetencionTxt }));
+            { mets: nProsa(H.mets), causa: H.causaDetencionTxt }));
     }
 
     // 5 · Recuperación de la FC al primer minuto.
@@ -2160,7 +2347,7 @@ function construirNarrativa(H) {
         fcPico: H.fcPico || nada,
         pctFCmax: H.pctFCmax || nada,
         dobleProducto: H.dobleProducto ? H.dobleProducto.toLocaleString('es-AR') : nada,
-        metsMetodo: H.mets ? `, con ${H.mets} METs${H.pctMets ? ` (${H.pctMets} % del predicho para edad y sexo)` : ''}` : '',
+        metsMetodo: H.mets ? `, con ${nProsa(H.mets)} METs${H.pctMets ? ` (${H.pctMets} % del predicho para edad y sexo)` : ''}` : '',
         causaDetencion: H.causaDetencionTxt
     };
     const metodo = [rellenar(H.cargaKgm ? T.metodo : T.metodoSinCarga, datosMetodo)];
@@ -2214,8 +2401,8 @@ function construirNarrativa(H) {
     // ── REPOSO ──
     const datosReposo = {
         fey: H.feyReposo || nada,
-        ee: H.eeReposo || nada,
-        vrt: H.vrtReposo || nada,
+        ee: nProsa(H.eeReposo) || nada,
+        vrt: nProsa(H.vrtReposo) || nada,
         gradoSecuela: gradoEnProsa(H.secuelas, 'scoreReposo'),
         segmentosSecuela: segmentosEnProsa(H.secuelas),
         deSegmentosSecuela: deSegmentos(H.secuelas),
@@ -2256,8 +2443,8 @@ function construirNarrativa(H) {
         territorio: territoriosEnProsa(H.territoriosIsquemia),
         territorioFrase: territorioFrase(H.territoriosIsquemia),
         territorios: territoriosEnProsa(H.territoriosIsquemia),
-        wmsiReposo: H.wmsiReposo || nada,
-        wmsiEstres: H.wmsiEstres || nada,
+        wmsiReposo: nProsa(H.wmsiReposo, 2) || nada,
+        wmsiEstres: nProsa(H.wmsiEstres, 2) || nada,
         aclaracionWMSI: H.wmsiExcluyeSeptales ? NARRATIVA.aclaracionWMSI : '',
         acompanamiento: acompanamiento,
         caidaFey: H.caidaFey ? `, con caída de la FEy de ${H.feyReposo} % a ${H.feyEstres} % post-esfuerzo` : '',
@@ -2266,8 +2453,8 @@ function construirNarrativa(H) {
             : 'los hallazgos descritos',
         feyReposo: H.feyReposo || nada,
         feyEstres: H.feyEstres || nada,
-        eeEstres: H.eeEstres || nada,
-        vrtEstres: H.vrtEstres || nada,
+        eeEstres: nProsa(H.eeEstres) || nada,
+        vrtEstres: nProsa(H.vrtEstres) || nada,
         reservaGlobal: H.deltaFey === null ? '' : rellenar(
             H.reservaGlobal ? T.reservaGlobalConservada : T.reservaGlobalAusente,
             { feyReposo: H.feyReposo, feyEstres: H.feyEstres,
@@ -2306,14 +2493,14 @@ function construirNarrativa(H) {
     const comprometidos = H.isquemicos.length + H.secuelas.length;
     if (comprometidos > 0 && H.wmsiReposo !== null && H.wmsiEstres !== null) {
         const d = H.deltaWMSI;
-        const dTxt = d > 0 ? '+' + d.toFixed(2) : d.toFixed(2);
+        const dTxt = (d > 0 ? '+' : '') + nProsa(d, 2);
         const detalle = [];
         if (H.isquemicos.length) detalle.push(`${H.isquemicos.length} con isquemia inducible`);
         if (H.secuelas.length) detalle.push(`${H.secuelas.length} sin respuesta al esfuerzo`);
         if (detalle.length === 1 && comprometidos === parseInt(detalle[0])) detalle[0] = detalle[0].replace(/^\d+ /, '');
         parrafos.push(rellenar(T.lineaWMSI, {
-            wmsiReposo: H.wmsiReposo,
-            wmsiEstres: H.wmsiEstres,
+            wmsiReposo: nProsa(H.wmsiReposo, 2),
+            wmsiEstres: nProsa(H.wmsiEstres, 2),
             deltaWMSI: dTxt,
             aclaracionWMSI: H.wmsiExcluyeSeptales ? NARRATIVA.aclaracionWMSI : '',
             segmentos: comprometidos === 1
@@ -2383,7 +2570,7 @@ function construirNarrativa(H) {
     if (oracionesFinales.length) conclusion += oracionesFinales.join('');
 
     // Preámbulo: encabeza SIEMPRE, antes del veredicto.
-    const metsFrase = H.mets ? rellenar(T.preambuloMETs, { mets: H.mets }) : '';
+    const metsFrase = H.mets ? rellenar(T.preambuloMETs, { mets: nProsa(H.mets) }) : '';
     const preambulo = rellenar(T.preambulo, {
         suficiencia: H.pctFCmax >= 85 ? 'suficiente' : 'insuficiente',
         pctFCmax: H.pctFCmax || nada,
@@ -2493,22 +2680,25 @@ function validarEstudio(rama) {
         if (!num('ej_etapa')) av.push({ nivel: 'info', txt: 'Sin etapa alcanzada: la conclusión no va a poder decir en qué etapa se detuvo.' });
     }
 
-    if (!resultado) av.push({ nivel: 'error', txt: 'Falta seleccionar el RESULTADO del estudio.' });
-    if (resultado === 'positivo' && cnt.isquemicos === 0)
-        av.push({ nivel: 'warn', txt: 'Resultado POSITIVO pero ningún segmento muestra isquemia inducible en la tabla. Verificar la carga de motilidad.' });
-    if (resultado === 'negativo' && cnt.isquemicos > 0)
-        av.push({ nivel: 'warn', txt: `Resultado NEGATIVO pero hay ${cnt.isquemicos} segmento(s) con deterioro en el pico. Revisar.` });
+    // El resultado ya no se elige a mano: lo deduce la app. Estas comprobaciones
+    // sólo tienen sentido cuando el operador lo corrigió.
+    if (fueCorregido('resultado_estudio')) {
+        if (resultado === 'positivo' && cnt.isquemicos === 0)
+            av.push({ nivel: 'warn', txt: 'Elegiste resultado POSITIVO pero ningún segmento muestra isquemia inducible. Verificá la carga de motilidad.' });
+        if (resultado === 'negativo' && cnt.isquemicos > 0)
+            av.push({ nivel: 'warn', txt: `Elegiste resultado NEGATIVO pero hay ${cnt.isquemicos} segmento(s) con deterioro en el pico. Revisá.` });
+    }
 
     const terrSel = document.getElementById('territorio_afectado').value;
-    if (cnt.territorios.length && terrSel === 'ninguno')
-        av.push({ nivel: 'warn', txt: `La tabla sugiere compromiso de ${cnt.territorios.join(' + ')} y el territorio informado es "Ninguno".` });
+    if (cnt.territorios.length && terrSel === 'ninguno' && fueCorregido('territorio_afectado'))
+        av.push({ nivel: 'info', txt: `El bull's eye muestra compromiso de ${cnt.territorios.join(' + ')} y dejaste el territorio en "Ninguno".` });
 
-    if (rama) {
-        const esperado = { negativa: 'negativo', positivaUnico: 'positivo', positivaMulti: 'positivo',
-                           hipotensiva: 'positivo', noConcluyente: 'no_concluyente',
-                           diastolico: 'diastolico_positivo', secuela: 'negativo' }[rama];
+    // Misma función que usa el autocompletado: la validación no puede discrepar con
+    // la propia sugerencia de la app. Sólo avisa cuando el operador la corrigió.
+    if (rama && fueCorregido('resultado_estudio')) {
+        const esperado = resultadoSugerido(recolectarHallazgos(), rama);
         if (resultado && esperado && resultado !== esperado)
-            av.push({ nivel: 'warn', txt: `El informe narrativo salió por la rama "${rama}" pero el resultado elegido a mano es otro. Verificá cuál corresponde.` });
+            av.push({ nivel: 'info', txt: `El informe narrativo sale por la rama "${rama}" (correspondería "${esperado}") y vos elegiste otro resultado. Si fue a propósito, ignorá este aviso.` });
     }
 
     if (document.getElementById('ventana').value === 'limitada' && cnt.evalRep >= 17 && cnt.evalEst >= 17)
@@ -3122,8 +3312,7 @@ function resetFormulario() {
     setFechaHoy();
     medicacionActual = [];
     renderMedicacion();
-    diastolicoTocadoAMano = false;
-    patronTocadoAMano = false;
+    camposCorregidos = {};   // paciente nuevo: la app vuelve a proponer todo
     setProtocol('ejercicio');
     setSpecialTab('viabilidad');
     updateChecklistBadge();
@@ -3294,6 +3483,9 @@ function saveDraft() {
             specialTab: currentSpecialTab,
             dobStages: captureDobStages(),
             medicacion: medicacionActual.map(m => ({ ...m })),
+            // Qué campos deducidos corrigió el operador. Sin esto el valor corregido
+            // se restaura y el primer recálculo lo pisa: la corrección se pierde sola.
+            corregidos: { ...camposCorregidos },
             // El informe ya redactado también se guarda: si se cierra el navegador
             // después de generarlo, vuelve tal cual y no hay que rehacerlo.
             reporte: document.getElementById('reporte-output').textContent || ''
@@ -3379,6 +3571,10 @@ function restoreDobStages(saved) {
 function aplicarEstudio(d) {
     if (!d) return;
 
+    // Las correcciones manuales se restauran ANTES que nada: los recálculos de más
+    // abajo consultan esta marca, y si llega después ya pisaron el valor corregido.
+    camposCorregidos = (d.corregidos && typeof d.corregidos === 'object') ? { ...d.corregidos } : {};
+
     restoreFields(d.fields);
 
     // Pestañas activas
@@ -3399,8 +3595,8 @@ function aplicarEstudio(d) {
     calcBSA(); calcEjercicio(); calcDobutamina(); calcDipiridamol();
     calcFEVI(); calcDiastolico(); calcCFR(); calcStrain(); calcEAo(); calcMCH();
     updateResultBanner(); updateChecklistBadge();
-    diastolicoTocadoAMano = !!(d.fields && d.fields.diast_resultado && d.fields.diast_resultado !== 'no_evaluado');
-    patronTocadoAMano = !!(d.fields && d.fields.patron_motilidad === 'global');
+    // Las notas vuelven a decir si el valor lo puso la app o lo corregiste vos
+    refrescarNotasOrigen();
 
     medicacionActual = Array.isArray(d.medicacion) ? d.medicacion.map(m => ({ ...m })) : [];
     renderMedicacion();
@@ -3492,6 +3688,8 @@ function setupAutosave() {
     // Un solo "escucha" general cubre todos los campos, incluso los que se crean al vuelo
     document.addEventListener('input', scheduleSave, true);
     document.addEventListener('change', scheduleSave, true);
+    document.addEventListener('input', refrescarDeducidos, true);
+    document.addEventListener('change', refrescarDeducidos, true);
 
     // Borradores presentes. Puede haber dos si el navegador se cerró con el aviso abierto.
     const candidatos = [DRAFT_KEY, DRAFT_PENDIENTE_KEY]
