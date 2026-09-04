@@ -255,7 +255,7 @@ function calcGeometria() {
 
     if (masa === null) {
         setVal2('imvi', ''); setVal2('rwt', '');
-        if (box) box.style.display = 'none';
+        if (box) { box.style.display = 'none'; box.innerHTML = ''; }
         const faltan = [];
         if (!(ddvi > 0)) faltan.push('el DDVI');
         if (!(siv > 0)) faltan.push('el septum');
@@ -268,7 +268,7 @@ function calcGeometria() {
     setVal2('rwt', nProsa(rwt, 2));
     if (imvi === null) {
         setVal2('imvi', '');
-        if (box) box.style.display = 'none';
+        if (box) { box.style.display = 'none'; box.innerHTML = ''; }
         sugerir('geometria_vi', undefined,
             `Masa ${nProsa(masa, 0)} g y RWT ${nProsa(rwt, 2)}. Falta el peso y la altura para indexar la masa.`);
         return;
@@ -426,7 +426,7 @@ function autocompletarDiastolicaReposo() {
     // el veredicto en vez de aceptarlo.
     const box = document.getElementById('diast_grado_criterios');
     if (!box) return;
-    if (!R.criterios || !R.criterios.length) { box.style.display = 'none'; return; }
+    if (!R.criterios || !R.criterios.length) { box.style.display = 'none'; box.innerHTML = ''; return; }
     box.style.display = 'block';
     box.innerHTML = R.criterios.map(c =>
         `<div class="criterio-ase ${c.alto ? 'criterio-alto' : 'criterio-normal'}">` +
@@ -656,6 +656,18 @@ function metsPredichos(edad, sexo) {
     if (!(edad > 0)) return null;
     return sexo === 'F' ? 14.7 - 0.13 * edad : 18 - 0.15 * edad;
 }
+// categoriaMETs devuelve la frase entera y con dos órdenes distintos: "capacidad
+// funcional reducida" pero "buena capacidad funcional". Quitarle el prefijo servía
+// para la mitad de los casos; la otra mitad salía duplicada en el informe de la rama
+// dilatada: "La capacidad funcional fue buena capacidad funcional."
+function adjetivoMETs(mets) {
+    if (!(mets > 0)) return '';
+    if (mets < 5)  return 'reducida';
+    if (mets < 7)  return 'regular';
+    if (mets < 10) return 'buena';
+    return 'excelente';
+}
+
 function categoriaMETs(mets) {
     if (!(mets > 0)) return null;
     if (mets < 5)  return 'capacidad funcional reducida';
@@ -2810,7 +2822,7 @@ function construirNarrativa(H) {
         gradoFey: gradoFeyEnProsa(H.feyReposo),
         vdConcl: H.vdProsa ? ', ' + H.vdProsa : '',
         descripcionST: descripcionSTEnProsa(H),
-        capacidadDilatada: H.capacidadFuncional ? ` La capacidad funcional fue ${H.capacidadFuncional.replace('capacidad funcional ', '')}.` : '',
+        capacidadDilatada: H.mets ? ` La capacidad funcional fue ${adjetivoMETs(H.mets)}.` : '',
         territorioFrase: territorioFrase(H.territoriosIsquemia),
         territorioSecuelaFrase: territorioFrase(H.territoriosSecuela),
         motivoNoConcluyente: motivoNoConcluyente(H),
