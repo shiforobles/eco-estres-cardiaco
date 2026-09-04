@@ -66,9 +66,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (p) document.getElementById('dip_peso').value = p;
         calcDobutamina();
         calcDipiridamol();
+        calcGeometria();
     });
 
     // Recalcular lo derivado al cambiar datos que lo alimentan
+    document.getElementById('altura').addEventListener('input', calcGeometria);
+    document.getElementById('sexo').addEventListener('change', calcGeometria);
+
     ['sexo', 'ant_betabloq', 'fevi_reposo', 'fevi_pico'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.addEventListener('change', calcEjercicio);
@@ -216,6 +220,91 @@ function autocompletarPatron() {
 function marcarDiastolicoManual() {
     marcarManual('diast_resultado', 'Corregido a mano: el cálculo ya no lo modifica.');
 }
+
+// ══════════════════════════════════════════════
+//  GEOMETRÍA DEL VENTRÍCULO IZQUIERDO
+//  Se cargan las tres medidas crudas y la app hace el resto: masa por la fórmula
+//  del cubo, indexación por superficie corporal y espesor relativo. Cargar la masa
+//  ya calculada obligaría a hacer la cuenta afuera, que es justo lo que se evita.
+//  Masa = 0,8 × 1,04 × [(DDVI + SIV + PP)³ − DDVI³] + 0,6   (ASE, en cm)
+// ══════════════════════════════════════════════
+const IMVI_ALTO = { M: 115, F: 95 };   // g/m²
+const RWT_ALTO = 0.42;
+
+// Un único lugar donde se calcula. Antes el informe leía la masa indexada del campo
+// de pantalla: al formatear ese campo con coma decimal, parseFloat lo habría truncado
+// en silencio. Los números se calculan de las medidas crudas y el campo es sólo vista.
+function medidasVI() {
+    const ddvi = num('ddvi'), siv = num('siv_d'), pp = num('pp_d');
+    const peso = num('peso'), altura = num('altura');
+    const bsa = (peso > 0 && altura > 0)
+        ? 0.007184 * Math.pow(altura, 0.725) * Math.pow(peso, 0.425) : null;
+    if (!(ddvi > 0 && siv > 0 && pp > 0)) return { ddvi, siv, pp, bsa, masa: null, imvi: null, rwt: null };
+
+    // La fórmula del cubo va en centímetros
+    const d = ddvi / 10, s = siv / 10, p = pp / 10;
+    const masa = 0.8 * 1.04 * (Math.pow(d + s + p, 3) - Math.pow(d, 3)) + 0.6;
+    return { ddvi, siv, pp, bsa, masa, imvi: bsa ? masa / bsa : null, rwt: (2 * p) / d };
+}
+
+function calcGeometria() {
+    const { ddvi, siv, pp, bsa, masa, imvi, rwt } = medidasVI();
+
+    const setVal2 = (id, txt) => { const el = document.getElementById(id); if (el) el.value = txt; };
+    const box = document.getElementById('geometria_criterios');
+
+    if (masa === null) {
+        setVal2('imvi', ''); setVal2('rwt', '');
+        if (box) box.style.display = 'none';
+        const faltan = [];
+        if (!(ddvi > 0)) faltan.push('el DDVI');
+        if (!(siv > 0)) faltan.push('el septum');
+        if (!(pp > 0)) faltan.push('la pared posterior');
+        sugerir('geometria_vi', undefined, faltan.length
+            ? `Falta ${listarEnProsa(faltan)} para calcular la masa y el espesor relativo.` : '');
+        return;
+    }
+
+    setVal2('rwt', nProsa(rwt, 2));
+    if (imvi === null) {
+        setVal2('imvi', '');
+        if (box) box.style.display = 'none';
+        sugerir('geometria_vi', undefined,
+            `Masa ${nProsa(masa, 0)} g y RWT ${nProsa(rwt, 2)}. Falta el peso y la altura para indexar la masa.`);
+        return;
+    }
+
+    setVal2('imvi', nProsa(imvi, 0));
+
+    const sexo = document.getElementById('sexo').value === 'F' ? 'F' : 'M';
+    const corte = IMVI_ALTO[sexo];
+    const masaAlta = imvi > corte;
+    const espesorAlto = rwt > RWT_ALTO;
+
+    const geo = masaAlta
+        ? (espesorAlto ? 'hvi_concentrica' : 'hvi_excentrica')
+        : (espesorAlto ? 'remodelado' : 'normal');
+
+    sugerir('geometria_vi', geo, 'Deducido de la masa indexada y el espesor relativo. Podés corregirlo.');
+
+    if (box) {
+        box.style.display = 'block';
+        box.innerHTML =
+            `<div class="criterio-ase ${masaAlta ? 'criterio-alto' : 'criterio-normal'}">` +
+            `${masaAlta ? '▲' : '✓'} Masa indexada ${nProsa(imvi, 0)} g/m² ` +
+            `<span class="criterio-corte">(corte ${corte} g/m² en ${sexo === 'F' ? 'mujeres' : 'varones'})</span></div>` +
+            `<div class="criterio-ase ${espesorAlto ? 'criterio-alto' : 'criterio-normal'}">` +
+            `${espesorAlto ? '▲' : '✓'} RWT ${nProsa(rwt, 2)} ` +
+            `<span class="criterio-corte">(corte ${nProsa(RWT_ALTO, 2)})</span></div>`;
+    }
+}
+
+const GEOMETRIA_PROSA = {
+    normal: 'geometría ventricular normal',
+    remodelado: 'remodelado concéntrico',
+    hvi_concentrica: 'hipertrofia ventricular concéntrica',
+    hvi_excentrica: 'hipertrofia ventricular excéntrica'
+};
 
 // ══════════════════════════════════════════════
 //  FUNCIÓN DIASTÓLICA EN REPOSO — ALGORITMO ASE/EACVI 2016
@@ -470,7 +559,8 @@ function autocompletarInterpretacion() {
 
 // Campos que la app deduce: al tocarlos, el operador toma el control del campo.
 const CAMPOS_DEDUCIDOS = [
-    'patron_motilidad', 'diast_resultado', 'diast_grado', 'resultado_estudio', 'territorio_afectado',
+    'patron_motilidad', 'diast_resultado', 'diast_grado', 'geometria_vi',
+    'resultado_estudio', 'territorio_afectado',
     'extension_isquemia', 'categorizacion', 'pp_reposo', 'hal_st_dep', 'hal_st_ele',
     'hal_hipotension', 'hal_hipertensiva', 'hal_arritmia', 'hal_extrasistoles'
 ];
@@ -520,7 +610,7 @@ function calcBSA() {
     const altura = parseFloat(document.getElementById('altura').value);
     if (peso > 0 && altura > 0) {
         const bsa = 0.007184 * Math.pow(altura, 0.725) * Math.pow(peso, 0.425);
-        document.getElementById('sc_display').value = bsa.toFixed(2) + ' m²';
+        document.getElementById('sc_display').value = nProsa(bsa, 2) + ' m²';
     } else {
         document.getElementById('sc_display').value = '';
     }
@@ -1627,8 +1717,8 @@ function calcDiastolico() {
     const interp = (x) => x > 14 ? '↑ Elevado' : x > 8 ? 'Normal-alto' : '✓ Normal';
     const set = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };
 
-    document.getElementById('ee_reposo').value = rep ? rep.valor.toFixed(1) : '';
-    document.getElementById('ee_estres').value = est ? est.valor.toFixed(1) : '';
+    document.getElementById('ee_reposo').value = rep ? nProsa(rep.valor, 1) : '';
+    document.getElementById('ee_estres').value = est ? nProsa(est.valor, 1) : '';
 
     // E/A y LAVi: los dos derivados que pide el algoritmo ASE
     const D = datosDiastolicos();
@@ -1636,14 +1726,14 @@ function calcDiastolico() {
     setVal2('ea_reposo', D.ea !== null ? nProsa(D.ea, 2) : '');
     setVal2('lavi_reposo', D.lavi !== null ? nProsa(D.lavi, 1) + ' mL/m²' : '');
     autocompletarDiastolicaReposo();
-    set('diast_rep_interp', rep ? `E/e' ${rep.valor.toFixed(1)}${rep.promedio ? ' (promedio)' : ' (septal)'} — ${interp(rep.valor)}` : '—');
-    set('diast_est_interp', est ? `E/e' ${est.valor.toFixed(1)}${est.promedio ? ' (promedio)' : ' (septal)'} — ${interp(est.valor)}` : '—');
+    set('diast_rep_interp', rep ? `E/e' ${nProsa(rep.valor, 1)}${rep.promedio ? ' (promedio)' : ' (septal)'} — ${interp(rep.valor)}` : '—');
+    set('diast_est_interp', est ? `E/e' ${nProsa(est.valor, 1)}${est.promedio ? ' (promedio)' : ' (septal)'} — ${interp(est.valor)}` : '—');
 
     // Respuesta de e' al esfuerzo: lo esperable es que suba
     if (rep && est) {
         const d = est.eprima - rep.eprima;
-        set('diast_eprima_resp', `e' ${rep.eprima.toFixed(1)} → ${est.eprima.toFixed(1)} cm/s ` +
-            (d > 0 ? `(+${d.toFixed(1)}) — ✓ incremento presente` : `(${d.toFixed(1)}) — ⚠ sin el incremento esperado`));
+        set('diast_eprima_resp', `e' ${nProsa(rep.eprima, 1)} → ${nProsa(est.eprima, 1)} cm/s ` +
+            (d > 0 ? `(+${nProsa(d, 1)}) — ✓ incremento presente` : `(${nProsa(d, 1)}) — ⚠ sin el incremento esperado`));
     } else set('diast_eprima_resp', '—');
 
     // Criterio ASE: E/e' promedio >14 con esfuerzo Y VRT >2,8 m/s
@@ -2150,12 +2240,26 @@ function recolectarHallazgos() {
     // Grado de función diastólica en reposo. Se lee del CAMPO y no del algoritmo, así
     // una corrección manual pesa igual que la deducción.
     H.diastGrado = document.getElementById('diast_grado').value;
-    H.eeReposo = v('ee_reposo');
-    H.eeEstres = v('ee_estres');
+    H.geometriaVI = document.getElementById('geometria_vi').value;
+    const G = medidasVI();
+    H.imvi = G.imvi;
+    H.rwt = G.rwt;
+    // Los E/e' se calculan de sus componentes, NO se leen del campo de pantalla. Ese
+    // ida y vuelta por el DOM era una trampa esperando: al formatear el campo con coma
+    // decimal, parseFloat("14,5") devuelve 14 y el criterio de >14 se da vuelta solo.
+    const eeDe = (fase) => {
+        const E = num('e_onda_' + fase);
+        const sep = num('e_prima_' + fase), lat = num('e_prima_lat_' + fase);
+        const ep = (sep > 0 && lat > 0) ? (sep + lat) / 2 : (sep > 0 ? sep : lat);
+        return (E > 0 && ep > 0) ? E / ep : null;
+    };
+    H.eeReposoNum = eeDe('rep');
+    H.eeEstresNum = eeDe('est');
+    H.eeReposo = H.eeReposoNum === null ? '' : H.eeReposoNum.toFixed(1);
+    H.eeEstres = H.eeEstresNum === null ? '' : H.eeEstresNum.toFixed(1);
     H.vrtReposo = v('vrt_rep');
     H.vrtEstres = v('vrt_est');
-    const eeEstNum = parseFloat(H.eeEstres) || 0;
-    H.diastolicoPositivo = eeEstNum > 14 && num('vrt_est') > 2.8;
+    H.diastolicoPositivo = (H.eeEstresNum || 0) > 14 && num('vrt_est') > 2.8;
 
     // ECG
     H.stTipo = document.getElementById('ecg_st_tipo').value;
@@ -2589,8 +2693,23 @@ function construirNarrativa(H) {
         // Lo normal se comprime: la plantilla ya dice que no hay aumento de las presiones
         // de llenado. Sólo la disfunción real agrega una oración con su grado.
         if (['g1', 'g2', 'g3'].includes(H.diastGrado)) {
-            parrafoReposo += ' ' + rellenar(T.diastolicaGrado,
+            // Si el grado lo puso el operador, no se lo atribuye al algoritmo.
+            parrafoReposo += ' ' + rellenar(
+                fueCorregido('diast_grado') ? T.diastolicaGradoManual : T.diastolicaGrado,
                 { grado: DIAST_GRADO_PROSA[H.diastGrado] });
+        }
+        // Ídem la geometría: una geometría normal no merece una oración propia.
+        if (['remodelado', 'hvi_concentrica', 'hvi_excentrica'].includes(H.geometriaVI)) {
+            // Los números van sólo si la clasificación es la que dedujo la app. Corregida
+            // a mano pueden contradecirla —un "remodelado concéntrico" se define por masa
+            // normal, y ahí al lado una masa de 173 g/m² se lee como un error del informe.
+            // La medición cruda igual queda en el formulario y en la planilla.
+            parrafoReposo += ' ' + rellenar(
+                fueCorregido('geometria_vi') ? T.geometriaVIManual : T.geometriaVI, {
+                    geometria: GEOMETRIA_PROSA[H.geometriaVI],
+                    imvi: nProsa(H.imvi, 0),
+                    rwt: nProsa(H.rwt, 2)
+                });
         }
     }
     parrafos.push(parrafoReposo);
@@ -3560,11 +3679,16 @@ function applyPreset(name) {
     // Wall motion
     if (P.wm) setWM(P.wm);
 
-    // Estrés diastólico
-    if (P.e_prima_rep) setVal('e_prima_rep', P.e_prima_rep);
-    if (P.e_onda_rep) setVal('e_onda_rep', P.e_onda_rep);
-    if (P.e_prima_est) setVal('e_prima_est', P.e_prima_est);
-    if (P.e_onda_est) setVal('e_onda_est', P.e_onda_est);
+    // Eco basal: diastólica y geometría. Antes se aplicaban a mano sólo cuatro de estos
+    // campos, así que los presets cargaban a medias: el de "Diastólico (+)" declaraba
+    // vrt_est 3,1 pero nunca llegaba al formulario, y sin VRT el criterio ASE no puede
+    // dar positivo. El preset no podía cumplir lo que su nombre prometía.
+    ['e_onda_rep', 'a_onda_rep', 'e_prima_rep', 'e_prima_lat_rep', 'vrt_rep',
+     'e_onda_est', 'e_prima_est', 'e_prima_lat_est', 'vrt_est',
+     'volvi_reposo', 'ddvi', 'siv_d', 'pp_d']
+        .forEach(k => { if (P[k]) setVal(k, P[k]); });
+    calcBSA();
+    calcGeometria();
     calcDiastolico();
 
     // Resultado
@@ -3754,7 +3878,7 @@ function aplicarEstudio(d) {
 
     // Recalcular todo lo derivado (no se guarda: se regenera)
     calcBSA(); calcEjercicio(); calcDobutamina(); calcDipiridamol();
-    calcFEVI(); calcDiastolico(); calcCFR(); calcStrain(); calcEAo(); calcMCH();
+    calcFEVI(); calcDiastolico(); calcGeometria(); calcCFR(); calcStrain(); calcEAo(); calcMCH();
     updateResultBanner(); updateChecklistBadge();
     // Las notas vuelven a decir si el valor lo puso la app o lo corregiste vos
     refrescarNotasOrigen();
@@ -3997,7 +4121,8 @@ const PRESETS = {
         ej_causa_detencion: 'fatiga', ej_seg_img: '45', ej_fc_img: '138',
         e_prima_lat_rep: '9', e_prima_lat_est: '8', vrt_rep: '2.4', vrt_est: '3.1',
         fevi_reposo: 60, fevi_pico: 65,
-        e_prima_rep: '7', e_onda_rep: '65', e_prima_est: '6', e_onda_est: '110',
+        e_prima_rep: '7', e_onda_rep: '65', a_onda_rep: '60', e_prima_est: '6', e_onda_est: '110',
+        volvi_reposo: '72',
         wm: { reposo: allSegments(1), estres: allSegments(1) },
         resultado: 'diastolico_positivo', territorio: 'ninguno',
         hallazgos: ['disnea', 'hipertensiva']

@@ -82,6 +82,13 @@ const NARRATIVA = {
     // Se agrega al bloque de reposo SÓLO cuando hay disfunción diastólica real: el
     // grado normal ya está dicho en las plantillas de arriba.
     diastolicaGrado:   'La función diastólica en reposo corresponde a {{grado}}, según el algoritmo de la ASE.',
+    // Corregido a mano: el criterio es del operador y no se le atribuye al algoritmo.
+    diastolicaGradoManual: 'La función diastólica en reposo corresponde a {{grado}}.',
+
+    // Ídem: sólo cuando la geometría NO es normal.
+    geometriaVI:       'El ventrículo izquierdo presenta {{geometria}} (masa indexada {{imvi}} g/m², espesor relativo {{rwt}}).',
+    // Sin los números: corregida a mano pueden contradecir la clasificación elegida.
+    geometriaVIManual: 'El ventrículo izquierdo presenta {{geometria}}.',
 
     // Coletilla de presiones de llenado. Antes era una afirmación fija dentro de la
     // plantilla ("sin datos de aumento") y contradecía al grado diastólico cuando el

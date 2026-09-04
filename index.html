@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=1.6">
+    <link rel="stylesheet" href="styles.css?v=1.7">
 </head>
 <body>
 <div class="container">
@@ -17,7 +17,7 @@
     <header class="app-header">
         <div>
             <h1>Eco Estrés Cardíaco</h1>
-            <p class="version">v1.6 — La app deduce, vos corregís</p>
+            <p class="version">v1.7 — Geometría del VI y función diastólica deducidas</p>
         </div>
         <div class="header-controls">
             <button id="btn-theme-toggle" class="btn btn-icon" title="Cambiar Tema">
@@ -159,6 +159,38 @@
             <div class="form-group">
                 <label for="volvi_reposo">Volumen AI (mL) — Reposo</label>
                 <input autocomplete="off" type="number" id="volvi_reposo" placeholder="mL" min="10" max="200">
+            </div>
+            <div class="form-group">
+                <label for="ddvi">DDVI (mm)</label>
+                <input autocomplete="off" type="number" id="ddvi" placeholder="mm" min="20" max="90" step="0.5" oninput="calcGeometria()">
+            </div>
+            <div class="form-group">
+                <label for="siv_d">Septum interventricular (mm)</label>
+                <input autocomplete="off" type="number" id="siv_d" placeholder="mm" min="4" max="30" step="0.5" oninput="calcGeometria()">
+            </div>
+            <div class="form-group">
+                <label for="pp_d">Pared posterior (mm)</label>
+                <input autocomplete="off" type="number" id="pp_d" placeholder="mm" min="4" max="30" step="0.5" oninput="calcGeometria()">
+            </div>
+            <div class="form-group">
+                <label>Masa VI indexada (g/m²)</label>
+                <input autocomplete="off" type="text" id="imvi" class="calculated-value" disabled>
+            </div>
+            <div class="form-group">
+                <label>Espesor relativo — RWT</label>
+                <input autocomplete="off" type="text" id="rwt" class="calculated-value" disabled>
+            </div>
+            <div class="form-group" style="grid-column: 1 / -1">
+                <label for="geometria_vi">Geometría del ventrículo izquierdo</label>
+                <select autocomplete="off" id="geometria_vi">
+                    <option value="">No evaluada</option>
+                    <option value="normal">Normal</option>
+                    <option value="remodelado">Remodelado concéntrico</option>
+                    <option value="hvi_concentrica">Hipertrofia concéntrica</option>
+                    <option value="hvi_excentrica">Hipertrofia excéntrica</option>
+                </select>
+                <span class="firma-nota" id="geometria_vi_origen"></span>
+                <div id="geometria_criterios" class="criterios-ase" style="display:none"></div>
             </div>
             <div class="form-group">
                 <label for="pp_reposo">Presión Pulm. estimada (mmHg)</label>
@@ -1375,15 +1407,15 @@
 
 
 </div>
-<script src="pearls.js?v=1.6"></script>
-<script src="report-templates.js?v=1.6"></script>
-<script src="sheets-storage.js?v=1.6"></script>
-<script src="app.js?v=1.6"></script>
+<script src="pearls.js?v=1.7"></script>
+<script src="report-templates.js?v=1.7"></script>
+<script src="sheets-storage.js?v=1.7"></script>
+<script src="app.js?v=1.7"></script>
 <script>
 // Control de versión: si el navegador sirvió una mezcla de archivos viejos y nuevos,
 // los botones fallan en silencio. Esto lo convierte en un aviso visible.
 (function () {
-    var APP_VERSION = '1.6';
+    var APP_VERSION = '1.7';
     var faltan = ['generarInforme', 'recolectarHallazgos', 'calcEjercicio'].filter(function (f) {
         return typeof window[f] !== 'function';
     });
