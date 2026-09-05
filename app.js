@@ -555,11 +555,15 @@ function autocompletarInterpretacion() {
     // Va acá y no sólo en calcEjercicio(): está anclada en el WMSI pico, y antes
     // cambiar el bull's eye dejaba en pantalla una categoría de riesgo vieja.
     sugerirCategorizacion();
+
+    // Depende de la TA basal y de esfuerzo, de los METs y de la VRT post-esfuerzo:
+    // campos que viven fuera de su propio panel.
+    calcEAoEjercicio();
 }
 
 // Campos que la app deduce: al tocarlos, el operador toma el control del campo.
 const CAMPOS_DEDUCIDOS = [
-    'patron_motilidad', 'diast_resultado', 'diast_grado', 'geometria_vi',
+    'patron_motilidad', 'diast_resultado', 'diast_grado', 'geometria_vi', 'eaoej_veredicto',
     'resultado_estudio', 'territorio_afectado',
     'extension_isquemia', 'categorizacion', 'pp_reposo', 'hal_st_dep', 'hal_st_ele',
     'hal_hipotension', 'hal_hipertensiva', 'hal_arritmia', 'hal_extrasistoles'
@@ -1792,8 +1796,7 @@ function updateResultBanner() {
 function setSpecialTab(tab) {
     currentSpecialTab = tab;
     document.querySelectorAll('.special-tab').forEach(btn => {
-        btn.classList.toggle('active', btn.textContent.toLowerCase().includes(tab.split('_')[0]) ||
-            btn.onclick.toString().includes(tab));
+        btn.classList.toggle('active', btn.onclick.toString().includes(`'${tab}'`));
     });
     document.querySelectorAll('.special-panel').forEach(p => p.style.display = 'none');
     document.getElementById('panel-' + tab).style.display = 'block';
@@ -1834,33 +1837,147 @@ function calcStrain() {
 }
 
 // EAo
+// ══════════════════════════════════════════════
+//  EAo SEVERA ASINTOMÁTICA — EVALUACIÓN CON EJERCICIO
+//  Otra indicación que la de bajo flujo/bajo gradiente: el paciente YA tiene EAo
+//  severa y lo que se pone a prueba es si de verdad está asintomático. Si aparecen
+//  síntomas o la respuesta tensional es anormal, deja de serlo — y eso cambia la
+//  indicación quirúrgica, así que tiene que llegar al informe y no quedarse acá.
+//
+//  En cicloergómetro reclinable el gradiente y la PSAP se miden post-esfuerzo
+//  inmediato, no en el pico: caen rápido, y por eso se registra a los cuántos
+//  segundos se tomaron. Un ΔGradiente sin ese dato no se puede releer después.
+// ══════════════════════════════════════════════
+const EAOEJ_SINTOMAS = [
+    { id: 'eaoej_sint_angina',     txt: 'angina' },
+    { id: 'eaoej_sint_disnea',     txt: 'disnea desproporcionada' },
+    { id: 'eaoej_sint_mareo',      txt: 'mareo' },
+    { id: 'eaoej_sint_presincope', txt: 'presíncope' }
+];
+
+// La respuesta tensional en EAo severa tiene su propio corte: no alcanza con que no
+// caiga, tiene que SUBIR al menos 20 mmHg. Un ascenso plano ya es criterio.
+function respuestaTensionalEAo() {
+    const basal = num('esf_basal_tas'), pico = num('esf_max_tas');
+    if (!(basal > 0 && pico > 0)) return null;
+    const d = pico - basal;
+    // Las tres empiezan con verbo: se insertan detrás de "La respuesta tensional".
+    // `corto` va en la conclusión, donde el texto ya está dentro de un paréntesis.
+    if (d < 0) return { d, anormal: true,
+        txt: `cayó ${nProsa(-d, 0)} mmHg por debajo del basal (${basal} → ${pico} mmHg)`,
+        corto: `caída de ${nProsa(-d, 0)} mmHg respecto del basal` };
+    if (d < 20) return { d, anormal: true,
+        txt: `ascendió sólo ${nProsa(d, 0)} mmHg (${basal} → ${pico} mmHg), sin alcanzar los 20 mmHg esperados`,
+        corto: `ascenso de sólo ${nProsa(d, 0)} mmHg` };
+    return { d, anormal: false,
+        txt: `ascendió ${nProsa(d, 0)} mmHg (${basal} → ${pico} mmHg), dentro de lo esperado`,
+        corto: `ascenso de ${nProsa(d, 0)} mmHg` };
+}
+
+function psapPostEsfuerzo() {
+    const vrt = parseFloat(String(v('vrt_est') || '').replace(',', '.'));
+    if (!Number.isFinite(vrt) || vrt <= 0) return null;
+    return Math.round(4 * vrt * vrt + PAD_ASUMIDA);
+}
+
+function datosEAoEjercicio() {
+    const sintomas = EAOEJ_SINTOMAS.filter(x => {
+        const el = document.getElementById(x.id);
+        return el && el.checked;
+    });
+    const gradRep = num('eaoej_grad_reposo'), gradPost = num('eaoej_grad_post');
+    return {
+        ava: num('eaoej_ava') || null,
+        gradRep: gradRep || null,
+        gradPost: gradPost || null,
+        deltaGrad: (gradRep > 0 && gradPost > 0) ? gradPost - gradRep : null,
+        segDoppler: num('eaoej_seg_doppler') || null,
+        psapReposo: num('pp_reposo') || null,
+        psapPost: psapPostEsfuerzo(),
+        sintomas,
+        momento: v('eaoej_sint_momento'),
+        ta: respuestaTensionalEAo(),
+        mets: num('ej_mets') || null
+    };
+}
+
+function calcEAoEjercicio() {
+    const E = datosEAoEjercicio();
+    const setVal2 = (id, txt) => { const el = document.getElementById(id); if (el) el.value = txt; };
+    const set = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };
+
+    setVal2('eaoej_delta_grad', E.deltaGrad === null ? ''
+        : (E.deltaGrad >= 0 ? '+' : '') + nProsa(E.deltaGrad, 0) + ' mmHg');
+    setVal2('eaoej_psap_post', E.psapPost === null ? '' : E.psapPost + ' mmHg');
+    set('eaoej_ta', E.ta ? E.ta.txt : '—');
+    set('eaoej_cf', E.mets ? `${nProsa(E.mets)} METs — ${categoriaMETs(E.mets)}` : '—');
+
+    // ── Veredicto
+    const criterios = [];
+    if (E.sintomas.length) criterios.push({ cumple: true,
+        txt: `Síntomas con el esfuerzo: ${listarEnProsa(E.sintomas.map(x => x.txt))}${E.momento ? ' (' + E.momento + ')' : ''}` });
+    if (E.ta) criterios.push({ cumple: E.ta.anormal, txt: `Respuesta tensional: ${E.ta.txt}` });
+
+    const box = document.getElementById('eaoej_criterios');
+    if (!criterios.length) {
+        if (box) { box.style.display = 'none'; box.innerHTML = ''; }
+        sugerir('eaoej_veredicto', undefined,
+            'Cargá los síntomas y la TA basal y de esfuerzo para que la app proponga el veredicto.');
+        return;
+    }
+    const hayCriterio = criterios.some(c => c.cumple);
+    sugerir('eaoej_veredicto', hayCriterio ? 'no_asintomatico' : 'asintomatico',
+        hayCriterio
+            ? 'Cumple criterio para dejar de considerarse asintomático. Podés corregirlo.'
+            : 'Sin criterios positivos: se mantiene asintomático. Podés corregirlo.');
+
+    if (box) {
+        box.style.display = 'block';
+        box.innerHTML = criterios.map(c =>
+            `<div class="criterio-ase ${c.cumple ? 'criterio-alto' : 'criterio-normal'}">` +
+            `${c.cumple ? '▲' : '✓'} ${c.txt}</div>`).join('') +
+            (E.mets && E.mets < 5
+                ? `<div class="criterio-ase criterio-alto">▲ Capacidad funcional ${nProsa(E.mets)} METs: hallazgo de apoyo, no criterio por sí solo</div>`
+                : '');
+    }
+}
+
 function calcEAo() {
-    const gradRep = parseFloat(document.getElementById('eao_grad_reposo').value);
-    const avaRep = parseFloat(document.getElementById('eao_ava_reposo').value);
-    const gradDob = parseFloat(document.getElementById('eao_grad_dob').value);
-    const avaDob = parseFloat(document.getElementById('eao_ava_dob').value);
+    const gradRep = num('eao_grad_reposo'), avaRep = num('eao_ava_reposo');
+    const gradDob = num('eao_grad_dob'), avaDob = num('eao_ava_dob');
+    const reserva = document.getElementById('eao_reserva_flujo').value;
+    const set = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };
 
-    if (gradRep > 0 && gradDob > 0) {
-        const dGrad = gradDob - gradRep;
-        document.getElementById('eao_delta_grad').textContent = (dGrad >= 0 ? '+' : '') + dGrad.toFixed(0) + ' mmHg';
-    }
-    if (avaRep > 0 && avaDob > 0) {
-        const dAva = avaDob - avaRep;
-        document.getElementById('eao_delta_ava').textContent = (dAva >= 0 ? '+' : '') + dAva.toFixed(2) + ' cm²';
+    // El ΔGradiente ya no depende de tener el AVA cargada: antes toda la
+    // interpretación vivía dentro del if del AVA y con sólo gradientes no decía nada.
+    set('eao_delta_grad', (gradRep > 0 && gradDob > 0)
+        ? (gradDob - gradRep >= 0 ? '+' : '') + nProsa(gradDob - gradRep, 0) + ' mmHg' : '—');
+    const dAva = (avaRep > 0 && avaDob > 0) ? avaDob - avaRep : null;
+    set('eao_delta_ava', dAva === null ? '—'
+        : (dAva >= 0 ? '+' : '') + nProsa(dAva, 2) + ' cm²');
 
-        // Interpretación
-        let interp = '—';
-        if (gradDob >= 40 && dAva < 0.3) {
-            interp = 'EAo VERDADERA severa (↑ gradiente, AVA sin cambio)';
-        } else if (gradDob < 40 && dAva >= 0.3) {
-            interp = 'PSEUDOESTENOSIS (↑ AVA, gradiente no aumenta a ≥40 mmHg)';
-        } else if (gradDob >= 40 && dAva >= 0.3) {
-            interp = 'Indeterminado (ambos aumentan)';
-        } else {
-            interp = 'Sin reserva de flujo — pronóstico adverso';
-        }
-        document.getElementById('eao_interp').textContent = interp;
+    // La reserva de flujo es un dato del operador (incremento del VTI ≥20 %), no algo
+    // que se pueda inferir del gradiente y el AVA. Antes el campo no se leía nunca y
+    // la app dictaminaba "sin reserva de flujo" por su cuenta, pudiendo contradecir
+    // lo que el propio operador había cargado dos casillas más arriba.
+    if (!reserva) {
+        set('eao_interp', 'Falta la reserva de flujo: sin ese dato la comparación reposo/dobutamina no es interpretable.');
+        return;
     }
+    if (reserva === 'ausente') {
+        set('eao_interp', 'Sin reserva de flujo (VTI ↑ <20 %): la dobutamina no distingue EAo verdadera de ' +
+            'pseudoestenosis. Su ausencia tiene además peso pronóstico propio.');
+        return;
+    }
+    // Con reserva de flujo presente, la comparación sí discrimina
+    if (!(gradDob > 0) || dAva === null) {
+        set('eao_interp', 'Cargá gradiente medio y AVA en reposo y con dobutamina para interpretar.');
+        return;
+    }
+    if (gradDob >= 40 && dAva < 0.3)      set('eao_interp', 'EAo VERDADERA severa (↑ gradiente, AVA sin cambio)');
+    else if (gradDob < 40 && dAva >= 0.3) set('eao_interp', 'PSEUDOESTENOSIS (↑ AVA, gradiente no alcanza 40 mmHg)');
+    else if (gradDob >= 40 && dAva >= 0.3) set('eao_interp', 'Indeterminado: aumentan los dos');
+    else set('eao_interp', 'Indeterminado: ni el gradiente alcanza 40 mmHg ni el AVA aumenta 0,3 cm²');
 }
 
 // MCH
@@ -2253,6 +2370,11 @@ function recolectarHallazgos() {
     // una corrección manual pesa igual que la deducción.
     H.diastGrado = document.getElementById('diast_grado').value;
     H.geometriaVI = document.getElementById('geometria_vi').value;
+    // EAo severa asintomática: sólo se arma el bloque si el módulo está en uso
+    H.eaoEj = datosEAoEjercicio();
+    H.eaoEjVeredicto = document.getElementById('eaoej_veredicto').value;
+    H.eaoEjEnUso = document.getElementById('indicacion').value === 'eao_asintomatica' ||
+                   !!(H.eaoEjVeredicto || H.eaoEj.gradRep || H.eaoEj.gradPost || H.eaoEj.ava);
     const G = medidasVI();
     H.imvi = G.imvi;
     H.rwt = G.rwt;
@@ -2559,9 +2681,15 @@ function oracionPronostica(H, rama) {
     const P = NARRATIVA.pronostico;
     const items = [];
 
+    // En un estudio de EAo asintomática la oración de cierre ya informa la respuesta
+    // tensional, y con más peso: es lo que mueve la indicación quirúrgica. Repetirla
+    // acá la pondría dos veces en oraciones consecutivas de la misma conclusión.
+    const taLaDiceEAo = H.eaoEjEnUso && H.eaoEjVeredicto === 'no_asintomatico' &&
+                        H.eaoEj && H.eaoEj.ta && H.eaoEj.ta.anormal;
+
     // 1 · Hipotensión: es criterio de suspensión, el de mayor peso.
     //     En la rama hipotensiva ya es el núcleo de la conclusión.
-    if (H.hipotension && rama !== 'hipotensiva') items.push(P.hipotension);
+    if (H.hipotension && rama !== 'hipotensiva' && !taLaDiceEAo) items.push(P.hipotension);
 
     // 2 · Caída de la FEy. En multivaso e hipotensiva la conclusión ya la explica.
     if (H.caidaFey && rama !== 'positivaMulti' && rama !== 'hipotensiva')
@@ -2596,11 +2724,84 @@ function oracionPronostica(H, rama) {
 
     // 6 · Respuesta hipertensiva: el de menor peso inmediato de los seis, pero cambia
     //     el tratamiento. En un no concluyente no se afirma nada sobre el esfuerzo.
-    if (H.hipertension && rama !== 'noConcluyente') items.push(P.hipertension);
+    if (H.hipertension && rama !== 'noConcluyente' && !taLaDiceEAo) items.push(P.hipertension);
 
     if (!items.length) return '';
     return rellenar(items.length === 1 ? P.oracionUna : P.oracionVarias,
         { hallazgos: listarEnProsa(items) });
+}
+
+// Bloque descriptivo del módulo de EAo severa asintomática. Cada frase se omite
+// entera si le faltan datos: un informe con rayitas se lee como algo a medio hacer.
+function bloqueEAoEjercicio(H) {
+    const T = NARRATIVA, E = H.eaoEj;
+
+    const severidad = E.ava ? rellenar(T.eaoEjSeveridad, { ava: nProsa(E.ava, 2) }) : '';
+
+    let gradiente = '';
+    if (E.gradRep && E.gradPost) {
+        gradiente = rellenar(T.eaoEjGradiente, {
+            gradRep: nProsa(E.gradRep, 0), gradPost: nProsa(E.gradPost, 0),
+            delta: (E.deltaGrad >= 0 ? '+' : '') + nProsa(E.deltaGrad, 0),
+            segundos: E.segDoppler ? rellenar(T.eaoEjSegundos, { seg: E.segDoppler }) : ''
+        });
+    } else if (E.gradRep) {
+        gradiente = rellenar(T.eaoEjGradienteSolo, { gradRep: nProsa(E.gradRep, 0) });
+    }
+
+    let psap = '';
+    if (E.psapReposo && E.psapPost) psap = rellenar(T.eaoEjPsap, { psapRep: E.psapReposo, psapPost: E.psapPost });
+    else if (E.psapPost) psap = rellenar(T.eaoEjPsapPost, { psapPost: E.psapPost });
+
+    const sintomas = E.sintomas.length
+        ? rellenar(T.eaoEjSintomas, {
+            sintomas: listarEnProsa(E.sintomas.map(x => x.txt)),
+            momento: E.momento ? ` (${E.momento})` : '' })
+        : T.eaoEjSinSintomas;
+
+    // La respuesta tensional NO se repite acá: el párrafo del método ya la describe y
+    // la oración de cierre la usa como criterio. Decirla tres veces es apilarla.
+    const tension = '';
+    // adjetivoMETs y no capacidadFuncional: esta última trae la frase entera y saldría
+    // "la capacidad funcional alcanzada fue buena capacidad funcional".
+    const capacidad = H.mets
+        ? rellenar(T.eaoEjCapacidad, { capacidad: adjetivoMETs(H.mets) }) : '';
+
+    // Sin gradiente ni síntomas cargados el bloque no aporta nada
+    if (!gradiente && !E.sintomas.length && !tension) return '';
+
+    return rellenar(T.eaoEjBloque, { severidadBasal: severidad, gradiente, psap, sintomas, tension, capacidad })
+        .replace(/\s{2,}/g, ' ').trim();
+}
+
+// El veredicto: lo único de este módulo que cambia una conducta.
+function cierreEAoEjercicio(H, rama) {
+    const T = NARRATIVA, E = H.eaoEj;
+    // El veredicto lo puede corregir el operador, pero el informe no puede afirmar
+    // "sin síntomas y con respuesta tensional normal" cuando hay síntomas tildados o
+    // la TA fue anormal: sería falso. Ahí se dice que es SU criterio, sin negar los datos.
+    if (H.eaoEjVeredicto === 'asintomatico') {
+        const huboCriterios = E.sintomas.length > 0 || !!(E.ta && E.ta.anormal);
+        return huboCriterios ? T.eaoEjAsintomaticoPeseA : T.eaoEjAsintomatico;
+    }
+    if (H.eaoEjVeredicto !== 'no_asintomatico') return '';
+
+    // En la rama hipotensiva la conclusión ya abre diciendo la caída tensional y su
+    // peso pronóstico. Repetirla acá la pondría dos veces en el mismo párrafo.
+    const taYaDicha = rama === 'hipotensiva';
+    const taEsCriterio = !!(E.ta && E.ta.anormal);
+
+    const motivos = [];
+    if (E.sintomas.length) motivos.push(rellenar(T.eaoEjMotivoSintomas,
+        { sintomas: listarEnProsa(E.sintomas.map(x => x.txt)) }));
+    if (taEsCriterio && !taYaDicha) motivos.push(rellenar(T.eaoEjMotivoTension, { detalle: E.ta.corto }));
+
+    if (!motivos.length) {
+        // El único criterio era la tensional y ya quedó dicha: se la referencia.
+        if (taYaDicha && taEsCriterio) return T.eaoEjNoAsintomaticoTaYaDicha;
+        motivos.push('hallazgos con el esfuerzo');
+    }
+    return rellenar(T.eaoEjNoAsintomatico, { motivos: listarEnProsa(motivos) });
 }
 
 function construirNarrativa(H) {
@@ -2725,6 +2926,12 @@ function construirNarrativa(H) {
         }
     }
     parrafos.push(parrafoReposo);
+
+    // ── EAo SEVERA ASINTOMÁTICA CON EJERCICIO ──
+    if (H.eaoEjEnUso) {
+        const bloque = bloqueEAoEjercicio(H);
+        if (bloque) parrafos.push(bloque);
+    }
 
     // ── ESFUERZO ──
     const acompanamiento = acompanamientoEnProsa(H);
@@ -2857,6 +3064,13 @@ function construirNarrativa(H) {
     // Todo lo que le cambia la conducta al clínico, en una sola oración al cierre
     const pronostico = oracionPronostica(H, rama);
     if (pronostico) oracionesFinales.push(pronostico);
+
+    // El veredicto de la EAo asintomática va DESPUÉS: mueve la indicación quirúrgica,
+    // que es lo más accionable que puede llevar este informe.
+    if (H.eaoEjEnUso) {
+        const cierre = cierreEAoEjercicio(H, rama);
+        if (cierre) oracionesFinales.push(cierre);
+    }
 
     if (extras.length) conclusion = conclusion.replace(/\.$/, '') + extras.join('') + '.';
     if (oracionesFinales.length) conclusion += oracionesFinales.join('');
@@ -3697,7 +3911,8 @@ function applyPreset(name) {
     // dar positivo. El preset no podía cumplir lo que su nombre prometía.
     ['e_onda_rep', 'a_onda_rep', 'e_prima_rep', 'e_prima_lat_rep', 'vrt_rep',
      'e_onda_est', 'e_prima_est', 'e_prima_lat_est', 'vrt_est',
-     'volvi_reposo', 'ddvi', 'siv_d', 'pp_d']
+     'volvi_reposo', 'ddvi', 'siv_d', 'pp_d',
+     'eaoej_ava', 'eaoej_grad_reposo', 'eaoej_grad_post', 'eaoej_seg_doppler']
         .forEach(k => { if (P[k]) setVal(k, P[k]); });
     calcBSA();
     calcGeometria();
@@ -3890,7 +4105,7 @@ function aplicarEstudio(d) {
 
     // Recalcular todo lo derivado (no se guarda: se regenera)
     calcBSA(); calcEjercicio(); calcDobutamina(); calcDipiridamol();
-    calcFEVI(); calcDiastolico(); calcGeometria(); calcCFR(); calcStrain(); calcEAo(); calcMCH();
+    calcFEVI(); calcDiastolico(); calcGeometria(); calcCFR(); calcStrain(); calcEAo(); calcEAoEjercicio(); calcMCH();
     updateResultBanner(); updateChecklistBadge();
     // Las notas vuelven a decir si el valor lo puso la app o lo corregiste vos
     refrescarNotasOrigen();

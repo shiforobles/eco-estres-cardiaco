@@ -90,6 +90,44 @@ const NARRATIVA = {
     // Sin los números: corregida a mano pueden contradecir la clasificación elegida.
     geometriaVIManual: 'El ventrículo izquierdo presenta {{geometria}}.',
 
+    // ── EAo SEVERA ASINTOMÁTICA CON EJERCICIO ─────────────────────────
+    // Párrafo propio: es la pregunta que se fue a responder, no un accesorio.
+    eaoEjBloque: 'Evaluación de estenosis aórtica severa asintomática con ejercicio.{{severidadBasal}} ' +
+                 '{{gradiente}}{{psap}} {{sintomas}} {{tension}}{{capacidad}}',
+
+    eaoEjSeveridad:  ' Área valvular en reposo de {{ava}} cm².',
+    eaoEjGradiente:  'El gradiente medio pasó de {{gradRep}} mmHg en reposo a {{gradPost}} mmHg en el ' +
+                     'post-esfuerzo inmediato{{segundos}} ({{delta}} mmHg).',
+    eaoEjGradienteSolo: 'El gradiente medio en reposo fue de {{gradRep}} mmHg.',
+    eaoEjSegundos:   ', medido a los {{seg}} segundos de finalizado el ejercicio',
+    eaoEjPsap:       ' La presión sistólica pulmonar estimada pasó de {{psapRep}} a {{psapPost}} mmHg.',
+    eaoEjPsapPost:   ' La presión sistólica pulmonar estimada post-esfuerzo fue de {{psapPost}} mmHg.',
+
+    eaoEjSintomas:      'Durante el esfuerzo presentó {{sintomas}}{{momento}}.',
+    eaoEjSinSintomas:   'No refirió síntomas durante el esfuerzo.',
+    eaoEjCapacidad:     ' La capacidad funcional alcanzada fue {{capacidad}}.',
+
+    // ── Conclusión del módulo: lo que cambia la conducta ──
+    // Va como oración propia al final: un paciente que se hace sintomático o tiene
+    // respuesta tensional anormal deja de ser asintomático, y eso mueve la indicación
+    // quirúrgica. Decirlo a medias no sirve de nada.
+    eaoEjNoAsintomatico: ' La prueba de esfuerzo desenmascaró {{motivos}}, por lo que el paciente ' +
+                 'deja de considerarse asintomático: el hallazgo modifica la indicación quirúrgica y ' +
+                 'amerita evaluación por el equipo de válvulas.',
+    eaoEjAsintomatico:   ' El paciente completó el esfuerzo sin síntomas y con respuesta tensional normal, ' +
+                 'confirmándose la condición de asintomático.',
+    // Cuando el operador sostiene "asintomático" pese a haber criterios cargados: se
+    // informa su criterio sin afirmar lo que los datos contradicen.
+    eaoEjAsintomaticoPeseA: ' Pese a los hallazgos descritos, se interpreta que el paciente mantiene su ' +
+                 'condición de asintomático.',
+    eaoEjMotivoSintomas: 'síntomas hasta entonces no referidos ({{sintomas}})',
+    eaoEjMotivoTension:  'una respuesta tensional anormal ({{detalle}})',
+    // Cuando la conclusión ya abrió con la caída tensional (rama hipotensiva), se la
+    // referencia en vez de repetirla en el mismo párrafo.
+    eaoEjNoAsintomaticoTaYaDicha: ' La respuesta tensional descrita hace además que el paciente deje de ' +
+                 'considerarse asintomático: el hallazgo modifica la indicación quirúrgica y amerita ' +
+                 'evaluación por el equipo de válvulas.',
+
     // Coletilla de presiones de llenado. Antes era una afirmación fija dentro de la
     // plantilla ("sin datos de aumento") y contradecía al grado diastólico cuando el
     // algoritmo detectaba presiones elevadas. Ahora la elige el grado.

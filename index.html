@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=1.7">
+    <link rel="stylesheet" href="styles.css?v=1.8">
 </head>
 <body>
 <div class="container">
@@ -17,7 +17,7 @@
     <header class="app-header">
         <div>
             <h1>Eco Estrés Cardíaco</h1>
-            <p class="version">v1.7 — Geometría del VI y función diastólica deducidas</p>
+            <p class="version">v1.8 — EAo severa asintomática con ejercicio</p>
         </div>
         <div class="header-controls">
             <button id="btn-theme-toggle" class="btn btn-icon" title="Cambiar Tema">
@@ -103,6 +103,7 @@
                     <option value="viabilidad">Evaluación de Viabilidad Miocárdica</option>
                     <option value="post_iam">Control Post-IAM</option>
                     <option value="estenosis_ao">Estenosis Aórtica (Bajo Flujo/Gradiente)</option>
+                    <option value="eao_asintomatica">Estenosis Aórtica severa asintomática (evaluación con ejercicio)</option>
                     <option value="mch">Miocardiopatía Hipertrófica (obstrucción latente)</option>
                     <option value="dolor_toracico">Unidad de Dolor Torácico</option>
                     <option value="diastolico">Función Diastólica con Estrés</option>
@@ -989,7 +990,8 @@
 
             <div class="special-tabs" style="margin-top:1rem">
                 <button class="special-tab active" onclick="setSpecialTab('viabilidad')">Viabilidad</button>
-                <button class="special-tab" onclick="setSpecialTab('estenosis_ao')">Est. Aórtica</button>
+                <button class="special-tab" onclick="setSpecialTab('estenosis_ao')">EAo bajo flujo</button>
+                <button class="special-tab" onclick="setSpecialTab('eao_ejercicio')">EAo asintomática</button>
                 <button class="special-tab" onclick="setSpecialTab('cfr')">Reserva Coronaria</button>
                 <button class="special-tab" onclick="setSpecialTab('strain')">Strain / GLS</button>
                 <button class="special-tab" onclick="setSpecialTab('mch')">MCH / Chagas</button>
@@ -1064,6 +1066,83 @@
                     <div class="calc-row"><span>ΔGradiente:</span><span id="eao_delta_grad" class="calc-value">—</span></div>
                     <div class="calc-row"><span>ΔAVA:</span><span id="eao_delta_ava" class="calc-value">—</span></div>
                     <div class="calc-row"><span>Interpretación:</span><span id="eao_interp" class="calc-value">—</span></div>
+                </div>
+            </div>
+
+            <!-- EAo SEVERA ASINTOMÁTICA CON EJERCICIO -->
+            <div id="panel-eao_ejercicio" class="special-panel" style="display:none; padding-top:0.5rem">
+                <h3 class="subsection-title">Estenosis Aórtica severa asintomática — evaluación con ejercicio</h3>
+                <p class="module-description">
+                    Indicación distinta de la de bajo flujo/bajo gradiente: acá el paciente ya tiene EAo severa
+                    y la pregunta es si <strong>de verdad está asintomático</strong>. Si aparecen síntomas o la
+                    respuesta tensional es anormal, deja de considerarse asintomático y cambia la indicación quirúrgica.
+                </p>
+                <div class="info-banner" style="margin-bottom:0.75rem">
+                    En cicloergómetro reclinable el paciente pedalea medio sentado y recién después se acuesta y gira:
+                    el gradiente y la PSAP se miden <strong>post-esfuerzo inmediato</strong>, no en el pico, y caen
+                    rápido. Por eso se consigna a cuántos segundos se tomaron.
+                </div>
+
+                <h4 class="subsection-title" style="margin-top:1rem">Severidad de base y hemodinamia valvular</h4>
+                <div class="grid">
+                    <div class="form-group">
+                        <label for="eaoej_ava">AVA en reposo (cm²)</label>
+                        <input autocomplete="off" type="number" id="eaoej_ava" placeholder="cm²" step="0.01" min="0.1" max="4" oninput="calcEAoEjercicio()">
+                    </div>
+                    <div class="form-group">
+                        <label for="eaoej_grad_reposo">Gradiente medio en reposo (mmHg)</label>
+                        <input autocomplete="off" type="number" id="eaoej_grad_reposo" placeholder="mmHg" min="0" max="150" oninput="calcEAoEjercicio()">
+                    </div>
+                    <div class="form-group">
+                        <label for="eaoej_grad_post">Gradiente medio post-esfuerzo inmediato (mmHg)</label>
+                        <input autocomplete="off" type="number" id="eaoej_grad_post" placeholder="mmHg" min="0" max="150" oninput="calcEAoEjercicio()">
+                    </div>
+                    <div class="form-group">
+                        <label for="eaoej_seg_doppler">Segundos hasta el Doppler post-esfuerzo</label>
+                        <input autocomplete="off" type="number" id="eaoej_seg_doppler" placeholder="seg" min="0" max="600" oninput="calcEAoEjercicio()">
+                        <span class="firma-nota">Desde que dejó de pedalear hasta la toma del gradiente y la VRT.</span>
+                    </div>
+                    <div class="form-group">
+                        <label>Δ Gradiente medio</label>
+                        <input autocomplete="off" type="text" id="eaoej_delta_grad" class="calculated-value" disabled>
+                    </div>
+                    <div class="form-group">
+                        <label>PSAP post-esfuerzo (mmHg)</label>
+                        <input autocomplete="off" type="text" id="eaoej_psap_post" class="calculated-value" disabled>
+                        <span class="firma-nota">Se deduce de la VRT post-esfuerzo que ya cargás en el estrés diastólico.</span>
+                    </div>
+                </div>
+
+                <h4 class="subsection-title" style="margin-top:1.25rem">Síntomas durante el esfuerzo</h4>
+                <div class="grid grid-3col">
+                    <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="eaoej_sint_angina" onchange="calcEAoEjercicio()"><label for="eaoej_sint_angina">Angina</label></div>
+                    <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="eaoej_sint_disnea" onchange="calcEAoEjercicio()"><label for="eaoej_sint_disnea">Disnea desproporcionada</label></div>
+                    <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="eaoej_sint_mareo" onchange="calcEAoEjercicio()"><label for="eaoej_sint_mareo">Mareo</label></div>
+                    <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="eaoej_sint_presincope" onchange="calcEAoEjercicio()"><label for="eaoej_sint_presincope">Presíncope o síncope</label></div>
+                </div>
+                <div class="grid" style="margin-top:0.75rem">
+                    <div class="form-group">
+                        <label for="eaoej_sint_momento">Momento de aparición</label>
+                        <input autocomplete="off" type="text" id="eaoej_sint_momento" placeholder="Ej: etapa 2 — 300 Kgm/min">
+                    </div>
+                </div>
+
+                <div class="calc-box" style="margin-top:1rem">
+                    <div class="calc-row"><span>Respuesta tensional:</span><span id="eaoej_ta" class="calc-value">—</span></div>
+                    <div class="calc-row"><span>Capacidad funcional:</span><span id="eaoej_cf" class="calc-value">—</span></div>
+                </div>
+
+                <div class="grid" style="margin-top:1rem">
+                    <div class="form-group" style="grid-column: 1 / -1">
+                        <label for="eaoej_veredicto">¿Sigue siendo asintomático?</label>
+                        <select autocomplete="off" id="eaoej_veredicto">
+                            <option value="">No evaluado</option>
+                            <option value="asintomatico">Se mantiene asintomático</option>
+                            <option value="no_asintomatico">Deja de considerarse asintomático</option>
+                        </select>
+                        <span class="firma-nota" id="eaoej_veredicto_origen"></span>
+                        <div id="eaoej_criterios" class="criterios-ase" style="display:none"></div>
+                    </div>
                 </div>
             </div>
 
@@ -1407,15 +1486,15 @@
 
 
 </div>
-<script src="pearls.js?v=1.7"></script>
-<script src="report-templates.js?v=1.7"></script>
-<script src="sheets-storage.js?v=1.7"></script>
-<script src="app.js?v=1.7"></script>
+<script src="pearls.js?v=1.8"></script>
+<script src="report-templates.js?v=1.8"></script>
+<script src="sheets-storage.js?v=1.8"></script>
+<script src="app.js?v=1.8"></script>
 <script>
 // Control de versión: si el navegador sirvió una mezcla de archivos viejos y nuevos,
 // los botones fallan en silencio. Esto lo convierte en un aviso visible.
 (function () {
-    var APP_VERSION = '1.7';
+    var APP_VERSION = '1.8';
     var faltan = ['generarInforme', 'recolectarHallazgos', 'calcEjercicio'].filter(function (f) {
         return typeof window[f] !== 'function';
     });
