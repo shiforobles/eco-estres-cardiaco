@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=1.8">
+    <link rel="stylesheet" href="styles.css?v=1.9">
 </head>
 <body>
 <div class="container">
@@ -1292,6 +1292,7 @@
                     <option value="da_cx">DA + Cx</option>
                     <option value="cd_cx">CD + Cx</option>
                     <option value="trivascular">Trivascular</option>
+                    <option value="apical">Apical (sin distribución por vaso)</option>
                 </select>
                 <span class="firma-nota" id="territorio_afectado_origen"></span>
             </div>
@@ -1486,15 +1487,15 @@
 
 
 </div>
-<script src="pearls.js?v=1.8"></script>
-<script src="report-templates.js?v=1.8"></script>
-<script src="sheets-storage.js?v=1.8"></script>
-<script src="app.js?v=1.8"></script>
+<script src="pearls.js?v=1.9"></script>
+<script src="report-templates.js?v=1.9"></script>
+<script src="sheets-storage.js?v=1.9"></script>
+<script src="app.js?v=1.9"></script>
 <script>
 // Control de versión: si el navegador sirvió una mezcla de archivos viejos y nuevos,
 // los botones fallan en silencio. Esto lo convierte en un aviso visible.
 (function () {
-    var APP_VERSION = '1.8';
+    var APP_VERSION = '1.9';
     var faltan = ['generarInforme', 'recolectarHallazgos', 'calcEjercicio'].filter(function (f) {
         return typeof window[f] !== 'function';
     });

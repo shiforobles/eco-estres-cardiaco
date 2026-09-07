@@ -80,6 +80,9 @@ const EstresSheets = {
         if (rama === 'secuela')       return 'secuela';
         if (rama === 'positivaMulti') return 'multiterritorial';
         if (rama === 'positivaUnico' || rama === 'hipotensiva') {
+            // Un ápex comprometido en bloque toca tres territorios por anatomía: no es
+            // multiterritorial y no debe contarse como tal en la casuística.
+            if (H.patronApical) return 'positivo apical';
             if (H.territoriosIsquemia.length > 1) return 'multiterritorial';
             const t = H.territoriosIsquemia[0];
             return t ? 'positivo ' + t : 'positivo apical';

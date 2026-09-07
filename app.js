@@ -491,6 +491,7 @@ const TERRITORIOS_A_VALOR = {
 };
 
 function territorioSugerido(H) {
+    if (H.patronApical) return 'apical';   // no se reparte entre vasos
     const t = [...H.territoriosIsquemia].sort();
     if (!t.length) return 'ninguno';
     if (t.length >= 3) return 'trivascular';
@@ -1018,7 +1019,24 @@ function evaluarAvisosClinicos() {
             'La discordancia obliga a reconsiderar: puede tratarse de enfermedad microvascular, de dolor no cardíaco, ' +
             'o de isquemia perdida por una adquisición post-esfuerzo tardía. Conviene revisar los tiempos de adquisición.');
 
-    // 8 · Extensión de la isquemia. Cuenta segmentos NUEVOS, no anormales totales.
+    // 8 · El paciente que justificaba el estudio diastólico y quedó sin hacer.
+    //     Va en pantalla y no en el informe: es una oportunidad perdida del operador,
+    //     no información para el clínico que lo lee.
+    if (H.diastResultado === 'no_evaluado' || !H.diastResultado) {
+        const motivos = [];
+        if (['remodelado', 'hvi_concentrica', 'hvi_excentrica'].includes(H.geometriaVI))
+            motivos.push(GEOMETRIA_PROSA[H.geometriaVI]);
+        const eeRep = H.eeReposoNum;
+        if (eeRep !== null && eeRep >= 10) motivos.push(`E/e' en reposo de ${nProsa(eeRep, 1)}`);
+        if (['g1', 'g2', 'g3'].includes(H.diastGrado))
+            motivos.push(DIAST_GRADO_PROSA[H.diastGrado]);
+        if (motivos.length)
+            atencion(`Estudio diastólico de esfuerzo sin evaluar, con ${listarEnProsa(motivos)}`,
+                'Es el perfil en el que el estudio diastólico rinde: presiones de llenado limítrofes en ' +
+                'reposo que se desenmascaran con el ejercicio. Alcanza con E, e\' y VRT post-esfuerzo.');
+    }
+
+    // 9 · Extensión de la isquemia. Cuenta segmentos NUEVOS, no anormales totales.
     if (H.isquemicos.length >= 5)
         alto(`Isquemia inducible en ${H.isquemicos.length} segmentos nuevos`,
              'Cinco o más segmentos definen isquemia extensa, con indicación de evaluación invasiva. ' +
@@ -1061,7 +1079,7 @@ function evaluarCategorizacion() {
         alto.push(`FEy en reposo ${H.feyReposo} % (≤45 %): marcador independiente de riesgo`);
     if (H.caidaFey)
         alto.push(`la FEy cae de ${H.feyReposo} % a ${H.feyEstres} % con el esfuerzo: sugiere isquemia extensa`);
-    if (H.territoriosIsquemia.length > 1)
+    if (H.territoriosIsquemia.length > 1 && !H.patronApical)
         alto.push(`isquemia en ${H.territoriosIsquemia.length} territorios coronarios`);
     if (H.hipotension)
         alto.push('respuesta hipotensiva al esfuerzo');
@@ -1084,7 +1102,10 @@ function evaluarCategorizacion() {
     // ── Riesgo intermedio ──
     if (wmsiPico !== null && wmsiPico > 1.0 && wmsiPico <= 1.7)
         intermedio.push(`WMSI pico ${H.wmsiEstres} (1,1-1,7): ~3 % de eventos por año`);
-    if (H.isquemicos.length && H.territoriosIsquemia.length <= 1)
+    if (H.patronApical)
+        intermedio.push(`compromiso apical extenso (${H.isquemicos.length} segmentos), ` +
+            `sin distribución por territorio coronario`);
+    else if (H.isquemicos.length && H.territoriosIsquemia.length <= 1)
         intermedio.push(`isquemia inducible en ${H.isquemicos.length} ` +
             `${H.isquemicos.length === 1 ? 'segmento' : 'segmentos'} de un solo territorio`);
     if (H.secuelas.length)
@@ -1901,7 +1922,29 @@ function datosEAoEjercicio() {
     };
 }
 
+// El módulo está en uso si hay evidencia REAL: la indicación, un dato valvular
+// cargado, un síntoma tildado, o un veredicto puesto a mano. NO alcanza con que el
+// campo de veredicto tenga valor, porque lo rellena la propia app apenas hay TA basal
+// y pico — o sea, en todos los estudios. Leerlo como evidencia era circular, y por eso
+// la conclusión de EAo se coló en informes sin un solo dato valvular.
+function moduloEAoEnUso() {
+    if (document.getElementById('indicacion').value === 'eao_asintomatica') return true;
+    if (num('eaoej_ava') > 0 || num('eaoej_grad_reposo') > 0 || num('eaoej_grad_post') > 0) return true;
+    if (EAOEJ_SINTOMAS.some(x => { const el = document.getElementById(x.id); return el && el.checked; })) return true;
+    return fueCorregido('eaoej_veredicto');
+}
+
 function calcEAoEjercicio() {
+    const box0 = document.getElementById('eaoej_criterios');
+    if (!moduloEAoEnUso()) {
+        // Sin el módulo en uso el campo se limpia: si queda un veredicto viejo, vuelve
+        // a hacer verdadero el "en uso" y el bloque se cuela de nuevo.
+        const sel = document.getElementById('eaoej_veredicto');
+        if (sel && !fueCorregido('eaoej_veredicto')) sel.value = '';
+        if (box0) { box0.style.display = 'none'; box0.innerHTML = ''; }
+        notaOrigen('eaoej_veredicto', '');
+        return;
+    }
     const E = datosEAoEjercicio();
     const setVal2 = (id, txt) => { const el = document.getElementById(id); if (el) el.value = txt; };
     const set = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };
@@ -2373,8 +2416,7 @@ function recolectarHallazgos() {
     // EAo severa asintomática: sólo se arma el bloque si el módulo está en uso
     H.eaoEj = datosEAoEjercicio();
     H.eaoEjVeredicto = document.getElementById('eaoej_veredicto').value;
-    H.eaoEjEnUso = document.getElementById('indicacion').value === 'eao_asintomatica' ||
-                   !!(H.eaoEjVeredicto || H.eaoEj.gradRep || H.eaoEj.gradPost || H.eaoEj.ava);
+    H.eaoEjEnUso = moduloEAoEnUso();
     const G = medidasVI();
     H.imvi = G.imvi;
     H.rwt = G.rwt;
@@ -2489,6 +2531,8 @@ function recolectarHallazgos() {
     H.secuelas = secuelas;
     H.territoriosIsquemia = territoriosDe(isquemicos);
     H.territoriosSecuela = territoriosDe(secuelas);
+    H.patronApical = esPatronApical(isquemicos);
+    H.patronApicalSecuela = esPatronApical(secuelas);
 
     const cnt = contarMotilidad();
     H.segEvaluados = Math.min(cnt.evalRep, cnt.evalEst);
@@ -2517,6 +2561,16 @@ function gradoFeyEnProsa(fey) {
 
 // El ápex (17) tiene irrigación variable: sólo se le asigna vaso si viene
 // acompañado de otros segmentos del mismo territorio.
+// Los cuatro segmentos apicales pertenecen a tres territorios distintos (13 y 14 a la
+// DA, 15 a la CD, 16 a la Cx). Repartir por vaso un ápex comprometido en bloque lo hace
+// leer como enfermedad de tres vasos, que es justo lo que NO es: es un patrón apical
+// —aneurisma, Takotsubo, MCH apical, DA envolvente— y así hay que decirlo.
+const SEGMENTOS_APICALES = [13, 14, 15, 16, 17];
+
+function esPatronApical(segs) {
+    return segs.length >= 3 && segs.every(s => SEGMENTOS_APICALES.includes(s.id));
+}
+
 function territoriosDe(segs) {
     const t = new Set();
     segs.forEach(s => { if (s.id !== 17) t.add(s.territory); });
@@ -2531,7 +2585,10 @@ function elegirRama(H) {
     // No aplica si el estudio YA dio resultado, por imagen o por ECG.
     if (H.estimuloInsuficiente && !H.isquemicos.length && !H.stIsquemico) return 'noConcluyente';
     if (H.isquemicos.length && H.hipotension) return 'hipotensiva';
-    if (H.isquemicos.length) return H.territoriosIsquemia.length > 1 ? 'positivaMulti' : 'positivaUnico';
+    // Un patrón apical toca tres territorios por anatomía, no por enfermedad de tres
+    // vasos: no puede salir por la rama multiterritorial.
+    if (H.isquemicos.length)
+        return (H.territoriosIsquemia.length > 1 && !H.patronApical) ? 'positivaMulti' : 'positivaUnico';
     // Hipoquinesia global: no es secuela segmentaria y no tiene territorio coronario
     if (H.patronGlobal) return 'dilatada';
     if (H.secuelas.length) return 'secuela';
@@ -2588,6 +2645,14 @@ function deSegmentos(segs) {
 // "el territorio de la arteria X" cuando hay vaso; "la región apical" cuando no
 function territorioFrase(terrs) {
     return terrs.length ? 'territorio de ' + territoriosEnProsa(terrs) : 'la región apical';
+}
+
+// Con patrón apical no se nombra ningún vaso: se describe el patrón.
+function fraseTerritorioIsquemia(H) {
+    return H.patronApical ? 'la región apical en su totalidad' : territorioFrase(H.territoriosIsquemia);
+}
+function fraseTerritorioSecuela(H) {
+    return H.patronApicalSecuela ? 'la región apical en su totalidad' : territorioFrase(H.territoriosSecuela);
 }
 
 // Grado predominante (el peor) de un conjunto de segmentos
@@ -2879,7 +2944,7 @@ function construirNarrativa(H) {
         deSegmentosSecuela: deSegmentos(H.secuelas),
         segmentosSecuelaArt: H.secuelas.length === 1 ? 'El segmento' : 'Los segmentos',
         territorioSecuela: territoriosEnProsa(H.territoriosSecuela),
-        territorioSecuelaFrase: territorioFrase(H.territoriosSecuela),
+        territorioSecuelaFrase: fraseTerritorioSecuela(H),
         gradoFey: gradoFeyEnProsa(H.feyReposo),
         presionesLlenado: presionesLlenadoEnProsa(H.diastGrado),
         vd: H.vdProsa ? ', ' + H.vdProsa : ''
@@ -2940,7 +3005,7 @@ function construirNarrativa(H) {
         segmentos: segmentosEnProsa(H.isquemicos),
         deSegmentos: deSegmentos(H.isquemicos),
         territorio: territoriosEnProsa(H.territoriosIsquemia),
-        territorioFrase: territorioFrase(H.territoriosIsquemia),
+        territorioFrase: fraseTerritorioIsquemia(H),
         territorios: territoriosEnProsa(H.territoriosIsquemia),
         wmsiReposo: nProsa(H.wmsiReposo, 2) || nada,
         wmsiEstres: nProsa(H.wmsiEstres, 2) || nada,
@@ -3030,8 +3095,8 @@ function construirNarrativa(H) {
         vdConcl: H.vdProsa ? ', ' + H.vdProsa : '',
         descripcionST: descripcionSTEnProsa(H),
         capacidadDilatada: H.mets ? ` La capacidad funcional fue ${adjetivoMETs(H.mets)}.` : '',
-        territorioFrase: territorioFrase(H.territoriosIsquemia),
-        territorioSecuelaFrase: territorioFrase(H.territoriosSecuela),
+        territorioFrase: fraseTerritorioIsquemia(H),
+        territorioSecuelaFrase: fraseTerritorioSecuela(H),
         motivoNoConcluyente: motivoNoConcluyente(H),
         sugerenciaNoConcluyente: 'repetir el estudio con contraste o un método alternativo de perfusión'
     });
