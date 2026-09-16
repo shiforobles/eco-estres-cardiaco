@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=1.9">
+    <link rel="stylesheet" href="styles.css?v=2.0">
 </head>
 <body>
 <div class="container">
@@ -17,7 +17,7 @@
     <header class="app-header">
         <div>
             <h1>Eco Estrés Cardíaco</h1>
-            <p class="version">v1.8 — EAo severa asintomática con ejercicio</p>
+            <p class="version">v2.0 — El informe orienta, no sólo describe</p>
         </div>
         <div class="header-controls">
             <button id="btn-theme-toggle" class="btn btn-icon" title="Cambiar Tema">
@@ -408,6 +408,7 @@
                 <div class="form-group">
                     <label for="ej_causa_detencion">Causa de detención</label>
                     <select autocomplete="off" id="ej_causa_detencion">
+                        <option value="">Seleccionar…</option>
                         <option value="fc_objetivo">FC objetivo alcanzada</option>
                         <option value="fatiga">Fatiga</option>
                         <option value="angina">Angina</option>
@@ -1005,28 +1006,27 @@
                 <div class="grid">
                     <div class="form-group">
                         <label for="viab_seg_disfunc">Segmentos con Disfunción en Reposo</label>
-                        <input autocomplete="off" type="number" id="viab_seg_disfunc" placeholder="nº" min="0" max="17">
+                        <input autocomplete="off" type="number" id="viab_seg_disfunc" placeholder="nº" min="0" max="17" oninput="calcViabilidad()">
                     </div>
                     <div class="form-group">
                         <label for="viab_seg_mejora">Segmentos con Mejora (baja dosis)</label>
-                        <input autocomplete="off" type="number" id="viab_seg_mejora" placeholder="nº" min="0" max="17">
+                        <input autocomplete="off" type="number" id="viab_seg_mejora" placeholder="nº" min="0" max="17" oninput="calcViabilidad()">
                     </div>
                     <div class="form-group">
-                        <label for="viab_respuesta">Tipo de Respuesta Observada</label>
+                        <label for="viab_grosor_mm">Grosor parietal telediastólico (mm)</label>
+                        <input autocomplete="off" type="number" id="viab_grosor_mm" placeholder="mm" min="1" max="25" step="0.5" oninput="calcViabilidad()">
+                        <span class="firma-nota" id="viab_grosor_mm_origen"></span>
+                    </div>
+                    <div class="form-group" style="grid-column: 1 / -1">
+                        <label for="viab_respuesta">Tipo de respuesta</label>
                         <select autocomplete="off" id="viab_respuesta">
-                            <option value="">No aplica</option>
-                            <option value="bifasica">Bifásica (viable + isquemia)</option>
+                            <option value="">No evaluada</option>
+                            <option value="bifasica">Bifásica (viable con isquemia superpuesta)</option>
                             <option value="sostenida">Mejora sostenida (hibernación sin isquemia superpuesta)</option>
-                            <option value="sin_cambio">Sin cambio / empeoramiento (cicatriz)</option>
+                            <option value="sin_cambio">Sin mejora (cicatriz)</option>
                         </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="viab_grosor_pared">Grosor Parietal Telediastólico</label>
-                        <select autocomplete="off" id="viab_grosor_pared">
-                            <option value="">No evaluado</option>
-                            <option value="mayor6">≥6 mm (grosor preservado — sugiere viabilidad)</option>
-                            <option value="menor6">&lt;6 mm (afinamiento — sugiere cicatriz transmural)</option>
-                        </select>
+                        <span class="firma-nota" id="viab_respuesta_origen"></span>
+                        <div id="viab_criterios" class="criterios-ase" style="display:none"></div>
                     </div>
                 </div>
             </div>
@@ -1487,15 +1487,15 @@
 
 
 </div>
-<script src="pearls.js?v=1.9"></script>
-<script src="report-templates.js?v=1.9"></script>
-<script src="sheets-storage.js?v=1.9"></script>
-<script src="app.js?v=1.9"></script>
+<script src="pearls.js?v=2.0"></script>
+<script src="report-templates.js?v=2.0"></script>
+<script src="sheets-storage.js?v=2.0"></script>
+<script src="app.js?v=2.0"></script>
 <script>
 // Control de versión: si el navegador sirvió una mezcla de archivos viejos y nuevos,
 // los botones fallan en silencio. Esto lo convierte en un aviso visible.
 (function () {
-    var APP_VERSION = '1.9';
+    var APP_VERSION = '2.0';
     var faltan = ['generarInforme', 'recolectarHallazgos', 'calcEjercicio'].filter(function (f) {
         return typeof window[f] !== 'function';
     });

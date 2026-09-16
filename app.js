@@ -560,11 +560,12 @@ function autocompletarInterpretacion() {
     // Depende de la TA basal y de esfuerzo, de los METs y de la VRT post-esfuerzo:
     // campos que viven fuera de su propio panel.
     calcEAoEjercicio();
+    calcViabilidad();
 }
 
 // Campos que la app deduce: al tocarlos, el operador toma el control del campo.
 const CAMPOS_DEDUCIDOS = [
-    'patron_motilidad', 'diast_resultado', 'diast_grado', 'geometria_vi', 'eaoej_veredicto',
+    'patron_motilidad', 'diast_resultado', 'diast_grado', 'geometria_vi', 'eaoej_veredicto', 'viab_respuesta',
     'resultado_estudio', 'territorio_afectado',
     'extension_isquemia', 'categorizacion', 'pp_reposo', 'hal_st_dep', 'hal_st_ele',
     'hal_hipotension', 'hal_hipertensiva', 'hal_arritmia', 'hal_extrasistoles'
@@ -1922,6 +1923,91 @@ function datosEAoEjercicio() {
     };
 }
 
+// ══════════════════════════════════════════════
+//  VIABILIDAD MIOCÁRDICA — DOBUTAMINA BAJA DOSIS
+//  El tipo de respuesta se deduce: el módulo ya registra cuántos segmentos mejoran a
+//  baja dosis, y el bull's eye dice qué pasa en el pico. Mejora a baja dosis que se
+//  deteriora en el pico es la respuesta bifásica; mejora que se sostiene es
+//  hibernación; sin mejora es cicatriz.
+//
+//  El grosor dejó de ser un select de dos opciones y es una medida en milímetros: el
+//  corte de 6 mm lo aplica la app. Antes había que hacer esa cuenta afuera, que es
+//  justo lo que esta app existe para evitar.
+// ══════════════════════════════════════════════
+const GROSOR_VIABLE_MM = 6;
+
+function moduloViabilidadEnUso() {
+    return document.getElementById('indicacion').value === 'viabilidad' ||
+           num('viab_seg_disfunc') > 0 || num('viab_seg_mejora') > 0 || num('viab_grosor_mm') > 0 ||
+           fueCorregido('viab_respuesta');
+}
+
+function calcViabilidad() {
+    const box = document.getElementById('viab_criterios');
+    if (!moduloViabilidadEnUso()) {
+        const sel = document.getElementById('viab_respuesta');
+        if (sel && !fueCorregido('viab_respuesta')) sel.value = '';
+        if (box) { box.style.display = 'none'; box.innerHTML = ''; }
+        notaOrigen('viab_respuesta', ''); notaOrigen('viab_grosor_mm', '');
+        return;
+    }
+
+    // Grosor: dato crudo, corte aplicado por la app
+    const grosor = num('viab_grosor_mm');
+    notaOrigen('viab_grosor_mm', grosor > 0
+        ? (grosor >= GROSOR_VIABLE_MM
+            ? `${nProsa(grosor)} mm: grosor preservado (≥${GROSOR_VIABLE_MM} mm), compatible con miocardio viable.`
+            : `${nProsa(grosor)} mm: adelgazamiento (<${GROSOR_VIABLE_MM} mm), sugiere cicatriz transmural.`)
+        : '');
+
+    const disfunc = num('viab_seg_disfunc');
+    const mejora  = num('viab_seg_mejora');
+    const cnt = contarMotilidad();
+    const criterios = [];
+
+    if (disfunc > 0) criterios.push({ alto: true,
+        txt: `${disfunc} ${disfunc === 1 ? 'segmento' : 'segmentos'} con disfunción en reposo` });
+    if (mejora > 0) criterios.push({ alto: false,
+        txt: `${mejora} ${mejora === 1 ? 'segmento mejora' : 'segmentos mejoran'} a baja dosis (reserva contráctil)` });
+    else if (disfunc > 0) criterios.push({ alto: true, txt: 'Ningún segmento mejora a baja dosis' });
+    if (cnt.isquemicos > 0) criterios.push({ alto: true,
+        txt: `${cnt.isquemicos} ${cnt.isquemicos === 1 ? 'segmento se deteriora' : 'segmentos se deterioran'} en el pico` });
+    if (grosor > 0) criterios.push({ alto: grosor < GROSOR_VIABLE_MM,
+        txt: `Grosor parietal ${nProsa(grosor)} mm (corte ${GROSOR_VIABLE_MM} mm)` });
+
+    let respuesta = null, nota = '';
+    if (!(disfunc > 0)) {
+        nota = 'Cargá los segmentos con disfunción en reposo para clasificar la respuesta.';
+    } else if (mejora > 0 && cnt.isquemicos > 0) {
+        respuesta = 'bifasica';
+        nota = `Bifásica: ${mejora} mejoran a baja dosis y ${cnt.isquemicos} se deterioran en el pico. Podés corregirlo.`;
+    } else if (mejora > 0) {
+        respuesta = 'sostenida';
+        nota = `Mejora sostenida: ${mejora} mejoran a baja dosis y ninguno se deteriora en el pico. Podés corregirlo.`;
+    } else {
+        respuesta = 'sin_cambio';
+        nota = 'Sin mejora a baja dosis: patrón de cicatriz. Podés corregirlo.';
+    }
+    sugerir('viab_respuesta', respuesta === null ? undefined : respuesta, nota);
+
+    if (box) {
+        if (!criterios.length) { box.style.display = 'none'; box.innerHTML = ''; }
+        else {
+            box.style.display = 'block';
+            box.innerHTML = criterios.map(c =>
+                `<div class="criterio-ase ${c.alto ? 'criterio-alto' : 'criterio-normal'}">` +
+                `${c.alto ? '▲' : '✓'} ${c.txt}</div>`).join('');
+        }
+    }
+}
+
+// Cada uno trae su artículo: "fue una ausencia de reserva contráctil" no se dice.
+const VIAB_PROSA = {
+    bifasica:   'una respuesta bifásica, con mejoría de la contractilidad a baja dosis y deterioro en el pico',
+    sostenida:  'una mejoría sostenida de la contractilidad, sin deterioro en el pico',
+    sin_cambio: 'ausencia de reserva contráctil, sin mejoría a baja dosis'
+};
+
 // El módulo está en uso si hay evidencia REAL: la indicación, un dato valvular
 // cargado, un síntoma tildado, o un veredicto puesto a mano. NO alcanza con que el
 // campo de veredicto tenga valor, porque lo rellena la propia app apenas hay TA basal
@@ -2362,7 +2448,7 @@ function recolectarHallazgos() {
     H.carga = v('ej_carga');
     H.duracion = v('ej_duracion');
     H.causaDetencion = document.getElementById('ej_causa_detencion').value;
-    H.causaDetencionTxt = CAUSA_PROSA[H.causaDetencion] || textoSelect('ej_causa_detencion').toLowerCase();
+    H.causaDetencionTxt = CAUSA_PROSA[H.causaDetencion] || 'criterio médico';
     H.ventana = document.getElementById('ventana').value;
     H.ventanaTxt = textoSelect('ventana').toLowerCase();
     H.betabloqueante = document.getElementById('ant_betabloq').checked;
@@ -2417,6 +2503,12 @@ function recolectarHallazgos() {
     H.eaoEj = datosEAoEjercicio();
     H.eaoEjVeredicto = document.getElementById('eaoej_veredicto').value;
     H.eaoEjEnUso = moduloEAoEnUso();
+    // Viabilidad
+    H.viabEnUso = moduloViabilidadEnUso();
+    H.viabRespuesta = document.getElementById('viab_respuesta').value;
+    H.viabSegDisfunc = num('viab_seg_disfunc') || null;
+    H.viabSegMejora = num('viab_seg_mejora') || null;
+    H.viabGrosor = num('viab_grosor_mm') || null;
     const G = medidasVI();
     H.imvi = G.imvi;
     H.rwt = G.rwt;
@@ -2747,20 +2839,29 @@ function oracionPronostica(H, rama) {
     const items = [];
 
     // En un estudio de EAo asintomática la oración de cierre ya informa la respuesta
-    // tensional, y con más peso: es lo que mueve la indicación quirúrgica. Repetirla
-    // acá la pondría dos veces en oraciones consecutivas de la misma conclusión.
+    // tensional, y con más peso: es lo que mueve la indicación quirúrgica.
     const taLaDiceEAo = H.eaoEjEnUso && H.eaoEjVeredicto === 'no_asintomatico' &&
                         H.eaoEj && H.eaoEj.ta && H.eaoEj.ta.anormal;
 
-    // 1 · Hipotensión: es criterio de suspensión, el de mayor peso.
-    //     En la rama hipotensiva ya es el núcleo de la conclusión.
+    // ── Ordenados por cuánto cambian la conducta ──
+
+    // 1 · Hipotensión: criterio de suspensión. En su rama ya es el núcleo.
     if (H.hipotension && rama !== 'hipotensiva' && !taLaDiceEAo) items.push(P.hipotension);
 
     // 2 · Caída de la FEy. En multivaso e hipotensiva la conclusión ya la explica.
     if (H.caidaFey && rama !== 'positivaMulti' && rama !== 'hipotensiva')
         items.push(rellenar(P.caidaFey, { feyReposo: H.feyReposo, feyEstres: H.feyEstres }));
 
-    // 3 · Arritmia ventricular compleja (o cualquiera que haya sido sintomática)
+    // 3 · Isquemia a bajo umbral
+    if (H.isquemicos.length && H.dobleProducto > 0 && H.dobleProducto < 20000)
+        items.push(rellenar(P.umbralBajo, { dp: H.dobleProducto.toLocaleString('es-AR') }));
+
+    // 4 · Ausencia de reserva contráctil global. Si ya se dijo la caída de la FEy no
+    //     se repite: son el mismo dato mirado con distinto corte.
+    if (H.deltaFey !== null && !H.reservaGlobal && !H.caidaFey && H.feyReposo > 0)
+        items.push(rellenar(P.sinReserva, { feyReposo: H.feyReposo, feyEstres: H.feyEstres }));
+
+    // 5 · Arritmia ventricular compleja (o cualquiera que haya sido sintomática)
     if (H.hayArritmiaRelevante) {
         const lista = H.arritmiasRelevantes.length
             ? listarEnProsa(H.arritmiasRelevantes.map(a => a.txt))
@@ -2768,32 +2869,73 @@ function oracionPronostica(H, rama) {
         items.push(rellenar(P.arritmia, {
             arritmias: lista,
             momento: (H.arrMomentoTxt && H.arrMomentoTxt !== '—') ? ' ' + H.arrMomentoTxt : '',
-            // Entre paréntesis y no con coma: ver la nota en NARRATIVA.pronostico
             sintomas: H.arrSintomatica ? ' (con síntomas asociados)' : ''
         }));
     }
 
-    // 4 · Capacidad funcional por debajo de 5 METs
+    // 6 · Capacidad funcional por debajo de 5 METs
     if (H.mets > 0 && H.mets < 5) {
-        const limiteNoCV = ['fatiga', 'otro'].includes(H.causaDetencion);
-        items.push(rellenar(limiteNoCV ? P.metsLimiteNoCV : P.mets,
-            { mets: nProsa(H.mets), causa: H.causaDetencionTxt }));
+        // Sólo "otro" queda como límite indefinido: la fatiga a menos de 5 METs es,
+        // en la mayoría de los casos, la manifestación del límite cardiovascular, y
+        // tratarla como no cardiovascular desactivaba la sugerencia de rehabilitación
+        // justo en el paciente que más la necesita.
+        const limiteNoCV = H.causaDetencion === 'otro';
+        items.push(rellenar(limiteNoCV ? P.metsLimiteNoCV : P.mets, {
+            grado: H.mets < 4 ? 'severamente reducida' : 'reducida',
+            mets: nProsa(H.mets),
+            pct: H.pctMets ? rellenar(P.metsPct, { pct: H.pctMets }) : '',
+            causa: H.causaDetencionTxt
+        }));
     }
 
-    // 5 · Recuperación de la FC al primer minuto.
-    //     Un HRR₁ negativo significa que la FC de recuperación cargada es MAYOR que la
-    //     del pico: es un error de carga, no un hallazgo. No puede irse en un informe
-    //     firmado como dato pronóstico; se avisa en pantalla, que es donde se corrige.
+    // 7 · Recuperación de la FC al primer minuto.
+    //     Un HRR₁ negativo es un error de carga, no un hallazgo: queda fuera.
     if (H.hrr1 !== null && H.hrr1 >= 0 && H.hrr1 <= 12)
-        items.push(rellenar(P.hrr1, { hrr1: H.hrr1 }));
+        items.push(rellenar(P.hrr1, {
+            hrr1: H.hrr1,
+            matiz: H.hrr1 === 12 ? P.hrr1Limite : P.hrr1Bajo
+        }));
 
-    // 6 · Respuesta hipertensiva: el de menor peso inmediato de los seis, pero cambia
-    //     el tratamiento. En un no concluyente no se afirma nada sobre el esfuerzo.
-    if (H.hipertension && rama !== 'noConcluyente' && !taLaDiceEAo) items.push(P.hipertension);
+    // 8 · Respuesta hipertensiva: la de menor peso inmediato, pero cambia el tratamiento
+    if (H.hipertension && rama !== 'noConcluyente' && !taLaDiceEAo)
+        items.push(rellenar(P.hipertension, {
+            taPico: H.taPico || nada,
+            basal: H.basalElevada ? rellenar(P.hipertensionBasal, { taBasal: H.taBasal || nada }) : ''
+        }));
 
     if (!items.length) return '';
-    return rellenar(items.length === 1 ? P.oracionUna : P.oracionVarias,
-        { hallazgos: listarEnProsa(items) });
+
+    // Un solo hallazgo va integrado; dos o más abren párrafo propio, porque tres
+    // proposiciones con su implicancia dentro de una sola oración son ilegibles.
+    if (items.length === 1) return rellenar(P.integrada, { hallazgo: items[0] });
+
+    const bisagra = rellenar(H.negativoBajoRiesgo ? P.bisagraNegativa : P.bisagraGeneral,
+        { n: enPalabras(items.length) });
+    const mayus = t => t.charAt(0).toUpperCase() + t.slice(1);
+    return '\n\n' + bisagra + ' ' + items.map(mayus).join('. ') + '.';
+}
+
+const NUMEROS_PROSA = { 2: 'dos', 3: 'tres', 4: 'cuatro', 5: 'cinco', 6: 'seis', 7: 'siete', 8: 'ocho' };
+function enPalabras(n) { return NUMEROS_PROSA[n] || String(n); }
+
+function bloqueViabilidad(H) {
+    const T = NARRATIVA;
+    if (!H.viabRespuesta && !H.viabGrosor) return '';
+
+    const partes = [];
+    if (H.viabSegDisfunc) partes.push(rellenar(T.viabDisfuncion, {
+        n: H.viabSegDisfunc, plural: H.viabSegDisfunc === 1 ? 'segmento' : 'segmentos' }));
+    if (H.viabRespuesta) partes.push(rellenar(T.viabRespuesta, {
+        respuesta: VIAB_PROSA[H.viabRespuesta] || '' }));
+    if (H.viabGrosor) partes.push(rellenar(
+        H.viabGrosor >= GROSOR_VIABLE_MM ? T.viabGrosorPreservado : T.viabGrosorFino,
+        { mm: nProsa(H.viabGrosor) }));
+    if (!partes.length) return '';
+
+    // La implicancia: es lo que decide si conviene revascularizar
+    const cierre = { bifasica: T.viabImplicaBifasica, sostenida: T.viabImplicaSostenida,
+                     sin_cambio: T.viabImplicaCicatriz }[H.viabRespuesta] || '';
+    return (T.viabEncabezado + ' ' + partes.join(' ') + cierre).replace(/\s{2,}/g, ' ').trim();
 }
 
 // Bloque descriptivo del módulo de EAo severa asintomática. Cada frase se omite
@@ -2992,6 +3134,12 @@ function construirNarrativa(H) {
     }
     parrafos.push(parrafoReposo);
 
+    // ── VIABILIDAD MIOCÁRDICA ──
+    if (H.viabEnUso) {
+        const bloque = bloqueViabilidad(H);
+        if (bloque) parrafos.push(bloque);
+    }
+
     // ── EAo SEVERA ASINTOMÁTICA CON EJERCICIO ──
     if (H.eaoEjEnUso) {
         const bloque = bloqueEAoEjercicio(H);
@@ -3086,11 +3234,23 @@ function construirNarrativa(H) {
     // ── CONCLUSIÓN ──
     // Con FC subóptima la conclusión negativa arranca corta: la limitación es el foco
     let claveConclusion = rama;
+    // Con METs bajos la capacidad funcional se informa en el párrafo pronóstico, con su
+    // implicancia y su sugerencia: nombrarla también en el veredicto la dice dos veces.
+    const cfVaAlParrafo = H.mets > 0 && H.mets < 5;
+    // Ídem la reserva contráctil: si no la hubo, el veredicto no puede afirmarla.
+    const reservaVaAlParrafo = H.deltaFey !== null && !H.reservaGlobal && !H.caidaFey && H.feyReposo > 0;
     if (rama === 'negativa' && H.hayConduccion) claveConclusion = 'negativaConduccion';
     else if (rama === 'negativa' && H.fcSuboptima) claveConclusion = 'negativaCorta';
+    const cf = H.capacidadFuncional || 'adecuada tolerancia al esfuerzo';
+    const colaNegativa = cfVaAlParrafo
+        ? (reservaVaAlParrafo ? '' : T.conclusiones.colaNegativaSoloRes)
+        : rellenar(reservaVaAlParrafo ? T.conclusiones.colaNegativaSoloCF
+                                      : T.conclusiones.colaNegativaAmbas, { capacidadFuncional: cf });
+
     let conclusion = rellenar(T.conclusiones[claveConclusion], {
         ...datosConduccion,
-        capacidadFuncional: H.capacidadFuncional || 'adecuada tolerancia al esfuerzo',
+        colaNegativa,
+        capacidadFuncional: cf,
         gradoFey: gradoFeyEnProsa(H.feyReposo),
         vdConcl: H.vdProsa ? ', ' + H.vdProsa : '',
         descripcionST: descripcionSTEnProsa(H),
@@ -3126,7 +3286,15 @@ function construirNarrativa(H) {
         extras.push(rellenar(T.modificadores[clave], datosConduccion));
     }
 
-    // Todo lo que le cambia la conducta al clínico, en una sola oración al cierre
+    // Un negativo con estímulo suficiente afirma algo, no sólo niega: el bajo riesgo
+    // de eventos es la información que el clínico se lleva. Se calcula ANTES del
+    // bloque pronóstico porque decide cómo se encabeza el párrafo que lo matiza.
+    H.negativoBajoRiesgo = rama === 'negativa' && !H.isquemicos.length &&
+                           !H.fcSuboptima && !H.estimuloInsuficiente;
+    if (H.negativoBajoRiesgo) oracionesFinales.push(T.pronostico.negativoBajoRiesgo);
+
+    // Todo lo que le cambia la conducta al clínico: integrado si es uno, en párrafo
+    // propio si son dos o más.
     const pronostico = oracionPronostica(H, rama);
     if (pronostico) oracionesFinales.push(pronostico);
 
@@ -3182,6 +3350,18 @@ function generarInforme() {
     }
     if (currentProtocol !== 'ejercicio') {
         alert('El informe narrativo está redactado para el protocolo de ejercicio. Para dobutamina o dipiridamol, usá "Planilla de datos".');
+        return;
+    }
+    // La causa de detención no se puede deducir: la sabe el operador y nadie más. Antes
+    // venía precargada en "FC objetivo alcanzada", y un estudio detenido al 70 % de la
+    // FCMT salía afirmando que se había alcanzado el objetivo en la misma oración que
+    // decía lo contrario. Ahora arranca vacía y sin ella no se genera el informe.
+    if (!v('ej_causa_detencion')) {
+        mostrarValidacion([{ nivel: 'error', txt:
+            'Falta la causa de detención de la prueba. Es un dato que sólo sabe quien hizo el estudio: ' +
+            'la app no puede deducirlo, y sin él el informe no puede describir cómo terminó el esfuerzo.' }]);
+        const campo = document.getElementById('ej_causa_detencion');
+        if (campo) { campo.scrollIntoView({ behavior: 'smooth', block: 'center' }); campo.focus(); }
         return;
     }
     const H = recolectarHallazgos();
@@ -3251,6 +3431,31 @@ function validarEstudio(rama) {
         if (!num('ej_etapa')) av.push({ nivel: 'info', txt: 'Sin etapa alcanzada: la conclusión no va a poder decir en qué etapa se detuvo.' });
     }
 
+    // ── La causa de detención no se deduce, pero SÍ se puede contrastar con los
+    //    números. Un motivo que los contradice es casi siempre el valor por defecto
+    //    que quedó sin tocar, y termina en el informe como afirmación falsa.
+    const causa = v('ej_causa_detencion');
+    if (causa && currentProtocol === 'ejercicio') {
+        const pct = (edad && fcPico) ? Math.round(fcPico / (220 - edad) * 100) : null;
+        const tasB = num('esf_basal_tas'), tasP = num('esf_max_tas');
+        const dTAS = (tasB > 0 && tasP > 0) ? tasP - tasB : null;
+        const hayArritmia = ARRITMIAS.some(a2 => { const el = document.getElementById(a2.id); return el && el.checked; });
+        const contra = {
+            fc_objetivo:  pct !== null && pct < 85 &&
+                `elegiste "FC objetivo alcanzada" pero se llegó al ${pct} % de la FC máxima predicha`,
+            hipotension:  dTAS !== null && dTAS > -10 &&
+                `elegiste "Hipotensión" pero la TA sistólica ${dTAS >= 0 ? 'subió ' + dTAS : 'bajó sólo ' + (-dTAS)} mmHg`,
+            hipertensiva: tasP > 0 && tasP < 210 &&
+                `elegiste "Respuesta hipertensiva" pero la TA sistólica pico fue de ${tasP} mmHg`,
+            st_t:         !document.getElementById('ecg_st_tipo').value &&
+                'elegiste "Cambios del ST-T" pero no cargaste ningún cambio del ST en el ECG post-esfuerzo',
+            arritmia:     !hayArritmia &&
+                'elegiste "Arritmia" pero no marcaste ninguna en el bloque de arritmias'
+        }[causa];
+        if (contra) av.push({ nivel: 'warn', txt:
+            `La causa de detención no coincide con los datos: ${contra}. El informe va a decir lo que elegiste.` });
+    }
+
     // El resultado ya no se elige a mano: lo deduce la app. Estas comprobaciones
     // sólo tienen sentido cuando el operador lo corrigió.
     if (fueCorregido('resultado_estudio')) {
@@ -3307,7 +3512,14 @@ function validarEstudio(rama) {
             av.push({ nivel: 'info', txt: `${septalesAlterados.length} segmento(s) septal(es) quedan fuera del análisis isquémico por el trastorno de conducción. El WMSI de la tabla los sigue incluyendo.` });
     }
 
+    return mostrarValidacion(av);
+}
+
+// Pinta el panel de validación. Extraído de validarEstudio() para que el bloqueo por
+// causa de detención pueda usar el mismo lugar y el mismo formato.
+function mostrarValidacion(av) {
     const panel = document.getElementById('validacion-panel');
+    if (!panel) return true;
     if (!av.length) {
         panel.style.display = 'block';
         panel.className = 'validacion-panel val-ok';
@@ -3977,7 +4189,8 @@ function applyPreset(name) {
     ['e_onda_rep', 'a_onda_rep', 'e_prima_rep', 'e_prima_lat_rep', 'vrt_rep',
      'e_onda_est', 'e_prima_est', 'e_prima_lat_est', 'vrt_est',
      'volvi_reposo', 'ddvi', 'siv_d', 'pp_d',
-     'eaoej_ava', 'eaoej_grad_reposo', 'eaoej_grad_post', 'eaoej_seg_doppler']
+     'eaoej_ava', 'eaoej_grad_reposo', 'eaoej_grad_post', 'eaoej_seg_doppler',
+     'viab_seg_disfunc', 'viab_seg_mejora', 'viab_grosor_mm']
         .forEach(k => { if (P[k]) setVal(k, P[k]); });
     calcBSA();
     calcGeometria();
@@ -4170,7 +4383,7 @@ function aplicarEstudio(d) {
 
     // Recalcular todo lo derivado (no se guarda: se regenera)
     calcBSA(); calcEjercicio(); calcDobutamina(); calcDipiridamol();
-    calcFEVI(); calcDiastolico(); calcGeometria(); calcCFR(); calcStrain(); calcEAo(); calcEAoEjercicio(); calcMCH();
+    calcFEVI(); calcDiastolico(); calcGeometria(); calcCFR(); calcStrain(); calcEAo(); calcEAoEjercicio(); calcViabilidad(); calcMCH();
     updateResultBanner(); updateChecklistBadge();
     // Las notas vuelven a decir si el valor lo puso la app o lo corregiste vos
     refrescarNotasOrigen();

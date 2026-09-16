@@ -90,6 +90,21 @@ const NARRATIVA = {
     // Sin los números: corregida a mano pueden contradecir la clasificación elegida.
     geometriaVIManual: 'El ventrículo izquierdo presenta {{geometria}}.',
 
+    // ── VIABILIDAD MIOCÁRDICA ─────────────────────────────────────────
+    // Cierra con la implicancia, que es lo que decide si conviene revascularizar.
+    viabEncabezado:      'Evaluación de viabilidad miocárdica con dobutamina a baja dosis.',
+    viabDisfuncion:      'Se identificaron {{n}} {{plural}} con disfunción contráctil en reposo.',
+    viabRespuesta:       'La respuesta al apremio fue {{respuesta}}.',
+    viabGrosorPreservado:'El grosor parietal telediastólico de {{mm}} mm está preservado, compatible con miocardio viable.',
+    viabGrosorFino:      'El grosor parietal telediastólico de {{mm}} mm muestra adelgazamiento, que sugiere cicatriz transmural.',
+
+    viabImplicaBifasica:  ' La respuesta bifásica es el patrón de mayor valor predictivo de recuperación funcional ' +
+                 'tras la revascularización; se sugiere evaluar la anatomía coronaria del territorio comprometido.',
+    viabImplicaSostenida: ' La mejoría sostenida indica miocardio hibernado con reserva contráctil conservada, ' +
+                 'con probabilidad de recuperación funcional si se revasculariza.',
+    viabImplicaCicatriz:  ' La ausencia de reserva contráctil hace improbable la recuperación funcional del ' +
+                 'territorio comprometido tras la revascularización.',
+
     // ── EAo SEVERA ASINTOMÁTICA CON EJERCICIO ─────────────────────────
     // Párrafo propio: es la pregunta que se fue a responder, no un accesorio.
     eaoEjBloque: 'Evaluación de estenosis aórtica severa asintomática con ejercicio.{{severidadBasal}} ' +
@@ -219,8 +234,14 @@ const NARRATIVA = {
     // ── CONCLUSIONES ──────────────────────────────────────────────────
     conclusiones: {
 
-        negativa: 'Conclusión: prueba de eco estrés con ejercicio clínica y ecocardiográficamente negativa para isquemia miocárdica inducible, ' +
-                  'con {{capacidadFuncional}} y adecuada reserva contráctil.',
+        // La cola se arma según qué se informa abajo: lo que se va al párrafo pronóstico
+        // con su implicancia no se nombra también acá, y sobre todo no se afirma lo
+        // contrario. Antes el veredicto decía "adecuada reserva contráctil" y el párrafo
+        // siguiente decía que no la hubo.
+        negativa: 'Conclusión: prueba de eco estrés con ejercicio clínica y ecocardiográficamente negativa para isquemia miocárdica inducible{{colaNegativa}}.',
+        colaNegativaAmbas:   ', con {{capacidadFuncional}} y adecuada reserva contráctil',
+        colaNegativaSoloCF:  ', con {{capacidadFuncional}}',
+        colaNegativaSoloRes: ', con adecuada reserva contráctil',
 
         // Versión corta, para cuando la conclusión sigue con la limitación de FC subóptima
         negativaCorta: 'Conclusión: prueba de eco estrés con ejercicio negativa para isquemia miocárdica inducible.',
@@ -304,29 +325,61 @@ const NARRATIVA = {
     },
 
     // ── HALLAZGOS DE VALOR PRONÓSTICO ─────────────────────────────────
-    // El médico que pide el estudio no ve la pantalla del operador, y estos datos le
-    // cambian la conducta. Van todos en UNA sola oración al final de la conclusión,
-    // ordenados por relevancia, en prosa y no como lista de alertas.
-    // El control de calidad de la adquisición (imagen tardía, doble producto en el
-    // borde, WMSI inflado por conducción) NO entra acá: es del operador.
+    // El que pide el estudio no ve la pantalla del operador, y estos datos le cambian
+    // la conducta. Cada uno viene con QUÉ se encontró, QUÉ implica y, cuando
+    // corresponde, QUÉ hacer. Las sugerencias van acá y no en el cuerpo descriptivo.
+    //
+    // Cada ítem es una PROPOSICIÓN en minúscula ("la capacidad funcional fue…"), para
+    // que sirva en los dos formatos: con un solo hallazgo se integra tras "Merece
+    // señalarse que…"; con dos o más se capitaliza y arma un párrafo aparte.
+    //
+    // El control de calidad de la adquisición —imagen tardía, doble producto en el
+    // borde, WMSI inflado por conducción— NO entra: es del operador.
     pronostico: {
-        oracionUna:    ' Merece señalarse, con valor pronóstico propio e independiente del resultado del estudio, ' +
-                       '{{hallazgos}}.',
-        oracionVarias: ' Merecen señalarse, con valor pronóstico propio e independiente del resultado del estudio, ' +
-                       '{{hallazgos}}.',
+        // Un solo hallazgo: integrado en la conclusión
+        integrada: ' Merece señalarse que {{hallazgo}}.',
 
-        // Sintagmas nominales: se encadenan solos en la enumeración. Los matices van
-        // ENTRE PARÉNTESIS y nunca con coma: en una enumeración de tres, una coma
-        // interna hace leer el último "y" como parte del ítem anterior.
-        hipotension:  'la respuesta hipotensiva al esfuerzo',
-        caidaFey:     'la caída de la fracción de eyección de {{feyReposo}} % a {{feyEstres}} % con el esfuerzo',
-        arritmia:     'la presencia de {{arritmias}}{{momento}}{{sintomas}}',
-        mets:         'una capacidad funcional de {{mets}} METs',
-        // Si la prueba se detuvo por un límite muscular u ortopédico, el número no
-        // describe riesgo cardiovascular: se dice por qué se detuvo y el que lee decide.
-        metsLimiteNoCV: 'una capacidad funcional de {{mets}} METs (prueba detenida por {{causa}})',
-        hrr1:         'una recuperación de la frecuencia cardíaca al primer minuto de {{hrr1}} lpm',
-        hipertension: 'la respuesta hipertensiva al esfuerzo (amerita optimizar el control tensional)'
+        // Dos o más: párrafo propio, encabezado por una bisagra que impide que el
+        // lector apurado se quede con el veredicto y no lea lo que lo matiza.
+        bisagraNegativa: 'Ese buen pronóstico coronario convive, sin embargo, con {{n}} hallazgos que lo modifican.',
+        bisagraGeneral:  'Merecen señalarse además {{n}} hallazgos con valor pronóstico propio, independiente del resultado del estudio.',
+
+        // El negativo afirma algo, no sólo niega
+        negativoBajoRiesgo: ' La ausencia de isquemia con un estímulo suficiente se asocia a bajo riesgo de ' +
+                     'eventos coronarios, menor al 1 % anual.',
+
+        // ── Los hallazgos, ordenados por cuánto cambian la conducta ──
+        hipotension: 'la respuesta hipotensiva al esfuerzo constituye un marcador de alto riesgo, que sugiere ' +
+                     'isquemia extensa o disfunción ventricular; se sugiere evaluación de la anatomía coronaria sin demora',
+
+        caidaFey:    'la fracción de eyección cayó de {{feyReposo}} % a {{feyEstres}} % con el esfuerzo, marcador ' +
+                     'de isquemia extensa; se sugiere evaluación de la anatomía coronaria',
+
+        umbralBajo:  'la isquemia apareció con un doble producto de {{dp}}, umbral isquémico bajo que sugiere ' +
+                     'lesión severa o enfermedad de múltiples vasos; se sugiere evaluación coronaria a la brevedad',
+
+        sinReserva:  'no hubo reserva contráctil global con el esfuerzo (FEy {{feyReposo}} % → {{feyEstres}} %), ' +
+                     'hallazgo que se asocia a peor pronóstico',
+
+        arritmia:    'se constató {{arritmias}}{{momento}}{{sintomas}}, hallazgo de significación pronóstica; ' +
+                     'se sugiere monitoreo ambulatorio para definir su carga',
+
+        mets:        'la capacidad funcional fue {{grado}} ({{mets}} METs{{pct}}), predictor independiente de ' +
+                     'mortalidad más allá del resultado del estudio; se sugiere rehabilitación cardiovascular supervisada',
+        // Detenida por un límite muscular u ortopédico: el número no describe riesgo
+        // cardiovascular y la sugerencia cambia de sentido.
+        metsLimiteNoCV: 'la capacidad funcional fue {{grado}} ({{mets}} METs{{pct}}), con la prueba detenida por ' +
+                     '{{causa}}: conviene definir si el límite fue cardiovascular antes de atribuirle valor pronóstico',
+        metsPct:     ', {{pct}} % del predicho para edad y sexo',
+
+        hrr1:        'la recuperación de la frecuencia cardíaca al primer minuto fue de {{hrr1}} lpm, {{matiz}}, ' +
+                     'marcador de disfunción autonómica asociado a mayor mortalidad',
+        hrr1Limite:  'en el límite inferior',
+        hrr1Bajo:    'por debajo de los 12 lpm esperados',
+
+        hipertension: 'la tensión arterial alcanzó {{taPico}} mmHg{{basal}}, lo que sugiere control tensional ' +
+                     'subóptimo; se sugiere ajuste del tratamiento antihipertensivo',
+        hipertensionBasal: ' partiendo de cifras basales ya elevadas ({{taBasal}})'
     },
 
     // ── FRASE DE ACOMPAÑAMIENTO (ST-T y síntomas) ─────────────────────
