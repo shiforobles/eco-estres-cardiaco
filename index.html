@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=2.0">
+    <link rel="stylesheet" href="styles.css?v=2.1">
 </head>
 <body>
 <div class="container">
@@ -17,7 +17,7 @@
     <header class="app-header">
         <div>
             <h1>Eco Estrés Cardíaco</h1>
-            <p class="version">v2.0 — El informe orienta, no sólo describe</p>
+            <p class="version">v2.1 — Estructura estable, antecedentes en el informe</p>
         </div>
         <div class="header-controls">
             <button id="btn-theme-toggle" class="btn btn-icon" title="Cambiar Tema">
@@ -140,6 +140,35 @@
             <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="ant_epoc"><label for="ant_epoc">EPOC / Asma</label></div>
             <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="ant_mcd"><label for="ant_mcd">MCD conocida</label></div>
             <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="ant_valv"><label for="ant_valv">Valvulopatía conocida</label></div>
+        </div>
+
+        <h3 class="subsection-title" style="margin-top:1.25rem">Revascularización previa</h3>
+        <p class="firma-nota" style="margin-bottom:0.6rem">
+            El vaso importa: isquemia en un territorio ya tratado se lee como reestenosis o progresión
+            hasta que se demuestre lo contrario, y eso cambia la conducta. Sin el vaso, el informe no puede decirlo.
+        </p>
+        <div class="grid">
+            <div class="form-group" style="grid-column: 1 / -1">
+                <label>Angioplastia previa — vasos tratados</label>
+                <div class="grid grid-3col" style="margin-top:0.2rem">
+                    <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="atc_da"><label for="atc_da">ATC a DA</label></div>
+                    <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="atc_cd"><label for="atc_cd">ATC a CD</label></div>
+                    <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="atc_cx"><label for="atc_cx">ATC a Cx</label></div>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="atc_anio">Año de la angioplastia</label>
+                <input autocomplete="off" type="number" id="atc_anio" placeholder="Ej: 2019" min="1980" max="2100" step="1">
+            </div>
+            <div class="form-group">
+                <label for="crm_anio">Año de la cirugía de revascularización</label>
+                <input autocomplete="off" type="number" id="crm_anio" placeholder="Ej: 2017" min="1980" max="2100" step="1">
+            </div>
+            <div class="form-group" style="grid-column: 1 / -1">
+                <label for="ant_otros">Otros antecedentes relevantes</label>
+                <input autocomplete="off" type="text" id="ant_otros" placeholder="Ej: miocardiopatía chagásica, marcapasos bicameral 2021">
+                <span class="firma-nota">Se agrega a la línea de antecedentes del informe, tal como lo escribas.</span>
+            </div>
         </div>
     </section>
 
@@ -1487,15 +1516,15 @@
 
 
 </div>
-<script src="pearls.js?v=2.0"></script>
-<script src="report-templates.js?v=2.0"></script>
-<script src="sheets-storage.js?v=2.0"></script>
-<script src="app.js?v=2.0"></script>
+<script src="pearls.js?v=2.1"></script>
+<script src="report-templates.js?v=2.1"></script>
+<script src="sheets-storage.js?v=2.1"></script>
+<script src="app.js?v=2.1"></script>
 <script>
 // Control de versión: si el navegador sirvió una mezcla de archivos viejos y nuevos,
 // los botones fallan en silencio. Esto lo convierte en un aviso visible.
 (function () {
-    var APP_VERSION = '2.0';
+    var APP_VERSION = '2.1';
     var faltan = ['generarInforme', 'recolectarHallazgos', 'calcEjercicio'].filter(function (f) {
         return typeof window[f] !== 'function';
     });

@@ -12,10 +12,48 @@
 
 const NARRATIVA = {
 
+    // ══════════════════════════════════════════════════════════════════
+    //  CUERPO DEL INFORME — ESQUELETO FIJO
+    //  Antes el cuerpo eran párrafos cuya redacción cambiaba según qué campos
+    //  estuvieran cargados y según datos de OTRO bloque: la oración de motilidad se
+    //  elegía por la tensión arterial, el párrafo de reposo era largo o corto según
+    //  cómo había salido el esfuerzo, y las oraciones sin datos desaparecían. Eso
+    //  obligaba a releer y corregir cada informe.
+    //
+    //  Ahora son líneas rotuladas, siempre las mismas y en el mismo orden. Lo que
+    //  falta se dice "no consignado" en vez de hacer desaparecer la línea: la ausencia
+    //  se ve, y el panel de completitud la señala.
+    // ══════════════════════════════════════════════════════════════════
+    sinDato: 'no consignado',
+    sinDatoF: 'no consignada',
+
+    lineaIndicacion:   'Indicación: {{contenido}}',
+    lineaAntecedentes: 'Antecedentes: {{contenido}}',
+    lineaProtocolo:    'Protocolo: {{contenido}}',
+    lineaHemodinamia:  'Hemodinamia: {{contenido}}',
+    lineaCalidad:      'Calidad del estudio: {{contenido}}',
+    lineaReposo:       'Reposo: {{contenido}}',
+    lineaEsfuerzo:     'Esfuerzo: {{contenido}}',
+    lineaMotilidad:    'Motilidad: {{contenido}}',
+    lineaViabilidad:   'Viabilidad: {{contenido}}',
+    lineaValvular:     'Estenosis aórtica: {{contenido}}',
+
+    sinAntecedentes:   'sin antecedentes cardiovasculares consignados',
+
+    // Motilidad en reposo: una frase por situación, sin mezclarse con FEy ni llenado,
+    // que ahora se informan siempre por separado y con sus números.
+    reposoMotilidadNormal:  'motilidad parietal normal',
+    reposoMotilidadSecuela: '{{gradoSecuela}} {{deSegmentosSecuela}} ({{territorioSecuelaFrase}}), en relación con evento previo',
+    reposoMotilidadGlobal:  'hipoquinesia global, sin distribución en territorio coronario',
+
+    antecedentesATC:   'angioplastia a {{vasos}}{{anio}}',
+    antecedentesCRM:   'cirugía de revascularización miocárdica{{anio}}',
+    antecedentesBB:    'Bajo tratamiento betabloqueante.',
+
     // ── PREÁMBULO DE LA CONCLUSIÓN ────────────────────────────────────
     // Encabeza SIEMPRE la conclusión, antes del veredicto del Word.
     preambulo: 'Test de Eco estrés {{suficiencia}} ({{pctFCmax}} % de la FCMT{{betabloqueo}}){{etapa}} por {{causaDetencion}}.',
-    preambuloBetabloqueo: ', realizada bajo tratamiento con Beta Bloqueante',
+    preambuloBetabloqueo: ', realizado bajo tratamiento con Beta Bloqueante',
     preambuloEtapa: ', detenido en etapa {{etapa}}',
     preambuloSinEtapa: ', detenido',
 
@@ -36,48 +74,17 @@ const NARRATIVA = {
     diastolicoNoEvaluado:'Estudio diastólico de esfuerzo: No evaluado.',
 
     // ── MÉTODO ────────────────────────────────────────────────────────
-    metodo: 'Se realizó ecocardiograma con ejercicio en cicloergómetro{{protocolo}}, con carga escalonada hasta ' +
-            '{{carga}} Kgm/min{{etapaMetodo}}, alcanzando {{fcPico}} lpm ({{pctFCmax}} % de la FC máxima predicha) ' +
-            'y un doble producto de {{dobleProducto}}{{metsMetodo}}, deteniéndose la prueba por {{causaDetencion}}.',
-    metodoSinCarga: 'Se realizó ecocardiograma con ejercicio en cicloergómetro{{protocolo}}{{etapaMetodo}}, alcanzando ' +
-            '{{fcPico}} lpm ({{pctFCmax}} % de la FC máxima predicha) y un doble producto de {{dobleProducto}}' +
-            '{{metsMetodo}}, deteniéndose la prueba por {{causaDetencion}}.',
 
     // Frase de respuestas hemodinámicas: una sola de estas, según el caso
-    respuestaNormal:      'La respuesta tensional fue normotensiva y la respuesta cronotrópica adecuada.',
-    respuestaHipertensiva:'Durante el esfuerzo presentó respuesta hipertensiva, con TA pico de {{taPico}} mmHg partiendo de {{taBasal}} mmHg basal.',
     // Si el basal ya era hipertensivo, el dato es del paciente y no sólo de la prueba
-    respuestaHipertensivaBasalAlta:'Durante el esfuerzo presentó respuesta hipertensiva, con TA pico de {{taPico}} mmHg, ' +
-                          'partiendo de cifras basales ya elevadas ({{taBasal}} mmHg).',
-    respuestaHipotensiva: 'Durante el esfuerzo presentó descenso tensional, de {{taBasal}} mmHg basales a {{taPico}} mmHg en el pico, motivo por el cual se detuvo la prueba.',
-    respuestaFCSubóptima: 'Alcanzó {{fcPico}} lpm, correspondiente al {{pctFCmax}} % de la FC máxima predicha, sin lograr el objetivo del 85 %{{betabloqueante}}.',
 
     // ── CALIDAD ───────────────────────────────────────────────────────
-    calidad:          'La ventana acústica fue {{ventana}}. Las imágenes post-esfuerzo se adquirieron a los {{segImagen}} segundos ' +
-                      'del fin del ejercicio, con una FC de {{fcImagen}} lpm ({{pctFCadq}} % de la FC pico){{coletillaAdq}}.',
     // Sin los datos de adquisición cargados, la frase se omite entera:
     // un informe con rayitas se lee como algo a medio hacer.
-    calidadSola:       'La ventana acústica fue {{ventana}}.',
-    calidadSoloSegundos:'La ventana acústica fue {{ventana}}. Las imágenes post-esfuerzo se adquirieron a los ' +
-                      '{{segImagen}} segundos del fin del ejercicio.',
-    calidadLimitadaSola:'La ventana acústica fue limitada, con adecuada visualización de solo {{segEvaluados}} de los 17 segmentos.',
     // Si igual se pudieron evaluar los 17, "solo 17 de los 17" se contradice solo
-    calidadLimitadaSinConteo:'La ventana acústica fue limitada.',
 
-    coletillaAdqUtil: ', dentro de la ventana útil para la detección de isquemia',
-    coletillaAdqTardia: ', por debajo del rango óptimo para la detección de isquemia',
-    calidadLimitada:  'La ventana acústica fue limitada, con adecuada visualización de solo {{segEvaluados}} de los 17 segmentos. ' +
-                      'Las imágenes post-esfuerzo se adquirieron a los {{segImagen}} segundos, con FC de {{fcImagen}} lpm ' +
-                      '({{pctFCadq}} % de la FC pico){{coletillaAdq}}.',
 
     // ── REPOSO ────────────────────────────────────────────────────────
-    reposoNormalLargo: 'En reposo no se observaron alteraciones de la motilidad parietal, con función sistólica del ventrículo izquierdo ' +
-                       'conservada (FEy {{fey}} %) y relación E/e\' de {{ee}}{{presionesLlenado}}.',
-    reposoNormalCorto: 'En reposo la motilidad parietal fue normal, con FEy {{fey}} % y relación E/e\' de {{ee}}.',
-    reposoSecuela:     'En reposo se observó {{gradoSecuela}} {{deSegmentosSecuela}} ({{territorioSecuelaFrase}}), ' +
-                       'en relación con evento previo, con FEy {{fey}} % y relación E/e\' de {{ee}}.',
-    reposoDiastolico:  'En reposo la motilidad parietal fue normal, con FEy {{fey}} % conservada, relación E/e\' de {{ee}} y VRT de {{vrt}} m/s' +
-                       '{{presionesLlenado}}.',
 
     // Se agrega al bloque de reposo SÓLO cuando hay disfunción diastólica real: el
     // grado normal ya está dicho en las plantillas de arriba.
@@ -151,21 +158,22 @@ const NARRATIVA = {
     presionesNoClasificable: ', sin poder clasificar la función diastólica por discordancia entre los parámetros',
 
     // ── ESFUERZO ──────────────────────────────────────────────────────
-    esfuerzoNegativo:  'Con el esfuerzo se objetivó adecuada respuesta hiperdinámica global, sin nuevas alteraciones de la motilidad parietal ' +
-                       'en ninguno de los territorios evaluados. No presentó cambios del ST-T ni arritmias hasta el doble producto alcanzado, ' +
-                       'ni refirió dolor precordial o equivalentes anginosos.',
+    // Sólo motilidad y respuesta contráctil: el ST-T tiene sus propias líneas y lo
+    // hemodinámico la suya. Antes esta frase los repetía y cambiaba de forma según la TA.
+    esfuerzoNegativo:  'Adecuada respuesta hiperdinámica global, sin nuevas alteraciones de la motilidad parietal ' +
+                       'en ninguno de los territorios evaluados.',
 
-    esfuerzoPositivoUnico: 'Con el esfuerzo se objetivó nueva {{grado}} {{deSegmentos}}, con caída del engrosamiento sistólico ' +
+    esfuerzoPositivoUnico: 'Nueva {{grado}} {{deSegmentos}}, con caída del engrosamiento sistólico ' +
                        'respecto del reposo, en {{territorioFrase}}. El WMSI{{aclaracionWMSI}} ascendió de {{wmsiReposo}} en reposo a ' +
                        '{{wmsiEstres}} post-esfuerzo.' +
                        '{{acompanamiento}} El resto de los segmentos mostró adecuada respuesta hiperdinámica.',
 
-    esfuerzoPositivoMulti: 'Con el esfuerzo se objetivaron nuevas alteraciones de la motilidad en los segmentos {{segmentos}}, con compromiso ' +
+    esfuerzoPositivoMulti: 'Nuevas alteraciones de la motilidad en los segmentos {{segmentos}}, con compromiso ' +
                        'de más de un territorio coronario ({{territorios}}). El WMSI{{aclaracionWMSI}} ascendió de {{wmsiReposo}} a ' +
                        '{{wmsiEstres}}{{caidaFey}}.' +
                        '{{acompanamiento}} El hallazgo de isquemia extensa y multiterritorial constituye un marcador de alto riesgo.',
 
-    esfuerzoSecuela:   'Con el esfuerzo los segmentos comprometidos no modificaron su motilidad, sin reserva contráctil regional ' +
+    esfuerzoSecuela:   'Los segmentos comprometidos no modificaron su motilidad, sin reserva contráctil regional ' +
                        'en dicho territorio. El resto de los segmentos mostró adecuada respuesta hiperdinámica, sin nuevas ' +
                        'alteraciones.{{reservaGlobal}}{{acompanamiento}}',
 
@@ -177,25 +185,21 @@ const NARRATIVA = {
                        'Δ {{deltaFey}} puntos), sin reserva contráctil global.',
 
     // ── LÍNEA CUANTITATIVA DE MOTILIDAD ───────────────────────────────
-    lineaWMSI: 'Motilidad: WMSI {{wmsiReposo}} → {{wmsiEstres}} (Δ {{deltaWMSI}}){{aclaracionWMSI}}; {{segmentos}}.',
 
-    esfuerzoHipertensiva: 'No se observaron nuevas alteraciones de la motilidad parietal, con adecuada respuesta hiperdinámica global, ' +
-                       'sin cambios del ST-T ni angina.',
 
-    esfuerzoFCSuboptima: 'No se observaron nuevas alteraciones de la motilidad parietal ni cambios del ST-T al doble producto alcanzado.',
 
     esfuerzoNoConcluyente: 'En los segmentos evaluables no se observaron nuevas alteraciones de la motilidad parietal.',
 
-    esfuerzoDiastolico: 'Con el esfuerzo no se observaron nuevas alteraciones de la motilidad parietal. La relación E/e\' promedio ascendió a ' +
+    esfuerzoDiastolico: 'Sin nuevas alteraciones de la motilidad parietal. La relación E/e\' promedio ascendió a ' +
                        '{{eeEstres}}, con VRT de {{vrtEstres}} m/s, sin el incremento esperado de e\', hallazgos compatibles con aumento de las ' +
                        'presiones de llenado del ventrículo izquierdo inducido por el ejercicio.',
 
-    esfuerzoHipotensiva: 'Con el esfuerzo se objetivaron {{hallazgos}}, con caída de la FEy de {{feyReposo}} % a {{feyEstres}} %.',
+    esfuerzoHipotensiva: 'Se objetivaron {{hallazgos}}, con caída de la FEy de {{feyReposo}} % a {{feyEstres}} %.',
 
     // ── DISCORDANCIA ELÉCTRICO-ECOGRÁFICA ─────────────────────────────
     // ECG positivo con eco negativo. La conclusión no puede negar la isquemia
     // a secas cuando el bloque de ECG describe cambios isquémicos.
-    esfuerzoDiscordancia: 'Con el esfuerzo se objetivó adecuada respuesta hiperdinámica global, sin nuevas alteraciones ' +
+    esfuerzoDiscordancia: 'Adecuada respuesta hiperdinámica global, sin nuevas alteraciones ' +
                        'de la motilidad parietal en ninguno de los territorios evaluados, pese a los cambios eléctricos ' +
                        'descritos.{{acompanamiento}}',
 
@@ -205,7 +209,7 @@ const NARRATIVA = {
     reposoDilatada:   'En reposo se observó hipoquinesia global del ventrículo izquierdo, sin distribución en territorio ' +
                       'coronario, con función sistólica {{gradoFey}} (FEy {{fey}} %){{vd}} y relación E/e\' de {{ee}}.',
 
-    esfuerzoDilatada: 'Con el esfuerzo no se objetivó incremento significativo de la motilidad parietal ni de la función ' +
+    esfuerzoDilatada: 'No se objetivó incremento significativo de la motilidad parietal ni de la función ' +
                       'sistólica global, sin evidencia de reserva contráctil.{{acompanamiento}}',
 
     // ── TRASTORNO DE CONDUCCIÓN ───────────────────────────────────────
@@ -219,7 +223,7 @@ const NARRATIVA = {
     asincroniaSeptalSuelta: 'Se observó además {{hallazgoSeptal}}, con asincronía de los segmentos {{segmentosSeptales}}, ' +
                        'atribuible {{alTrastorno}} y no a secuela isquémica.',
 
-    esfuerzoConduccion: 'Con el esfuerzo los segmentos no septales mostraron adecuada respuesta hiperdinámica, sin nuevas ' +
+    esfuerzoConduccion: 'Los segmentos no septales mostraron adecuada respuesta hiperdinámica, sin nuevas ' +
                        'alteraciones de la motilidad. La evaluación de los segmentos septales se encuentra limitada por el ' +
                        'trastorno de conducción, que genera alteraciones del movimiento septal no atribuibles a isquemia.',
 
@@ -324,6 +328,21 @@ const NARRATIVA = {
                      'invalida el análisis del segmento ST'
     },
 
+    // ── EL ANTECEDENTE CAMBIA LA LECTURA DEL HALLAZGO ─────────────────
+    // Isquemia en un vaso ya tratado no es una lesión nueva: es reestenosis o
+    // progresión hasta que se demuestre lo contrario, y eso cambia la conducta.
+    // Por eso el vaso de la angioplastia se carga como dato y no como texto libre.
+    reestenosis: ' El territorio comprometido ({{territorio}}) tiene angioplastia previa{{anio}}: el hallazgo ' +
+                 'sugiere reestenosis o progresión de la lesión tratada hasta que se demuestre lo contrario; ' +
+                 'se sugiere evaluación de la anatomía coronaria.',
+    isquemiaOtroVaso: ' El territorio comprometido ({{territorio}}) no es el tratado en la angioplastia previa' +
+                 '{{anio}}, lo que sugiere progresión de la enfermedad en otro vaso.',
+    injertos:    ' En un paciente con cirugía de revascularización previa{{anio}}, la isquemia inducible obliga ' +
+                 'a evaluar la permeabilidad de los injertos.',
+
+    // Texto libre del operador: va al final, después de todo lo deducido.
+    conclusionLibre: '\n\n{{texto}}',
+
     // ── HALLAZGOS DE VALOR PRONÓSTICO ─────────────────────────────────
     // El que pide el estudio no ve la pantalla del operador, y estos datos le cambian
     // la conducta. Cada uno viene con QUÉ se encontró, QUÉ implica y, cuando
@@ -376,10 +395,26 @@ const NARRATIVA = {
                      'marcador de disfunción autonómica asociado a mayor mortalidad',
         hrr1Limite:  'en el límite inferior',
         hrr1Bajo:    'por debajo de los 12 lpm esperados',
+        hrr1MuyBajo: 'muy por debajo de los 12 lpm esperados',
 
-        hipertension: 'la tensión arterial alcanzó {{taPico}} mmHg{{basal}}, lo que sugiere control tensional ' +
-                     'subóptimo; se sugiere ajuste del tratamiento antihipertensivo',
-        hipertensionBasal: ' partiendo de cifras basales ya elevadas ({{taBasal}})'
+        // Un joven con 6 METs está mal aunque supere el corte absoluto de 5: se
+        // menciona como capacidad reducida para su edad y sexo, sin mover la categoría.
+        capacidadPct: 'la capacidad funcional alcanzada ({{mets}} METs) representa el {{pct}} % del predicho ' +
+                     'para edad y sexo, por debajo de lo esperable; se sugiere actividad física programada',
+
+        // La implicancia depende de la basal y del antecedente. Con basal normal,
+        // "control tensional subóptimo" es una afirmación que los datos no sostienen:
+        // lo anormal ahí es la respuesta, no el control en reposo.
+        hipertensionBasalAlta: 'la tensión arterial alcanzó {{taPico}} mmHg partiendo de cifras basales ya ' +
+                     'elevadas ({{taBasal}} mmHg), lo que sugiere control tensional subóptimo; se sugiere ' +
+                     'ajuste del tratamiento antihipertensivo',
+        hipertensionBasalNormalConHta: 'la tensión arterial alcanzó {{taPico}} mmHg partiendo de cifras basales ' +
+                     'normales ({{taBasal}} mmHg): el control en reposo es adecuado pero la respuesta al esfuerzo ' +
+                     'es exagerada; se sugiere monitoreo ambulatorio de la presión arterial para evaluar el ' +
+                     'control fuera del consultorio',
+        hipertensionBasalNormalSinHta: 'la tensión arterial alcanzó {{taPico}} mmHg partiendo de cifras basales ' +
+                     'normales ({{taBasal}} mmHg), respuesta exagerada que se asocia a mayor riesgo de desarrollar ' +
+                     'hipertensión arterial; se sugiere monitoreo ambulatorio de la presión arterial'
     },
 
     // ── FRASE DE ACOMPAÑAMIENTO (ST-T y síntomas) ─────────────────────

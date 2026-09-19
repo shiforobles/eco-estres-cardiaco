@@ -655,7 +655,11 @@ function sistolica(txt) {
 function taFila(fila) {
     const s = num('esf_' + fila + '_tas'), d = num('esf_' + fila + '_tad');
     if (!s && !d) return '';
-    return s + '/' + (d || '—');
+    // Sin la diastólica se informa sólo la sistólica: "130/—" se lee como un error
+    // de carga y no como un dato que falta.
+    if (!d) return String(s);
+    if (!s) return '—/' + d;
+    return s + '/' + d;
 }
 // METs predichos por edad y sexo (nomogramas de población referida)
 function metsPredichos(edad, sexo) {
@@ -1070,51 +1074,16 @@ function renderAvisosClinicos() {
 // ══════════════════════════════════════════════
 function evaluarCategorizacion() {
     const H = recolectarHallazgos();
+    // Misma tabla que usa el informe: no pueden discrepar por construcción.
+    const activos = hallazgosActivos(H);
     const alto = [], intermedio = [];
-    const wmsiPico = H.wmsiEstres !== null ? parseFloat(H.wmsiEstres) : null;
-
-    // ── Riesgo alto ──
-    if (wmsiPico !== null && wmsiPico > 1.7)
-        alto.push(`WMSI pico ${H.wmsiEstres} (>1,7): ~5 % de eventos cardíacos por año`);
-    if (H.feyReposo > 0 && H.feyReposo <= 45)
-        alto.push(`FEy en reposo ${H.feyReposo} % (≤45 %): marcador independiente de riesgo`);
-    if (H.caidaFey)
-        alto.push(`la FEy cae de ${H.feyReposo} % a ${H.feyEstres} % con el esfuerzo: sugiere isquemia extensa`);
-    if (H.territoriosIsquemia.length > 1 && !H.patronApical)
-        alto.push(`isquemia en ${H.territoriosIsquemia.length} territorios coronarios`);
-    if (H.hipotension)
-        alto.push('respuesta hipotensiva al esfuerzo');
-    if (H.mets > 0 && H.mets < 5) {
-        // Si la prueba se detuvo por un límite muscular u ortopédico, los METs solos
-        // no describen riesgo cardiovascular: se señala pero no sube la categoría.
-        const limiteNoCV = ['fatiga', 'otro'].includes(H.causaDetencion);
-        const sinOtrosCriterios = alto.length === 0;
-        if (limiteNoCV && sinOtrosCriterios)
-            intermedio.push(`capacidad funcional ${H.mets} METs, con detención por ${H.causaDetencionTxt}: ` +
-                `verificar si el límite fue cardiovascular antes de subir la categoría`);
-        else
-            alto.push(`capacidad funcional ${H.mets} METs (<5): predictor independiente de mortalidad`);
-    }
-    if (H.isquemicos.length && H.dobleProducto > 0 && H.dobleProducto < 20000)
-        alto.push(`isquemia con doble producto ${H.dobleProducto.toLocaleString('es-AR')}: umbral isquémico bajo`);
-    if (H.arritmias.some(a => ['arr_tvns', 'arr_ev_poli', 'arr_dupletas'].includes(a.id)))
-        alto.push('arritmia ventricular compleja durante el estudio');
-
-    // ── Riesgo intermedio ──
-    if (wmsiPico !== null && wmsiPico > 1.0 && wmsiPico <= 1.7)
-        intermedio.push(`WMSI pico ${H.wmsiEstres} (1,1-1,7): ~3 % de eventos por año`);
-    if (H.patronApical)
-        intermedio.push(`compromiso apical extenso (${H.isquemicos.length} segmentos), ` +
-            `sin distribución por territorio coronario`);
-    else if (H.isquemicos.length && H.territoriosIsquemia.length <= 1)
-        intermedio.push(`isquemia inducible en ${H.isquemicos.length} ` +
-            `${H.isquemicos.length === 1 ? 'segmento' : 'segmentos'} de un solo territorio`);
-    if (H.secuelas.length)
-        intermedio.push('secuela sin reserva contráctil regional');
-    if (H.diastResultado === 'positivo')
-        intermedio.push('test diastólico de esfuerzo positivo');
-    if (H.pctFCmax > 0 && H.pctFCmax < 85 && !H.betabloqueante)
-        intermedio.push(`respuesta cronotrópica ${H.pctFCmax} % sin betabloqueo: posible incompetencia cronotrópica`);
+    activos.forEach(h => {
+        const peso = pesoDe(h, H);
+        if (!peso) return;                    // se menciona, no categoriza
+        const m = h.motivo(H);
+        if (!m) return;
+        (peso === 'alto' ? alto : intermedio).push(m);
+    });
 
     const nivel = alto.length ? 'alto' : intermedio.length ? 'intermedio' : 'bajo';
     return {
@@ -2418,6 +2387,21 @@ Eco Estrés Cardíaco v1.1 — Calculadora Clínica
 // Arritmias: cuáles tienen peso pronóstico propio y llegan a la conclusión.
 // El criterio es morfología y patrón, no síntoma: unas EV polimorfas con bigeminia
 // pesan aunque el paciente no haya sentido nada.
+// Nombres para la línea de antecedentes del informe. Las etiquetas del formulario
+// están abreviadas para la pantalla; acá van como se escriben en un informe.
+const ANTECEDENTES_PROSA = [
+    { id: 'ant_hta',        txt: 'hipertensión arterial' },
+    { id: 'ant_dm',         txt: 'diabetes' },
+    { id: 'ant_dislipemia', txt: 'dislipemia' },
+    { id: 'ant_tabaquismo', txt: 'tabaquismo' },
+    { id: 'ant_isquemia',   txt: 'cardiopatía isquémica' },
+    { id: 'ant_iam',        txt: 'infarto de miocardio previo' },
+    { id: 'ant_fa',         txt: 'fibrilación auricular' },
+    { id: 'ant_mcd',        txt: 'miocardiopatía dilatada' },
+    { id: 'ant_valv',       txt: 'valvulopatía' },
+    { id: 'ant_epoc',       txt: 'EPOC o asma' }
+];
+
 const ARRITMIAS = [
     { id: 'arr_esv',       txt: 'extrasístoles supraventriculares aisladas', relevante: false },
     { id: 'arr_ev_mono',   txt: 'extrasístoles ventriculares monomorfas aisladas', relevante: false },
@@ -2452,6 +2436,27 @@ function recolectarHallazgos() {
     H.ventana = document.getElementById('ventana').value;
     H.ventanaTxt = textoSelect('ventana').toLowerCase();
     H.betabloqueante = document.getElementById('ant_betabloq').checked;
+
+    // ── Antecedentes ──
+    // No llegaban al informe: se cargaban y el que lee no sabía en qué contexto estaba
+    // interpretando el estudio. Los vasos tratados importan especialmente: isquemia en
+    // un territorio ya revascularizado se lee como reestenosis, no como lesión nueva.
+    H.antecedentes = ANTECEDENTES_PROSA.filter(a => {
+        const el = document.getElementById(a.id);
+        return el && el.checked;
+    }).map(a => a.txt);
+    H.antHta = document.getElementById('ant_hta').checked;
+    H.atcVasos = [
+        { id: 'atc_da', t: 'DA' }, { id: 'atc_cd', t: 'CD' }, { id: 'atc_cx', t: 'Cx' }
+    ].filter(v => { const el = document.getElementById(v.id); return el && el.checked; }).map(v => v.t);
+    H.atcAnio = v('atc_anio');
+    H.crmAnio = v('crm_anio');
+    H.antOtros = normalizarTexto(v('ant_otros'));
+    H.antCrm = document.getElementById('ant_crm').checked;
+    H.indicacionTxt = document.getElementById('indicacion').value ? textoSelect('indicacion') : '';
+    H.indicacionLibre = normalizarTexto(v('indicacion_libre'));
+    H.contraste = document.getElementById('contraste_usado').value;
+    H.conclusionLibre = normalizarTexto(v('conclusion_libre'));
 
     // Hemodinamia
     H.fcBasal = num('esf_basal_fc');
@@ -2834,74 +2839,216 @@ function rellenar(plantilla, datos) {
 //  producto en el borde, WMSI inflado por conducción—: eso es del operador.
 //  Salen todos en UNA oración ordenada por relevancia, no apilados como alertas.
 // ══════════════════════════════════════════════
-function oracionPronostica(H, rama) {
-    const P = NARRATIVA.pronostico;
-    const items = [];
-
-    // En un estudio de EAo asintomática la oración de cierre ya informa la respuesta
-    // tensional, y con más peso: es lo que mueve la indicación quirúrgica.
-    const taLaDiceEAo = H.eaoEjEnUso && H.eaoEjVeredicto === 'no_asintomatico' &&
-                        H.eaoEj && H.eaoEj.ta && H.eaoEj.ta.anormal;
-
-    // ── Ordenados por cuánto cambian la conducta ──
-
-    // 1 · Hipotensión: criterio de suspensión. En su rama ya es el núcleo.
-    if (H.hipotension && rama !== 'hipotensiva' && !taLaDiceEAo) items.push(P.hipotension);
-
-    // 2 · Caída de la FEy. En multivaso e hipotensiva la conclusión ya la explica.
-    if (H.caidaFey && rama !== 'positivaMulti' && rama !== 'hipotensiva')
-        items.push(rellenar(P.caidaFey, { feyReposo: H.feyReposo, feyEstres: H.feyEstres }));
-
-    // 3 · Isquemia a bajo umbral
-    if (H.isquemicos.length && H.dobleProducto > 0 && H.dobleProducto < 20000)
-        items.push(rellenar(P.umbralBajo, { dp: H.dobleProducto.toLocaleString('es-AR') }));
-
-    // 4 · Ausencia de reserva contráctil global. Si ya se dijo la caída de la FEy no
-    //     se repite: son el mismo dato mirado con distinto corte.
-    if (H.deltaFey !== null && !H.reservaGlobal && !H.caidaFey && H.feyReposo > 0)
-        items.push(rellenar(P.sinReserva, { feyReposo: H.feyReposo, feyEstres: H.feyEstres }));
-
-    // 5 · Arritmia ventricular compleja (o cualquiera que haya sido sintomática)
-    if (H.hayArritmiaRelevante) {
-        const lista = H.arritmiasRelevantes.length
-            ? listarEnProsa(H.arritmiasRelevantes.map(a => a.txt))
-            : listarEnProsa(H.arritmias.map(a => a.txt));
-        items.push(rellenar(P.arritmia, {
-            arritmias: lista,
+// ══════════════════════════════════════════════
+//  TABLA ÚNICA DE HALLAZGOS
+//  Había TRES reglamentos para decidir qué es significativo —el párrafo pronóstico, la
+//  categorización y el panel de avisos— con cortes y listas distintos, y no coincidían:
+//  un HRR₁ de 0 no movía la categoría, la bigeminia pesaba en el informe y no en la
+//  categoría, y unos METs bajos por fatiga contaban en uno y no en el otro. Ahora hay
+//  una sola tabla y los tres leen de acá, en este orden, que es el de cuánto cambian
+//  la conducta del que recibe el informe.
+//
+//  peso    → 'alto' | 'intermedio' | null (se menciona pero no mueve la categoría)
+//  informe → la proposición en minúscula, o null si el hallazgo ya está dicho en el
+//            cuerpo del informe y repetirlo sería apilarlo
+//  motivo  → la frase corta que ve el operador en el panel de categorización
+// ══════════════════════════════════════════════
+const HALLAZGOS = [
+    {
+        id: 'hipotension',
+        peso: 'alto',
+        activo: H => H.hipotension,
+        // En su propia rama ya es el núcleo de la conclusión; en EAo asintomática la
+        // oración de cierre la informa con más peso.
+        informe: (H, rama) => (rama === 'hipotensiva' || taLaDiceEAo(H)) ? null : NARRATIVA.pronostico.hipotension,
+        motivo: () => 'respuesta hipotensiva al esfuerzo'
+    },
+    {
+        id: 'caidaFey',
+        peso: 'alto',
+        activo: H => H.caidaFey,
+        informe: (H, rama) => (rama === 'positivaMulti' || rama === 'hipotensiva') ? null
+            : rellenar(NARRATIVA.pronostico.caidaFey, { feyReposo: H.feyReposo, feyEstres: H.feyEstres }),
+        motivo: H => `la FEy cae de ${H.feyReposo} % a ${H.feyEstres} % con el esfuerzo: sugiere isquemia extensa`
+    },
+    {
+        id: 'umbralBajo',
+        peso: 'alto',
+        activo: H => H.isquemicos.length && H.dobleProducto > 0 && H.dobleProducto < 20000,
+        informe: H => rellenar(NARRATIVA.pronostico.umbralBajo, { dp: H.dobleProducto.toLocaleString('es-AR') }),
+        motivo: H => `isquemia con doble producto ${H.dobleProducto.toLocaleString('es-AR')}: umbral isquémico bajo`
+    },
+    {
+        id: 'isquemiaExtensa',
+        peso: 'alto',
+        activo: H => H.isquemicos.length >= 5,
+        informe: () => null,   // el párrafo de esfuerzo ya enumera los segmentos
+        motivo: H => `isquemia inducible en ${H.isquemicos.length} segmentos (≥5): extensa`
+    },
+    {
+        id: 'multiterritorial',
+        peso: 'alto',
+        activo: H => H.territoriosIsquemia.length > 1 && !H.patronApical,
+        informe: () => null,
+        motivo: H => `isquemia en ${H.territoriosIsquemia.length} territorios coronarios`
+    },
+    {
+        id: 'wmsiAlto',
+        peso: 'alto',
+        activo: H => H.wmsiEstres !== null && parseFloat(H.wmsiEstres) > 1.7,
+        informe: () => null,
+        motivo: H => `WMSI pico ${nProsa(H.wmsiEstres, 2)} (>1,7): ~5 % de eventos cardíacos por año`
+    },
+    {
+        id: 'feyReposoBaja',
+        peso: 'alto',
+        activo: H => H.feyReposo > 0 && H.feyReposo <= 45,
+        informe: () => null,   // el bloque de reposo ya informa la FEy
+        motivo: H => `FEy en reposo ${H.feyReposo} % (≤45 %): marcador independiente de riesgo`
+    },
+    {
+        id: 'arritmiaCompleja',
+        // Una sola definición de "compleja": la que ya usa el informe. Antes la
+        // categorización miraba tres tipos y el informe seis.
+        peso: 'alto',
+        activo: H => H.hayArritmiaRelevante,
+        informe: H => rellenar(NARRATIVA.pronostico.arritmia, {
+            arritmias: listarEnProsa((H.arritmiasRelevantes.length ? H.arritmiasRelevantes : H.arritmias).map(a => a.txt)),
             momento: (H.arrMomentoTxt && H.arrMomentoTxt !== '—') ? ' ' + H.arrMomentoTxt : '',
             sintomas: H.arrSintomatica ? ' (con síntomas asociados)' : ''
-        }));
-    }
-
-    // 6 · Capacidad funcional por debajo de 5 METs
-    if (H.mets > 0 && H.mets < 5) {
-        // Sólo "otro" queda como límite indefinido: la fatiga a menos de 5 METs es,
-        // en la mayoría de los casos, la manifestación del límite cardiovascular, y
-        // tratarla como no cardiovascular desactivaba la sugerencia de rehabilitación
-        // justo en el paciente que más la necesita.
-        const limiteNoCV = H.causaDetencion === 'otro';
-        items.push(rellenar(limiteNoCV ? P.metsLimiteNoCV : P.mets, {
-            grado: H.mets < 4 ? 'severamente reducida' : 'reducida',
-            mets: nProsa(H.mets),
-            pct: H.pctMets ? rellenar(P.metsPct, { pct: H.pctMets }) : '',
-            causa: H.causaDetencionTxt
-        }));
-    }
-
-    // 7 · Recuperación de la FC al primer minuto.
-    //     Un HRR₁ negativo es un error de carga, no un hallazgo: queda fuera.
-    if (H.hrr1 !== null && H.hrr1 >= 0 && H.hrr1 <= 12)
-        items.push(rellenar(P.hrr1, {
+        }),
+        motivo: () => 'arritmia ventricular compleja durante el estudio'
+    },
+    {
+        id: 'metsBajos',
+        peso: 'alto',
+        activo: H => H.mets > 0 && H.mets < 5,
+        informe: H => {
+            // Sólo "otro" queda como límite indefinido: la fatiga a menos de 5 METs es,
+            // en la mayoría de los casos, la manifestación del límite cardiovascular.
+            const P = NARRATIVA.pronostico;
+            const limiteNoCV = H.causaDetencion === 'otro';
+            return rellenar(limiteNoCV ? P.metsLimiteNoCV : P.mets, {
+                grado: H.mets < 4 ? 'severamente reducida' : 'reducida',
+                mets: nProsa(H.mets),
+                pct: H.pctMets ? rellenar(P.metsPct, { pct: H.pctMets }) : '',
+                causa: H.causaDetencionTxt
+            });
+        },
+        motivo: H => `capacidad funcional ${nProsa(H.mets)} METs (<5): predictor independiente de mortalidad`
+    },
+    {
+        id: 'hrr1',
+        // Un HRR₁ de 0 no es lo mismo que uno de 12. Antes no movía la categoría en
+        // absoluto: un paciente sin ninguna recuperación de la FC salía "riesgo bajo".
+        peso: H => H.hrr1 <= 6 ? 'alto' : 'intermedio',
+        activo: H => H.hrr1 !== null && H.hrr1 >= 0 && H.hrr1 <= 12,
+        informe: H => rellenar(NARRATIVA.pronostico.hrr1, {
             hrr1: H.hrr1,
-            matiz: H.hrr1 === 12 ? P.hrr1Limite : P.hrr1Bajo
-        }));
+            matiz: H.hrr1 === 12 ? NARRATIVA.pronostico.hrr1Limite
+                 : H.hrr1 <= 6 ? NARRATIVA.pronostico.hrr1MuyBajo
+                 : NARRATIVA.pronostico.hrr1Bajo
+        }),
+        motivo: H => `recuperación de la FC al primer minuto ${H.hrr1} lpm (≤12): disfunción autonómica`
+    },
+    {
+        id: 'sinReservaContractil',
+        peso: 'intermedio',
+        activo: H => H.deltaFey !== null && !H.reservaGlobal && !H.caidaFey && H.feyReposo > 0,
+        informe: H => rellenar(NARRATIVA.pronostico.sinReserva, { feyReposo: H.feyReposo, feyEstres: H.feyEstres }),
+        motivo: H => `sin reserva contráctil global (FEy ${H.feyReposo} % → ${H.feyEstres} %)`
+    },
+    {
+        id: 'hipertensiva',
+        peso: 'intermedio',
+        activo: H => H.hipertension,
+        // Tres lecturas distintas según la basal y el antecedente: con basal normal,
+        // "control tensional subóptimo" es una afirmación que los datos no sostienen.
+        informe: (H, rama) => {
+            if (rama === 'noConcluyente' || taLaDiceEAo(H)) return null;
+            const P = NARRATIVA.pronostico;
+            const clave = H.basalElevada ? 'hipertensionBasalAlta'
+                        : H.antHta ? 'hipertensionBasalNormalConHta'
+                        : 'hipertensionBasalNormalSinHta';
+            return rellenar(P[clave], { taPico: H.taPico || '—', taBasal: H.taBasal || '—' });
+        },
+        motivo: H => `respuesta hipertensiva al esfuerzo (${H.taPico || '—'} mmHg)`
+    },
+    {
+        id: 'capacidadReducidaPct',
+        // Un joven con 6 METs está mal aunque supere el corte absoluto. Se menciona,
+        // pero no mueve la categoría: para eso está el corte de 5 METs.
+        peso: null,
+        activo: H => H.mets >= 5 && H.pctMets !== null && H.pctMets < 85,
+        informe: H => rellenar(NARRATIVA.pronostico.capacidadPct, { mets: nProsa(H.mets), pct: H.pctMets }),
+        motivo: () => null
+    },
+    {
+        id: 'wmsiIntermedio',
+        peso: 'intermedio',
+        activo: H => H.wmsiEstres !== null && parseFloat(H.wmsiEstres) > 1.0 && parseFloat(H.wmsiEstres) <= 1.7,
+        informe: () => null,
+        motivo: H => `WMSI pico ${nProsa(H.wmsiEstres, 2)} (1,1-1,7): ~3 % de eventos por año`
+    },
+    {
+        id: 'patronApical',
+        peso: 'intermedio',
+        activo: H => H.patronApical,
+        informe: () => null,
+        motivo: H => `compromiso apical extenso (${H.isquemicos.length} segmentos), sin distribución por territorio coronario`
+    },
+    {
+        id: 'isquemiaUnTerritorio',
+        peso: 'intermedio',
+        activo: H => H.isquemicos.length && H.isquemicos.length < 5 && H.territoriosIsquemia.length <= 1 && !H.patronApical,
+        informe: () => null,
+        motivo: H => `isquemia inducible en ${H.isquemicos.length} ` +
+            `${H.isquemicos.length === 1 ? 'segmento' : 'segmentos'} de un solo territorio`
+    },
+    {
+        id: 'secuela',
+        peso: 'intermedio',
+        activo: H => H.secuelas.length > 0,
+        informe: () => null,
+        motivo: () => 'secuela sin reserva contráctil regional'
+    },
+    {
+        id: 'diastolicoPositivo',
+        peso: 'intermedio',
+        activo: H => H.diastResultado === 'positivo',
+        informe: () => null,   // ya sale como modificador de la conclusión
+        motivo: () => 'test diastólico de esfuerzo positivo'
+    },
+    {
+        id: 'incompetenciaCronotropica',
+        peso: 'intermedio',
+        activo: H => H.pctFCmax > 0 && H.pctFCmax < 85 && !H.betabloqueante,
+        informe: () => null,
+        motivo: H => `respuesta cronotrópica ${H.pctFCmax} % sin betabloqueo: posible incompetencia cronotrópica`
+    }
+];
 
-    // 8 · Respuesta hipertensiva: la de menor peso inmediato, pero cambia el tratamiento
-    if (H.hipertension && rama !== 'noConcluyente' && !taLaDiceEAo)
-        items.push(rellenar(P.hipertension, {
-            taPico: H.taPico || nada,
-            basal: H.basalElevada ? rellenar(P.hipertensionBasal, { taBasal: H.taBasal || nada }) : ''
-        }));
+// En un estudio de EAo asintomática la oración de cierre ya informa la respuesta
+// tensional, y con más peso: es lo que mueve la indicación quirúrgica.
+function taLaDiceEAo(H) {
+    return !!(H.eaoEjEnUso && H.eaoEjVeredicto === 'no_asintomatico' &&
+              H.eaoEj && H.eaoEj.ta && H.eaoEj.ta.anormal);
+}
+
+function hallazgosActivos(H) {
+    return HALLAZGOS.filter(h => {
+        try { return !!h.activo(H); } catch (e) { return false; }
+    });
+}
+
+const pesoDe = (h, H) => (typeof h.peso === 'function' ? h.peso(H) : h.peso);
+
+// ── El párrafo pronóstico de la conclusión ──
+function oracionPronostica(H, rama) {
+    const P = NARRATIVA.pronostico;
+    const items = hallazgosActivos(H)
+        .map(h => h.informe(H, rama))
+        .filter(Boolean);
 
     if (!items.length) return '';
 
@@ -3011,62 +3158,166 @@ function cierreEAoEjercicio(H, rama) {
     return rellenar(T.eaoEjNoAsintomatico, { motivos: listarEnProsa(motivos) });
 }
 
+const mayuscula = t => t ? t.charAt(0).toUpperCase() + t.slice(1) : t;
+
+// Une oraciones sueltas en un párrafo. Algunas plantillas ya traen su punto final:
+// sin esto quedaban dos ("…de la ASE.. Geometría no consignada.").
+function unirOraciones(partes) {
+    return partes
+        .filter(Boolean)
+        .map(x => mayuscula(String(x).trim().replace(/\.+$/, '')))
+        .join('. ') + '.';
+}
+
+// La línea de antecedentes. No llegaba al informe: el que lee no sabía en qué contexto
+// estaba interpretando el estudio.
+function antecedentesEnProsa(H) {
+    const T = NARRATIVA;
+    const partes = [...H.antecedentes];
+    if (H.atcVasos.length) partes.push(rellenar(T.antecedentesATC, {
+        vasos: listarEnProsa(H.atcVasos),
+        anio: H.atcAnio ? ` (${H.atcAnio})` : ''
+    }));
+    if (H.crmAnio || H.antCrm) partes.push(rellenar(T.antecedentesCRM, {
+        anio: H.crmAnio ? ` (${H.crmAnio})` : ''
+    }));
+    if (H.antOtros) partes.push(H.antOtros);
+
+    let txt = partes.length ? mayuscula(listarEnProsa(partes)) + '.' : T.sinAntecedentes + '.';
+    if (H.betabloqueante) txt += ' ' + T.antecedentesBB;
+    return txt;
+}
+
+// El bloque de reposo, con forma estable: motilidad, FEy, llenado, geometría.
+function bloqueReposo(H, datosReposo, datosConduccion, hayAsincronia) {
+    const T = NARRATIVA, nada = '—';
+    const partes = [];
+
+    // Motilidad
+    if (H.secuelas.length) partes.push(rellenar(T.reposoMotilidadSecuela, datosReposo));
+    else if (H.patronGlobal) partes.push(T.reposoMotilidadGlobal);
+    else partes.push(T.reposoMotilidadNormal);
+    if (hayAsincronia) partes.push(rellenar(T.asincroniaSeptalSuelta, datosConduccion).trim());
+
+    // Función sistólica y llenado: siempre, con sus números
+    partes.push(`FEy ${H.feyReposo || nada} %`);
+    partes.push(`relación E/e' ${nProsa(H.eeReposo) || nada}${presionesLlenadoEnProsa(H.diastGrado)}`);
+    if (['g1', 'g2', 'g3'].includes(H.diastGrado))
+        partes.push(rellenar(fueCorregido('diast_grado') ? T.diastolicaGradoManual : T.diastolicaGrado,
+            { grado: DIAST_GRADO_PROSA[H.diastGrado] }).replace(/^La función/, 'función'));
+
+    // Geometría: siempre que esté medida
+    if (['remodelado', 'hvi_concentrica', 'hvi_excentrica'].includes(H.geometriaVI))
+        partes.push(rellenar(fueCorregido('geometria_vi') ? T.geometriaVIManual : T.geometriaVI, {
+            geometria: GEOMETRIA_PROSA[H.geometriaVI], imvi: nProsa(H.imvi, 0), rwt: nProsa(H.rwt, 2)
+        }).replace(/^El ventrículo izquierdo presenta /, 'geometría: '));
+    else if (H.geometriaVI === 'normal') partes.push('geometría ventricular normal');
+    else partes.push('geometría ' + NARRATIVA.sinDatoF);
+
+    if (H.vdProsa) partes.push(H.vdProsa.replace(/^con /, ''));
+    return unirOraciones(partes);
+}
+
+// La línea cuantitativa de motilidad, siempre presente.
+function lineaMotilidadEnProsa(H) {
+    const T = NARRATIVA;
+    if (H.wmsiReposo === null || H.wmsiEstres === null) return T.sinDatoF;
+    const d = H.deltaWMSI;
+    const comprometidos = H.isquemicos.length + H.secuelas.length;
+    const detalle = [];
+    if (H.isquemicos.length) detalle.push(`${H.isquemicos.length} con isquemia inducible`);
+    if (H.secuelas.length) detalle.push(`${H.secuelas.length} sin respuesta al esfuerzo`);
+    const segs = comprometidos === 0 ? 'sin segmentos comprometidos'
+        : comprometidos === 1 ? `1 segmento comprometido (${detalle.join(', ')})`
+        : `${comprometidos} segmentos comprometidos (${detalle.join(', ')})`;
+    return `WMSI ${nProsa(H.wmsiReposo, 2)} → ${nProsa(H.wmsiEstres, 2)} ` +
+           `(Δ ${(d > 0 ? '+' : '') + nProsa(d, 2)})${H.wmsiExcluyeSeptales ? T.aclaracionWMSI : ''}; ${segs}.`;
+}
+
+// La isquemia en un vaso ya tratado se lee distinto. Sin el vaso de la angioplastia
+// cargado como dato, el informe no puede decirlo.
+function oracionRevascularizacion(H) {
+    const T = NARRATIVA;
+    if (!H.isquemicos.length) return '';
+    const terr = H.patronApical ? [] : H.territoriosIsquemia;
+    const partes = [];
+
+    if (H.atcVasos.length && terr.length) {
+        const tratados = terr.filter(t => H.atcVasos.includes(t));
+        const anio = H.atcAnio ? ` (${H.atcAnio})` : '';
+        if (tratados.length) {
+            partes.push(rellenar(T.reestenosis, { territorio: territoriosEnProsa(tratados), anio }));
+        } else {
+            partes.push(rellenar(T.isquemiaOtroVaso, { territorio: territoriosEnProsa(terr), anio }));
+        }
+    }
+    if (H.crmAnio || H.antCrm) {
+        partes.push(rellenar(T.injertos, { anio: H.crmAnio ? ` (${H.crmAnio})` : '' }));
+    }
+    return partes.join('');
+}
+
 function construirNarrativa(H) {
     const T = NARRATIVA;
     const rama = elegirRama(H);
     const nada = '—';
     const parrafos = [];
 
-    // ── MÉTODO ──
-    const datosMetodo = {
-        protocolo: H.protocolo && H.protocolo !== 'otro' ? ' con protocolo de ' + H.protocoloTxt : '',
-        carga: H.cargaKgm || nada,
-        etapaMetodo: H.etapa ? `, en etapa ${H.etapa}` : '',
-        fcPico: H.fcPico || nada,
-        pctFCmax: H.pctFCmax || nada,
-        dobleProducto: H.dobleProducto ? H.dobleProducto.toLocaleString('es-AR') : nada,
-        metsMetodo: H.mets ? `, con ${nProsa(H.mets)} METs${H.pctMets ? ` (${H.pctMets} % del predicho para edad y sexo)` : ''}` : '',
-        causaDetencion: H.causaDetencionTxt
-    };
-    const metodo = [rellenar(H.cargaKgm ? T.metodo : T.metodoSinCarga, datosMetodo)];
+    // El cuerpo es un esqueleto fijo de líneas rotuladas. Ver la nota en
+    // report-templates.js: antes cambiaba de forma según qué campos había cargados.
+    const ND = T.sinDato, NDF = T.sinDatoF;
+    const linea = (plantilla, contenido) => parrafos.push(rellenar(plantilla, { contenido }));
 
-    if (H.hipotension) {
-        metodo.push(rellenar(T.respuestaHipotensiva, { taBasal: H.taBasal || nada, taPico: H.taPico || nada }));
-    } else if (H.hipertension) {
-        metodo.push(rellenar(H.basalElevada ? T.respuestaHipertensivaBasalAlta : T.respuestaHipertensiva,
-            { taPico: H.taPico || nada, taBasal: H.taBasal || nada }));
-    } else if (H.fcSuboptima) {
-        metodo.push(rellenar(T.respuestaFCSubóptima, {
-            fcPico: H.fcPico || nada, pctFCmax: H.pctFCmax || nada,
-            betabloqueante: H.betabloqueante ? ' (bajo tratamiento betabloqueante)' : ''
-        }));
-    } else if (H.pctFCmax >= 85) {
-        metodo.push(T.respuestaNormal);
-    }
-    parrafos.push(metodo.join(' '));
+    // ── INDICACIÓN ──
+    const indic = [H.indicacionTxt, H.indicacionLibre].filter(Boolean).join('. ');
+    linea(T.lineaIndicacion, indic || NDF);
+
+    // ── ANTECEDENTES ──
+    linea(T.lineaAntecedentes, antecedentesEnProsa(H));
+
+    // ── PROTOCOLO ──
+    const prot = [
+        'cicloergómetro',
+        H.protocoloTxt ? 'protocolo de ' + H.protocoloTxt : null,
+        H.cargaKgm ? `carga hasta ${H.cargaKgm} Kgm/min` : `carga ${NDF}`,
+        H.etapa ? `etapa ${H.etapa}` : null,
+        H.duracion ? `duración ${H.duracion}` : null
+    ].filter(Boolean).join(', ');
+    linea(T.lineaProtocolo, unirOraciones([prot, 'detenido por ' + H.causaDetencionTxt]));
+
+    // ── HEMODINAMIA ──
+    // Todo lo hemodinámico junto y SIEMPRE con sus números. Antes la FC se decía dos
+    // veces (en el método y otra vez si era subóptima) y la TA sólo aparecía si había
+    // sido anormal, así que "control tensional subóptimo" quedaba sin respaldo.
+    const hemo = [];
+    hemo.push(H.fcPico
+        ? `FC ${H.fcBasal || ND} → ${H.fcPico} lpm (${H.pctFCmax || ND} % de la FCMT` +
+          `${H.betabloqueante ? ', bajo betabloqueo' : ''})`
+        : `FC pico ${NDF}`);
+    hemo.push(H.taPico ? `TA ${H.taBasal || ND} → ${H.taPico} mmHg` : `TA ${NDF}`);
+    hemo.push(H.dobleProducto ? `doble producto ${H.dobleProducto.toLocaleString('es-AR')}`
+                              : `doble producto ${ND}`);
+    hemo.push(H.mets ? `${nProsa(H.mets)} METs${H.pctMets ? ` (${H.pctMets} % del predicho)` : ''}`
+                     : `METs ${ND}`);
+    hemo.push(H.hrr1 !== null && H.hrr1 >= 0
+        ? `recuperación de la FC al primer minuto ${H.hrr1} lpm`
+        : `recuperación de la FC al primer minuto ${NDF}`);
+    linea(T.lineaHemodinamia, unirOraciones(hemo));
 
     // ── CALIDAD ──
-    const datosCalidad = {
-        ventana: H.ventanaTxt,
-        segImagen: H.segImagen || nada,
-        fcImagen: H.fcImagen || nada,
-        pctFCadq: H.pctFCadq || nada,
-        segEvaluados: H.segEvaluados,
-        coletillaAdq: H.pctFCadq ? (H.adquisicionTardia ? T.coletillaAdqTardia : T.coletillaAdqUtil) : ''
-    };
-    const hayAdquisicion = H.segImagen > 0 || H.fcImagen > 0;
-    let plantillaCalidad;
-    if (H.ventana === 'limitada') {
-        if (H.fcImagen > 0) plantillaCalidad = T.calidadLimitada;
-        else plantillaCalidad = H.segEvaluados >= 17 ? T.calidadLimitadaSinConteo : T.calidadLimitadaSola;
-    } else if (H.fcImagen > 0) {
-        plantillaCalidad = T.calidad;
-    } else {
-        plantillaCalidad = hayAdquisicion ? T.calidadSoloSegundos : T.calidadSola;
-    }
-    parrafos.push(rellenar(plantillaCalidad, datosCalidad));
+    const cal = [];
+    cal.push(`ventana acústica ${H.ventanaTxt}`);
+    cal.push(H.contraste === 'si' ? 'con contraste ecocardiográfico' : 'sin contraste');
+    cal.push(`${H.segEvaluados} de 17 segmentos evaluables`);
+    cal.push(H.fcImagen > 0
+        ? `primera imagen post-esfuerzo a los ${H.segImagen || ND} segundos, con FC de ${H.fcImagen} lpm ` +
+          `(${H.pctFCadq || ND} % de la FC pico)${H.adquisicionTardia ? ', por debajo del rango óptimo' : ''}`
+        : (H.segImagen > 0
+            ? `primera imagen post-esfuerzo a los ${H.segImagen} segundos, FC al adquirir ${NDF}`
+            : `adquisición post-esfuerzo ${NDF}`));
+    linea(T.lineaCalidad, unirOraciones(cal));
 
-    // ── Datos del trastorno de conducción, comunes a los tres bloques ──
+    // ── Datos del trastorno de conducción, comunes a los bloques ──
     const cond = H.conduccionProsa || {};
     const datosConduccion = {
         trastorno: cond.trastorno || '',
@@ -3076,7 +3327,6 @@ function construirNarrativa(H) {
     };
     const hayAsincronia = H.hayConduccion && (H.septalesConduccion || []).length > 0;
 
-    // ── REPOSO ──
     const datosReposo = {
         fey: H.feyReposo || nada,
         ee: nProsa(H.eeReposo) || nada,
@@ -3091,62 +3341,13 @@ function construirNarrativa(H) {
         presionesLlenado: presionesLlenadoEnProsa(H.diastGrado),
         vd: H.vdProsa ? ', ' + H.vdProsa : ''
     };
-    let plantillaReposo;
-    if (rama === 'dilatada') plantillaReposo = T.reposoDilatada;
-    else if (H.secuelas.length) plantillaReposo = T.reposoSecuela;
-    else if (hayAsincronia) plantillaReposo = T.reposoConduccion;
-    else if (rama === 'diastolico') plantillaReposo = T.reposoDiastolico;
-    else if (rama === 'negativa') plantillaReposo = T.reposoNormalLargo;
-    else plantillaReposo = T.reposoNormalCorto;
 
-    let parrafoReposo;
-    if (H.reposoLibre) {
-        // El texto libre gobierna la redacción del bloque de reposo. Los datos cargados
-        // siguen alimentando la lógica: rama, WMSI, territorios y modificadores no cambian.
-        parrafoReposo = H.reposoLibre;
-    } else {
-        parrafoReposo = rellenar(plantillaReposo, { ...datosReposo, ...datosConduccion });
-        // Secuela real en un territorio + asincronía septal por conducción: van las dos cosas
-        if (H.secuelas.length && hayAsincronia) {
-            parrafoReposo += ' ' + rellenar(T.asincroniaSeptalSuelta, datosConduccion);
-        }
-        // Lo normal se comprime: la plantilla ya dice que no hay aumento de las presiones
-        // de llenado. Sólo la disfunción real agrega una oración con su grado.
-        if (['g1', 'g2', 'g3'].includes(H.diastGrado)) {
-            // Si el grado lo puso el operador, no se lo atribuye al algoritmo.
-            parrafoReposo += ' ' + rellenar(
-                fueCorregido('diast_grado') ? T.diastolicaGradoManual : T.diastolicaGrado,
-                { grado: DIAST_GRADO_PROSA[H.diastGrado] });
-        }
-        // Ídem la geometría: una geometría normal no merece una oración propia.
-        if (['remodelado', 'hvi_concentrica', 'hvi_excentrica'].includes(H.geometriaVI)) {
-            // Los números van sólo si la clasificación es la que dedujo la app. Corregida
-            // a mano pueden contradecirla —un "remodelado concéntrico" se define por masa
-            // normal, y ahí al lado una masa de 173 g/m² se lee como un error del informe.
-            // La medición cruda igual queda en el formulario y en la planilla.
-            parrafoReposo += ' ' + rellenar(
-                fueCorregido('geometria_vi') ? T.geometriaVIManual : T.geometriaVI, {
-                    geometria: GEOMETRIA_PROSA[H.geometriaVI],
-                    imvi: nProsa(H.imvi, 0),
-                    rwt: nProsa(H.rwt, 2)
-                });
-        }
-    }
-    parrafos.push(parrafoReposo);
-
-    // ── VIABILIDAD MIOCÁRDICA ──
-    if (H.viabEnUso) {
-        const bloque = bloqueViabilidad(H);
-        if (bloque) parrafos.push(bloque);
-    }
-
-    // ── EAo SEVERA ASINTOMÁTICA CON EJERCICIO ──
-    if (H.eaoEjEnUso) {
-        const bloque = bloqueEAoEjercicio(H);
-        if (bloque) parrafos.push(bloque);
-    }
+    // ── REPOSO ──
+    linea(T.lineaReposo, H.reposoLibre || bloqueReposo(H, datosReposo, datosConduccion, hayAsincronia));
 
     // ── ESFUERZO ──
+    // Sólo motilidad y respuesta contráctil. Lo hemodinámico vive en su línea y el
+    // ST-T en las del ECG: antes la redacción de esta línea cambiaba según la TA.
     const acompanamiento = acompanamientoEnProsa(H);
     const datosEsfuerzo = {
         grado: gradoEnProsa(H.isquemicos, 'scoreEstres'),
@@ -3181,55 +3382,36 @@ function construirNarrativa(H) {
         positivaUnico: T.esfuerzoPositivoUnico,
         secuela:       T.esfuerzoSecuela,
         diastolico:    T.esfuerzoDiastolico,
-        negativa:      hayAsincronia ? T.esfuerzoConduccion
-                     : H.hipertension ? T.esfuerzoHipertensiva
-                     : H.fcSuboptima ? T.esfuerzoFCSuboptima
-                     : T.esfuerzoNegativo
+        // Una sola forma para la rama negativa: la asincronía septal es lo único que
+        // cambia lo que se puede afirmar sobre la MOTILIDAD.
+        negativa:      hayAsincronia ? T.esfuerzoConduccion : T.esfuerzoNegativo
     }[rama];
-    let parrafoEsfuerzo = rellenar(plantillaEsfuerzo, datosEsfuerzo);
+    let textoEsfuerzo = rellenar(plantillaEsfuerzo, datosEsfuerzo);
+    if (hayAsincronia && rama !== 'negativa') textoEsfuerzo += ' ' + T.limitacionSeptalEsfuerzo;
+    if (H.secuelas.length && H.isquemicos.length)
+        textoEsfuerzo += ' ' + rellenar(T.parrafoSecuelaAgregado, datosReposo);
+    // La FEy de esfuerzo se informa siempre, no sólo en las ramas que la nombraban
+    if (H.feyEstres > 0 && !/FEy/.test(textoEsfuerzo))
+        textoEsfuerzo += ` FEy post-esfuerzo ${H.feyEstres} %` +
+            (H.deltaFey !== null ? ` (Δ ${H.deltaFey >= 0 ? '+' : ''}${H.deltaFey} puntos)` : '') + '.';
+    linea(T.lineaEsfuerzo, textoEsfuerzo);
 
-    // En las ramas que no son la negativa, la limitación septal se suma al párrafo
-    if (hayAsincronia && rama !== 'negativa') {
-        parrafoEsfuerzo += ' ' + T.limitacionSeptalEsfuerzo;
-    }
+    // ── MOTILIDAD: la línea cuantitativa, siempre ──
+    linea(T.lineaMotilidad, lineaMotilidadEnProsa(H));
 
-    // Secuela previa + isquemia nueva en otro territorio: se suma el párrafo de secuela
-    if (H.secuelas.length && H.isquemicos.length) {
-        parrafoEsfuerzo += ' ' + rellenar(T.parrafoSecuelaAgregado, datosReposo);
-    }
-    parrafos.push(parrafoEsfuerzo);
-
-    // ── LÍNEA CUANTITATIVA DE MOTILIDAD ──
-    // Aparece siempre que haya segmentos comprometidos: en secuela y dilatada el
-    // Δ cero ES el hallazgo (ausencia de respuesta), no una ausencia de dato.
-    const comprometidos = H.isquemicos.length + H.secuelas.length;
-    if (comprometidos > 0 && H.wmsiReposo !== null && H.wmsiEstres !== null) {
-        const d = H.deltaWMSI;
-        const dTxt = (d > 0 ? '+' : '') + nProsa(d, 2);
-        const detalle = [];
-        if (H.isquemicos.length) detalle.push(`${H.isquemicos.length} con isquemia inducible`);
-        if (H.secuelas.length) detalle.push(`${H.secuelas.length} sin respuesta al esfuerzo`);
-        if (detalle.length === 1 && comprometidos === parseInt(detalle[0])) detalle[0] = detalle[0].replace(/^\d+ /, '');
-        parrafos.push(rellenar(T.lineaWMSI, {
-            wmsiReposo: nProsa(H.wmsiReposo, 2),
-            wmsiEstres: nProsa(H.wmsiEstres, 2),
-            deltaWMSI: dTxt,
-            aclaracionWMSI: H.wmsiExcluyeSeptales ? NARRATIVA.aclaracionWMSI : '',
-            segmentos: comprometidos === 1
-                ? `1 segmento comprometido (${detalle.join(', ')})`
-                : `${comprometidos} segmentos comprometidos (${detalle.join(', ')})`
-        }));
-    }
-
-    // ── ECG: líneas propias, fuera del párrafo de motilidad ──
+    // ── ECG ──
     parrafos.push(rellenar(T.ecgReposo, { contenido: ecgReposoEnProsa(H) }));
     parrafos.push(rellenar(T.ecgPostEsfuerzo, { contenido: ecgEsfuerzoEnProsa(H) }));
 
-    // ── ESTUDIO DIASTÓLICO: línea fija ──
+    // ── ESTUDIO DIASTÓLICO ──
     parrafos.push({
         negativo: T.diastolicoNegativo,
         positivo: T.diastolicoPositivo
     }[H.diastResultado] || T.diastolicoNoEvaluado);
+
+    // ── MÓDULOS OPCIONALES ──
+    if (H.viabEnUso) { const b = bloqueViabilidad(H); if (b) linea(T.lineaViabilidad, b); }
+    if (H.eaoEjEnUso) { const b = bloqueEAoEjercicio(H); if (b) linea(T.lineaValvular, b); }
 
     // ── CONCLUSIÓN ──
     // Con FC subóptima la conclusión negativa arranca corta: la limitación es el foco
@@ -3286,6 +3468,12 @@ function construirNarrativa(H) {
         extras.push(rellenar(T.modificadores[clave], datosConduccion));
     }
 
+    // ── El antecedente reencuadra el hallazgo ──
+    // Va primero entre las oraciones finales: cambia cómo se lee la isquemia que el
+    // veredicto acaba de informar, así que tiene que ir pegada a ella.
+    const revasc = oracionRevascularizacion(H);
+    if (revasc) oracionesFinales.push(revasc);
+
     // Un negativo con estímulo suficiente afirma algo, no sólo niega: el bajo riesgo
     // de eventos es la información que el clínico se lleva. Se calcula ANTES del
     // bloque pronóstico porque decide cómo se encabeza el párrafo que lo matiza.
@@ -3307,6 +3495,9 @@ function construirNarrativa(H) {
 
     if (extras.length) conclusion = conclusion.replace(/\.$/, '') + extras.join('') + '.';
     if (oracionesFinales.length) conclusion += oracionesFinales.join('');
+    // La conclusión que escribe el operador cierra el informe: antes se cargaba y no
+    // aparecía en ninguna parte.
+
 
     // Preámbulo: encabeza SIEMPRE, antes del veredicto.
     const metsFrase = H.mets ? rellenar(T.preambuloMETs, { mets: nProsa(H.mets) }) : '';
@@ -3322,6 +3513,9 @@ function construirNarrativa(H) {
     });
     conclusion = preambulo + '\n' + conclusion;
     if (H.categorizacion) conclusion += ' ' + rellenar(T.categorizacion, { categorizacion: H.categorizacion });
+    // La conclusión que escribe el operador cierra el informe: antes se cargaba y no
+    // aparecía en ninguna parte.
+    if (H.conclusionLibre) conclusion += rellenar(T.conclusionLibre, { texto: H.conclusionLibre });
     parrafos.push(conclusion);
 
     return { rama, texto: parrafos.join('\n\n') };
