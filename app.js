@@ -988,7 +988,8 @@ function evaluarAvisosClinicos() {
             'y el dato queda fuera del informe.');
     else if (H.hrr1 !== null && H.hrr1 <= 12)
         atencion(`HRR₁ de ${H.hrr1} lpm`,
-            'Una caída menor a 12 lpm en el primer minuto de recuperación se asocia a mayor mortalidad, con independencia de la isquemia.');
+            'Una caída menor a 12 lpm en el primer minuto de recuperación se asocia a mayor mortalidad, con independencia de la isquemia.' +
+            (H.hrr1 <= 6 ? ' Por debajo de 6 lpm la app lo lleva a riesgo alto: ese segundo corte es criterio propio de esta app, no de guía —la guía sólo define ≤12 como anormal.' : ''));
 
     // 4 · Umbral isquémico bajo
     if (H.isquemicos.length && H.dobleProducto > 0 && H.dobleProducto < 20000)
@@ -2949,7 +2950,11 @@ const HALLAZGOS = [
                  : H.hrr1 <= 6 ? NARRATIVA.pronostico.hrr1MuyBajo
                  : NARRATIVA.pronostico.hrr1Bajo
         }),
-        motivo: H => `recuperación de la FC al primer minuto ${H.hrr1} lpm (≤12): disfunción autonómica`
+        // El corte validado es ≤12 para "anormal". Partirlo en dos niveles para que un
+        // 0 pese distinto que un 12 es criterio propio, y el panel lo dice: no hay que
+        // confundirlo con evidencia de guía.
+        motivo: H => `recuperación de la FC al primer minuto ${H.hrr1} lpm (≤12): disfunción autonómica` +
+            (H.hrr1 <= 6 ? ' — el salto a riesgo alto por debajo de 6 lpm es criterio propio, no de guía' : '')
     },
     {
         id: 'sinReservaContractil',
@@ -3499,19 +3504,16 @@ function construirNarrativa(H) {
     // aparecía en ninguna parte.
 
 
-    // Preámbulo: encabeza SIEMPRE, antes del veredicto.
-    const metsFrase = H.mets ? rellenar(T.preambuloMETs, { mets: nProsa(H.mets) }) : '';
-    const preambulo = rellenar(T.preambulo, {
+    // El veredicto de suficiencia abre la conclusión, en la misma oración: es un
+    // juicio y no un dato, así que no tiene línea propia en el cuerpo.
+    const suf = rellenar(T.suficiencia, {
         suficiencia: H.pctFCmax >= 85 ? 'suficiente' : 'insuficiente',
         pctFCmax: H.pctFCmax || nada,
-        betabloqueo: H.betabloqueante ? T.preambuloBetabloqueo : '',
-        etapa: H.etapa ? rellenar(T.preambuloEtapa, { etapa: H.etapa }) : T.preambuloSinEtapa,
-        causaDetencion: H.causaDetencionTxt
-    }) + rellenar(H.isquemicos.length ? T.preambuloConIsquemia : T.preambuloSinIsquemia, {
-        dobleProducto: H.dobleProducto ? H.dobleProducto.toLocaleString('es-AR') : nada,
-        mets: metsFrase
+        betabloqueo: H.betabloqueante ? T.suficienciaBetabloqueo : ''
     });
-    conclusion = preambulo + '\n' + conclusion;
+    // El veredicto abre con punto propio, así que lo que sigue arranca oración nueva.
+    conclusion = conclusion.replace(/^Conclusión: (.)/,
+        (_, c) => 'Conclusión: ' + suf + ' ' + c.toUpperCase());
     if (H.categorizacion) conclusion += ' ' + rellenar(T.categorizacion, { categorizacion: H.categorizacion });
     // La conclusión que escribe el operador cierra el informe: antes se cargaba y no
     // aparecía en ninguna parte.

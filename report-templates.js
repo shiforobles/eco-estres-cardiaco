@@ -50,17 +50,13 @@ const NARRATIVA = {
     antecedentesCRM:   'cirugía de revascularización miocárdica{{anio}}',
     antecedentesBB:    'Bajo tratamiento betabloqueante.',
 
-    // ── PREÁMBULO DE LA CONCLUSIÓN ────────────────────────────────────
-    // Encabeza SIEMPRE la conclusión, antes del veredicto del Word.
-    preambulo: 'Test de Eco estrés {{suficiencia}} ({{pctFCmax}} % de la FCMT{{betabloqueo}}){{etapa}} por {{causaDetencion}}.',
-    preambuloBetabloqueo: ', realizado bajo tratamiento con Beta Bloqueante',
-    preambuloEtapa: ', detenido en etapa {{etapa}}',
-    preambuloSinEtapa: ', detenido',
-
-    // Segunda oración: sólo afirma ausencia de isquemia cuando efectivamente no la hubo
-    preambuloSinIsquemia: ' Sin evidencia de isquemia hasta el DP alcanzado ({{dobleProducto}}){{mets}}.',
-    preambuloConIsquemia: ' DP alcanzado {{dobleProducto}}{{mets}}.',
-    preambuloMETs: '; {{mets}} METs',
+    // ── VEREDICTO DE SUFICIENCIA ──────────────────────────────────────
+    // Antes era un preámbulo largo que repetía la etapa, la causa de detención, el
+    // doble producto y los METs: todo eso vive ahora en Protocolo y Hemodinamia.
+    // Queda sólo el juicio, que es lo único que no es un dato crudo y no está en
+    // ninguna otra línea.
+    suficiencia: 'Test {{suficiencia}} ({{pctFCmax}} % de la FCMT{{betabloqueo}}).',
+    suficienciaBetabloqueo: ', bajo tratamiento betabloqueante',
 
     // ── BLOQUE ECG ────────────────────────────────────────────────────
     // Va en líneas propias, fuera del párrafo de motilidad.
@@ -72,17 +68,6 @@ const NARRATIVA = {
     diastolicoNegativo:  'Estudio diastólico de esfuerzo: Negativo, sin aumento de las presiones de llenado con el esfuerzo.',
     diastolicoPositivo:  'Estudio diastólico de esfuerzo: Positivo, con aumento de las presiones de llenado inducido por el ejercicio.',
     diastolicoNoEvaluado:'Estudio diastólico de esfuerzo: No evaluado.',
-
-    // ── MÉTODO ────────────────────────────────────────────────────────
-
-    // Frase de respuestas hemodinámicas: una sola de estas, según el caso
-    // Si el basal ya era hipertensivo, el dato es del paciente y no sólo de la prueba
-
-    // ── CALIDAD ───────────────────────────────────────────────────────
-    // Sin los datos de adquisición cargados, la frase se omite entera:
-    // un informe con rayitas se lee como algo a medio hacer.
-    // Si igual se pudieron evaluar los 17, "solo 17 de los 17" se contradice solo
-
 
     // ── REPOSO ────────────────────────────────────────────────────────
 
