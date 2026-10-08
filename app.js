@@ -2610,6 +2610,7 @@ function recolectarHallazgos() {
     // e `isquemicos`, la rama de secuela se vuelve inalcanzable por construcción y no se
     // les atribuye ningún territorio coronario.
     const isquemicos = [], secuelas = [], septales = [];
+    const anormalesReposo = [], recuperaron = [], sinParReposo = [];
     SEGMENTS.forEach(s => {
         const r = WM.reposo[s.id], e = WM.estres[s.id];
         const c = classifyResponse(r, e);
@@ -2617,20 +2618,45 @@ function recolectarHallazgos() {
             if (r > 1 || e > 1) septales.push({ ...s, scoreReposo: r, scoreEstres: e });
             return;
         }
+        // La motilidad de REPOSO se lee del reposo y de nada más. Antes la línea de
+        // Reposo se decidía mirando `secuelas`, que es una clasificación de la
+        // RESPUESTA al esfuerzo: todo segmento basal anormal que mejorara con el
+        // esfuerzo ('viable') o que quedara sin par ('parcial') desaparecía, y el
+        // informe afirmaba "motilidad parietal normal" sobre segmentos cargados
+        // como anormales en el bull's eye.
+        if (r > 1) {
+            anormalesReposo.push({ ...s, scoreReposo: r, scoreEstres: e, respuesta: c.key });
+            if (c.key === 'viable') recuperaron.push({ ...s, scoreReposo: r, scoreEstres: e });
+            if (c.key === 'parcial') sinParReposo.push({ ...s, scoreReposo: r });
+        }
         if (c.key === 'isquemia' || c.key === 'isquemia_necrosis') isquemicos.push({ ...s, scoreEstres: e });
         if (c.key === 'cicatriz') secuelas.push({ ...s, scoreReposo: r });
     });
-    isquemicos.sort((a, b) => a.id - b.id);
-    secuelas.sort((a, b) => a.id - b.id);
-    septales.sort((a, b) => a.id - b.id);
+    const porId = (a, b) => a.id - b.id;
+    isquemicos.sort(porId);
+    secuelas.sort(porId);
+    septales.sort(porId);
+    anormalesReposo.sort(porId);
+    recuperaron.sort(porId);
+    sinParReposo.sort(porId);
     H.septalesConduccion = septales;
 
     H.isquemicos = isquemicos;
     H.secuelas = secuelas;
+    H.anormalesReposo = anormalesReposo;
+    H.recuperaron = recuperaron;
+    H.sinParReposo = sinParReposo;
     H.territoriosIsquemia = territoriosDe(isquemicos);
     H.territoriosSecuela = territoriosDe(secuelas);
+    H.territoriosReposo = territoriosDe(anormalesReposo);
     H.patronApical = esPatronApical(isquemicos);
     H.patronApicalSecuela = esPatronApical(secuelas);
+    H.patronApicalReposo = esPatronApical(anormalesReposo);
+    // Sólo se puede atribuir el reposo a un evento previo si TODOS los segmentos
+    // basales anormales quedaron sin cambio con el esfuerzo. Si alguno mejoró o
+    // quedó sin par, el reposo describe y no interpreta.
+    H.reposoTodoSecuela = anormalesReposo.length > 0 &&
+                          anormalesReposo.every(s => s.respuesta === 'cicatriz');
 
     const cnt = contarMotilidad();
     H.segEvaluados = Math.min(cnt.evalRep, cnt.evalEst);
@@ -2751,6 +2777,25 @@ function fraseTerritorioIsquemia(H) {
 }
 function fraseTerritorioSecuela(H) {
     return H.patronApicalSecuela ? 'la región apical en su totalidad' : territorioFrase(H.territoriosSecuela);
+}
+function fraseTerritorioReposo(H) {
+    return H.patronApicalReposo ? 'la región apical en su totalidad' : territorioFrase(H.territoriosReposo);
+}
+
+// Cómo se dice el cambio del WMSI, con el verbo que corresponde al signo del delta.
+function fraseWMSIEnProsa(H) {
+    const rep = nProsa(H.wmsiReposo, 2), est = nProsa(H.wmsiEstres, 2);
+    if (!rep || !est) return 'no pudo calcularse';
+    const d = H.deltaWMSI;
+    if (d === null) return `fue de ${rep} en reposo`;
+    if (d === 0) return `se mantuvo en ${rep}, sin cambio con el esfuerzo`;
+    return `${d > 0 ? 'ascendió' : 'descendió'} de ${rep} en reposo a ${est} post-esfuerzo`;
+}
+
+// Concordancia de número. Las frases que enumeran segmentos traían el artículo y el
+// verbo escritos en plural: con un solo segmento salía "El segmento ... no modificaron".
+function conc(segs, singular, plural) {
+    return (segs || []).length === 1 ? singular : plural;
 }
 
 // Grado predominante (el peor) de un conjunto de segmentos
@@ -3198,9 +3243,13 @@ function bloqueReposo(H, datosReposo, datosConduccion, hayAsincronia) {
     const T = NARRATIVA, nada = '—';
     const partes = [];
 
-    // Motilidad
-    if (H.secuelas.length) partes.push(rellenar(T.reposoMotilidadSecuela, datosReposo));
-    else if (H.patronGlobal) partes.push(T.reposoMotilidadGlobal);
+    // Motilidad en reposo: se lee de los puntajes de reposo del bull's eye y de
+    // ninguna otra clasificación. La hipoquinesia global es una declaración explícita
+    // del operador y manda sobre la descripción segmentaria, igual que en elegirRama().
+    if (H.patronGlobal) partes.push(T.reposoMotilidadGlobal);
+    else if (H.anormalesReposo.length)
+        partes.push(rellenar(H.reposoTodoSecuela ? T.reposoMotilidadSecuela
+                                                 : T.reposoMotilidadAlterada, datosReposo));
     else partes.push(T.reposoMotilidadNormal);
     if (hayAsincronia) partes.push(rellenar(T.asincroniaSeptalSuelta, datosConduccion).trim());
 
@@ -3228,10 +3277,17 @@ function lineaMotilidadEnProsa(H) {
     const T = NARRATIVA;
     if (H.wmsiReposo === null || H.wmsiEstres === null) return T.sinDatoF;
     const d = H.deltaWMSI;
-    const comprometidos = H.isquemicos.length + H.secuelas.length;
+    // Comprometido = anormal en reposo o en esfuerzo. Antes sólo contaba isquémicos y
+    // secuelas, así que un WMSI de reposo de 1,12 convivía con "sin segmentos
+    // comprometidos" en la misma línea.
+    const ids = new Set();
+    [H.isquemicos, H.anormalesReposo].forEach(g => (g || []).forEach(s => ids.add(s.id)));
+    const comprometidos = ids.size;
     const detalle = [];
     if (H.isquemicos.length) detalle.push(`${H.isquemicos.length} con isquemia inducible`);
     if (H.secuelas.length) detalle.push(`${H.secuelas.length} sin respuesta al esfuerzo`);
+    if (H.recuperaron.length) detalle.push(`${H.recuperaron.length} con mejoría`);
+    if (H.sinParReposo.length) detalle.push(`${H.sinParReposo.length} sin par reposo/esfuerzo`);
     const segs = comprometidos === 0 ? 'sin segmentos comprometidos'
         : comprometidos === 1 ? `1 segmento comprometido (${detalle.join(', ')})`
         : `${comprometidos} segmentos comprometidos (${detalle.join(', ')})`;
@@ -3339,9 +3395,24 @@ function construirNarrativa(H) {
         gradoSecuela: gradoEnProsa(H.secuelas, 'scoreReposo'),
         segmentosSecuela: segmentosEnProsa(H.secuelas),
         deSegmentosSecuela: deSegmentos(H.secuelas),
-        segmentosSecuelaArt: H.secuelas.length === 1 ? 'El segmento' : 'Los segmentos',
+        segmentosSecuelaArt: conc(H.secuelas, 'El segmento', 'Los segmentos'),
+        verboSecuela: conc(H.secuelas, 'no modificó', 'no modificaron'),
         territorioSecuela: territoriosEnProsa(H.territoriosSecuela),
         territorioSecuelaFrase: fraseTerritorioSecuela(H),
+        // Motilidad basal: describe TODO lo anormal en reposo, cualquiera haya sido
+        // su respuesta al esfuerzo.
+        gradoReposo: gradoEnProsa(H.anormalesReposo, 'scoreReposo'),
+        segmentosReposo: segmentosEnProsa(H.anormalesReposo),
+        deSegmentosReposo: deSegmentos(H.anormalesReposo),
+        territorioReposoFrase: fraseTerritorioReposo(H),
+        // Los segmentos basales anormales que mejoraron o que quedaron sin par:
+        // antes se perdían del informe por completo.
+        segmentosRecuperaron: segmentosEnProsa(H.recuperaron),
+        recuperaronArt: conc(H.recuperaron, 'El segmento', 'Los segmentos'),
+        verboRecuperaron: conc(H.recuperaron, 'normalizó o mejoró', 'normalizaron o mejoraron'),
+        segmentosSinPar: segmentosEnProsa(H.sinParReposo),
+        sinParArt: conc(H.sinParReposo, 'El segmento', 'Los segmentos'),
+        sinParValorable: conc(H.sinParReposo, 'no resultó valorable', 'no resultaron valorables'),
         gradoFey: gradoFeyEnProsa(H.feyReposo),
         presionesLlenado: presionesLlenadoEnProsa(H.diastGrado),
         vd: H.vdProsa ? ', ' + H.vdProsa : ''
@@ -3363,6 +3434,10 @@ function construirNarrativa(H) {
         territorios: territoriosEnProsa(H.territoriosIsquemia),
         wmsiReposo: nProsa(H.wmsiReposo, 2) || nada,
         wmsiEstres: nProsa(H.wmsiEstres, 2) || nada,
+        // El índice global puede BAJAR con isquemia nueva si otros segmentos mejoraron:
+        // la plantilla decía "ascendió de X a Y" siempre y afirmaba lo contrario del
+        // número que ella misma imprimía.
+        frasewmsi: fraseWMSIEnProsa(H),
         aclaracionWMSI: H.wmsiExcluyeSeptales ? NARRATIVA.aclaracionWMSI : '',
         acompanamiento: acompanamiento,
         caidaFey: H.caidaFey ? `, con caída de la FEy de ${H.feyReposo} % a ${H.feyEstres} % post-esfuerzo` : '',
@@ -3395,6 +3470,13 @@ function construirNarrativa(H) {
     if (hayAsincronia && rama !== 'negativa') textoEsfuerzo += ' ' + T.limitacionSeptalEsfuerzo;
     if (H.secuelas.length && H.isquemicos.length)
         textoEsfuerzo += ' ' + rellenar(T.parrafoSecuelaAgregado, datosReposo);
+    // Lo que le pasó con el esfuerzo a cada segmento basal anormal tiene que decirse
+    // en alguna línea. Las ramas describen la isquemia nueva y la secuela; la mejoría
+    // y el par faltante no los cubre ninguna.
+    if (H.recuperaron.length)
+        textoEsfuerzo += ' ' + rellenar(T.parrafoReservaRegional, datosReposo);
+    if (H.sinParReposo.length)
+        textoEsfuerzo += ' ' + rellenar(T.parrafoSinParReposo, datosReposo);
     // La FEy de esfuerzo se informa siempre, no sólo en las ramas que la nombraban
     if (H.feyEstres > 0 && !/FEy/.test(textoEsfuerzo))
         textoEsfuerzo += ` FEy post-esfuerzo ${H.feyEstres} %` +
@@ -3520,7 +3602,31 @@ function construirNarrativa(H) {
     if (H.conclusionLibre) conclusion += rellenar(T.conclusionLibre, { texto: H.conclusionLibre });
     parrafos.push(conclusion);
 
-    return { rama, texto: parrafos.join('\n\n') };
+    const texto = parrafos.join('\n\n');
+    INCOHERENCIAS_INFORME = incoherenciasInforme(texto, H);
+    return { rama, texto };
+}
+
+// ── Guarda de coherencia ──────────────────────
+// Red de seguridad para el peor error posible: un informe que contradice lo que se
+// cargó. La causa original —la línea de Reposo decidiéndose por la clasificación de
+// respuesta al esfuerzo— ya está arreglada; esto existe para que, si vuelve a pasar
+// por otro camino, se vea en pantalla antes de firmar en vez de pasar inadvertido.
+// Nunca altera el informe: sólo lo denuncia.
+let INCOHERENCIAS_INFORME = [];
+
+function incoherenciasInforme(texto, H) {
+    const malos = [];
+    const nAnormales = (H.anormalesReposo || []).length;
+    if (nAnormales && /Reposo:[^\n]*motilidad parietal normal/i.test(texto))
+        malos.push(`El informe afirma motilidad parietal normal en reposo, pero hay ` +
+            `${nAnormales} segmento${nAnormales === 1 ? '' : 's'} con puntaje anormal en el reposo ` +
+            `del bull's eye (${segmentosEnProsa(H.anormalesReposo)}).`);
+    if ((nAnormales || H.isquemicos.length) && /sin segmentos comprometidos/.test(texto))
+        malos.push('El informe dice "sin segmentos comprometidos" habiendo segmentos alterados cargados.');
+    if (!nAnormales && !H.patronGlobal && /Reposo:[^\n]*en relación con evento previo/.test(texto))
+        malos.push('El informe atribuye el reposo a un evento previo sin segmentos anormales en reposo.');
+    return malos;
 }
 
 function motivoNoConcluyente(H) {
@@ -3593,6 +3699,11 @@ function generarInforme() {
 // No bloquea la generación del informe: avisa qué falta o qué es incoherente.
 function validarEstudio(rama) {
     const av = [];   // { nivel: 'error'|'warn'|'info', txt }
+    // Lo primero: si el texto recién generado contradice lo cargado, eso va arriba de
+    // todo. Es el único aviso que dice "no firmes esto".
+    INCOHERENCIAS_INFORME.forEach(txt => av.push({ nivel: 'error',
+        txt: 'INCOHERENCIA DEL INFORME — no lo firmes así. ' + txt +
+             ' Avisá de este caso: es un error de la app, no de la carga.' }));
     const cnt = contarMotilidad();
     const edad = parseInt(v('edad')) || 0;
     const fcPico = num('esf_max_fc');

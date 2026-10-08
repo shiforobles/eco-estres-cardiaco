@@ -42,9 +42,21 @@ const NARRATIVA = {
 
     // Motilidad en reposo: una frase por situación, sin mezclarse con FEy ni llenado,
     // que ahora se informan siempre por separado y con sus números.
-    reposoMotilidadNormal:  'motilidad parietal normal',
-    reposoMotilidadSecuela: '{{gradoSecuela}} {{deSegmentosSecuela}} ({{territorioSecuelaFrase}}), en relación con evento previo',
-    reposoMotilidadGlobal:  'hipoquinesia global, sin distribución en territorio coronario',
+    // Los marcadores salen de los puntajes de REPOSO del bull's eye, no de la
+    // clasificación de respuesta al esfuerzo: la variante de secuela se usa sólo
+    // cuando todos los segmentos basales anormales quedaron sin cambio con el esfuerzo.
+    reposoMotilidadNormal:   'motilidad parietal normal',
+    reposoMotilidadAlterada: '{{gradoReposo}} {{deSegmentosReposo}} ({{territorioReposoFrase}})',
+    reposoMotilidadSecuela:  '{{gradoReposo}} {{deSegmentosReposo}} ({{territorioReposoFrase}}), en relación con evento previo',
+    reposoMotilidadGlobal:   'hipoquinesia global, sin distribución en territorio coronario',
+
+    // Lo que le pasó con el esfuerzo a un segmento basal anormal. Antes, si mejoraba
+    // o si quedaba sin par, no se decía en ninguna línea del informe.
+    parrafoReservaRegional: '{{recuperaronArt}} con alteración de la motilidad en reposo ({{segmentosRecuperaron}}) ' +
+        '{{verboRecuperaron}} su motilidad con el esfuerzo, con reserva contráctil regional conservada, ' +
+        'hallazgo compatible con viabilidad miocárdica.',
+    parrafoSinParReposo: '{{sinParArt}} con alteración de la motilidad en reposo ({{segmentosSinPar}}) ' +
+        '{{sinParValorable}} en el post-esfuerzo, por lo que no puede establecerse su respuesta contráctil.',
 
     antecedentesATC:   'angioplastia a {{vasos}}{{anio}}',
     antecedentesCRM:   'cirugía de revascularización miocárdica{{anio}}',
@@ -149,13 +161,11 @@ const NARRATIVA = {
                        'en ninguno de los territorios evaluados.',
 
     esfuerzoPositivoUnico: 'Nueva {{grado}} {{deSegmentos}}, con caída del engrosamiento sistólico ' +
-                       'respecto del reposo, en {{territorioFrase}}. El WMSI{{aclaracionWMSI}} ascendió de {{wmsiReposo}} en reposo a ' +
-                       '{{wmsiEstres}} post-esfuerzo.' +
+                       'respecto del reposo, en {{territorioFrase}}. El WMSI{{aclaracionWMSI}} {{frasewmsi}}.' +
                        '{{acompanamiento}} El resto de los segmentos mostró adecuada respuesta hiperdinámica.',
 
     esfuerzoPositivoMulti: 'Nuevas alteraciones de la motilidad en los segmentos {{segmentos}}, con compromiso ' +
-                       'de más de un territorio coronario ({{territorios}}). El WMSI{{aclaracionWMSI}} ascendió de {{wmsiReposo}} a ' +
-                       '{{wmsiEstres}}{{caidaFey}}.' +
+                       'de más de un territorio coronario ({{territorios}}). El WMSI{{aclaracionWMSI}} {{frasewmsi}}{{caidaFey}}.' +
                        '{{acompanamiento}} El hallazgo de isquemia extensa y multiterritorial constituye un marcador de alto riesgo.',
 
     esfuerzoSecuela:   'Los segmentos comprometidos no modificaron su motilidad, sin reserva contráctil regional ' +
@@ -217,7 +227,7 @@ const NARRATIVA = {
                        'que genera alteraciones del movimiento septal no atribuibles a isquemia.',
 
     // Párrafo que se agrega cuando hay secuela previa Y además isquemia nueva en otro territorio
-    parrafoSecuelaAgregado: '{{segmentosSecuelaArt}} con alteración basal ({{segmentosSecuela}}, {{territorioSecuelaFrase}}) no modificaron su ' +
+    parrafoSecuelaAgregado: '{{segmentosSecuelaArt}} con alteración basal ({{segmentosSecuela}}, {{territorioSecuelaFrase}}) {{verboSecuela}} su ' +
                        'motilidad con el esfuerzo, sin evidencia de reserva contráctil, en relación con secuela.',
 
     // ── CONCLUSIONES ──────────────────────────────────────────────────
