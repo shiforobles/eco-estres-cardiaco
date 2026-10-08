@@ -392,6 +392,48 @@ const NARRATIVA = {
         hrr1Bajo:    'por debajo de los 12 lpm esperados',
         hrr1MuyBajo: 'muy por debajo de los 12 lpm esperados',
 
+        // ── Hallazgos que movían la categoría SIN decir una palabra ───────
+        // Nueve hallazgos devolvían `null` porque el cuerpo ya los describía. El
+        // resultado era que un estudio de riesgo alto por isquemia extensa y
+        // multiterritorial cerraba sin ninguna implicancia ni conducta: la categoría
+        // decía "alto" y el párrafo pronóstico no existía. Estas frases no
+        // redescriben el hallazgo —eso ya está arriba— sino lo que significa y qué
+        // se sugiere hacer.
+        isquemiaExtensa: 'la isquemia compromete {{n}} segmentos, extensión que define un grupo de alto riesgo ' +
+                     'de eventos; se sugiere evaluación de la anatomía coronaria',
+
+        multiterritorial: 'la isquemia compromete más de un territorio coronario ({{territorios}}), lo que sugiere ' +
+                     'enfermedad de múltiples vasos; se sugiere evaluación de la anatomía coronaria',
+
+        wmsiAlto:    'el índice de motilidad parietal post-esfuerzo fue de {{wmsi}}, por encima de 1,7: ese estrato ' +
+                     'se asocia a una tasa de eventos cardíacos cercana al 5 % anual',
+
+        wmsiIntermedio: 'el índice de motilidad parietal post-esfuerzo fue de {{wmsi}}, que se asocia a una tasa de ' +
+                     'eventos cardíacos cercana al 3 % anual',
+
+        feyReposoBaja: 'la fracción de eyección en reposo ({{fey}} %) es por sí sola marcador de riesgo; se sugiere ' +
+                     'seguimiento de la función ventricular y optimización del tratamiento médico',
+
+        patronApicalPron: 'el compromiso apical abarca segmentos de tres territorios coronarios por anatomía y no ' +
+                     'por enfermedad de tres vasos; conviene considerar otras causas de disfunción apical ' +
+                     '—aneurisma, síndrome de Takotsubo, miocardiopatía hipertrófica apical, descendente anterior ' +
+                     'envolvente— antes de leerlo como enfermedad coronaria difusa',
+
+        isquemiaUnTerritorio: 'la isquemia se limita a {{n}} {{plural}} de un solo territorio coronario, extensión ' +
+                     'que se asocia a menor riesgo de eventos: la conducta puede guiarse por los síntomas y por la ' +
+                     'respuesta al tratamiento médico',
+
+        secuelaPron: 'los segmentos con secuela no mostraron reserva contráctil, de modo que no cabe esperar ' +
+                     'recuperación funcional de ese territorio con la revascularización',
+
+        diastolicoPron: 'el aumento de las presiones de llenado inducido por el ejercicio es compatible con ' +
+                     'insuficiencia cardíaca con fracción de eyección preservada y puede explicar la disnea de ' +
+                     'esfuerzo; se sugiere tratamiento dirigido a la congestión y control de la presión arterial',
+
+        incompetenciaCronotropica: 'el índice cronotrópico fue de {{indice}} con una reserva de frecuencia cardíaca ' +
+                     'de {{reserva}}, por debajo de lo esperable sin betabloqueo: sugiere incompetencia ' +
+                     'cronotrópica, que es un hallazgo pronóstico propio y no sólo un estudio submáximo',
+
         // Un joven con 6 METs está mal aunque supere el corte absoluto de 5: se
         // menciona como capacidad reducida para su edad y sexo, sin mover la categoría.
         capacidadPct: 'la capacidad funcional alcanzada ({{mets}} METs) representa el {{pct}} % del predicho ' +

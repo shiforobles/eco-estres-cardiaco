@@ -2991,28 +2991,33 @@ const HALLAZGOS = [
         id: 'isquemiaExtensa',
         peso: 'alto',
         activo: H => H.isquemicos.length >= 5,
-        informe: () => null,   // el párrafo de esfuerzo ya enumera los segmentos
+        // El cuerpo enumera los segmentos; acá va lo que esa extensión significa.
+        informe: H => rellenar(NARRATIVA.pronostico.isquemiaExtensa, { n: H.isquemicos.length }),
         motivo: H => `isquemia inducible en ${H.isquemicos.length} segmentos (≥5): extensa`
     },
     {
         id: 'multiterritorial',
         peso: 'alto',
         activo: H => H.territoriosIsquemia.length > 1 && !H.patronApical,
-        informe: () => null,
+        // La rama multiterritorial ya cierra con el marcador de alto riesgo.
+        informe: (H, rama) => rama === 'positivaMulti' ? null
+            : rellenar(NARRATIVA.pronostico.multiterritorial,
+                       { territorios: territoriosEnProsa(H.territoriosIsquemia) }),
         motivo: H => `isquemia en ${H.territoriosIsquemia.length} territorios coronarios`
     },
     {
         id: 'wmsiAlto',
         peso: 'alto',
         activo: H => H.wmsiEstres !== null && parseFloat(H.wmsiEstres) > 1.7,
-        informe: () => null,
+        informe: H => rellenar(NARRATIVA.pronostico.wmsiAlto, { wmsi: nProsa(H.wmsiEstres, 2) }),
         motivo: H => `WMSI pico ${nProsa(H.wmsiEstres, 2)} (>1,7): ~5 % de eventos cardíacos por año`
     },
     {
         id: 'feyReposoBaja',
         peso: 'alto',
         activo: H => H.feyReposo > 0 && H.feyReposo <= 45,
-        informe: () => null,   // el bloque de reposo ya informa la FEy
+        // El bloque de reposo informa el número; acá va lo que implica.
+        informe: H => rellenar(NARRATIVA.pronostico.feyReposoBaja, { fey: H.feyReposo }),
         motivo: H => `FEy en reposo ${H.feyReposo} % (≤45 %): marcador independiente de riesgo`
     },
     {
@@ -3100,21 +3105,24 @@ const HALLAZGOS = [
         id: 'wmsiIntermedio',
         peso: 'intermedio',
         activo: H => H.wmsiEstres !== null && parseFloat(H.wmsiEstres) > 1.0 && parseFloat(H.wmsiEstres) <= 1.7,
-        informe: () => null,
+        informe: H => rellenar(NARRATIVA.pronostico.wmsiIntermedio, { wmsi: nProsa(H.wmsiEstres, 2) }),
         motivo: H => `WMSI pico ${nProsa(H.wmsiEstres, 2)} (1,1-1,7): ~3 % de eventos por año`
     },
     {
         id: 'patronApical',
         peso: 'intermedio',
         activo: H => H.patronApical,
-        informe: () => null,
+        informe: () => NARRATIVA.pronostico.patronApicalPron,
         motivo: H => `compromiso apical extenso (${H.isquemicos.length} segmentos), sin distribución por territorio coronario`
     },
     {
         id: 'isquemiaUnTerritorio',
         peso: 'intermedio',
         activo: H => H.isquemicos.length && H.isquemicos.length < 5 && H.territoriosIsquemia.length <= 1 && !H.patronApical,
-        informe: () => null,
+        // El WMSI dice lo mismo con un número publicado: si está, esta frase sobra.
+        cubiertoPor: ['wmsiAlto', 'wmsiIntermedio'],
+        informe: H => rellenar(NARRATIVA.pronostico.isquemiaUnTerritorio, {
+            n: H.isquemicos.length, plural: H.isquemicos.length === 1 ? 'segmento' : 'segmentos' }),
         motivo: H => `isquemia inducible en ${H.isquemicos.length} ` +
             `${H.isquemicos.length === 1 ? 'segmento' : 'segmentos'} de un solo territorio`
     },
@@ -3122,22 +3130,31 @@ const HALLAZGOS = [
         id: 'secuela',
         peso: 'intermedio',
         activo: H => H.secuelas.length > 0,
-        informe: () => null,
+        informe: () => NARRATIVA.pronostico.secuelaPron,
         motivo: () => 'secuela sin reserva contráctil regional'
     },
     {
         id: 'diastolicoPositivo',
         peso: 'intermedio',
         activo: H => H.diastResultado === 'positivo',
-        informe: () => null,   // ya sale como modificador de la conclusión
+        // El modificador de la conclusión dice QUE fue positivo; acá va qué significa.
+        // En su propia rama la implicancia ya es el núcleo del veredicto.
+        informe: (H, rama) => rama === 'diastolico' ? null : NARRATIVA.pronostico.diastolicoPron,
         motivo: () => 'test diastólico de esfuerzo positivo'
     },
     {
         id: 'incompetenciaCronotropica',
         peso: 'intermedio',
-        activo: H => H.pctFCmax > 0 && H.pctFCmax < 85 && !H.betabloqueante,
-        informe: () => null,
-        motivo: H => `respuesta cronotrópica ${H.pctFCmax} % sin betabloqueo: posible incompetencia cronotrópica`
+        // Mismo criterio que el panel de pantalla. Antes la tabla miraba el %FCMT
+        // crudo —que en bici da falsos positivos, y por eso el panel no lo usa— y el
+        // panel miraba el índice cronotrópico: dos reglas distintas para el mismo
+        // hallazgo, en la misma app.
+        activo: H => !H.betabloqueante && H.indiceCronotropico !== null && H.reservaFC !== null &&
+                     H.indiceCronotropico < 0.80 && H.reservaFC < 1.85,
+        informe: H => rellenar(NARRATIVA.pronostico.incompetenciaCronotropica, {
+            indice: nProsa(H.indiceCronotropico, 2), reserva: nProsa(H.reservaFC, 2) }),
+        motivo: H => `índice cronotrópico ${nProsa(H.indiceCronotropico, 2)} y reserva de FC ` +
+            `${nProsa(H.reservaFC, 2)} sin betabloqueo: incompetencia cronotrópica`
     }
 ];
 
@@ -3159,8 +3176,22 @@ const pesoDe = (h, H) => (typeof h.peso === 'function' ? h.peso(H) : h.peso);
 // ── El párrafo pronóstico de la conclusión ──
 function oracionPronostica(H, rama) {
     const P = NARRATIVA.pronostico;
-    const items = hallazgosActivos(H)
-        .map(h => h.informe(H, rama))
+    // Dos hallazgos distintos pueden traer el mismo mensaje: con un solo segmento
+    // isquémico se activan a la vez el WMSI intermedio y la isquemia de un territorio,
+    // y el párrafo decía "~3 % de eventos por año" y "menor riesgo de eventos" como si
+    // fueran dos cosas. `cubiertoPor` calla al que aporta menos; el peso para la
+    // categoría no cambia, sólo la redacción.
+    const activos = hallazgosActivos(H);
+    const ids = new Set(activos.map(h => h.id));
+    // Por relevancia: primero lo que mueve a riesgo alto, después lo intermedio, y
+    // último lo que se menciona sin categorizar. El orden de la tabla ya era casi ese,
+    // pero `capacidadReducidaPct` —que no categoriza— caía en el medio.
+    const ORDEN = { alto: 0, intermedio: 1 };
+    const items = activos
+        .filter(h => !(h.cubiertoPor || []).some(id => ids.has(id)))
+        .map((h, i) => ({ h, i, orden: ORDEN[pesoDe(h, H)] ?? 2 }))
+        .sort((a, b) => a.orden - b.orden || a.i - b.i)
+        .map(({ h }) => h.informe(H, rama))
         .filter(Boolean);
 
     if (!items.length) return '';
