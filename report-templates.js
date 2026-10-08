@@ -40,6 +40,29 @@ const NARRATIVA = {
 
     sinAntecedentes:   'sin antecedentes cardiovasculares consignados',
 
+    // ── MÉTODO, EN PROSA ──────────────────────────────────────────────
+    // Vuelve al informe como PRIMERA oración del bloque de reposo. Las líneas
+    // rotuladas de Protocolo y Hemodinamia quedan arriba igual: el bloque de reposo
+    // se recorta solo para pegarlo en el formulario de la institución, y sin esta
+    // oración el recorte sale sin el contexto de cómo se hizo el estudio.
+    metodo: 'Se realizó ecocardiograma con ejercicio en cicloergómetro{{protocolo}}, con carga escalonada hasta ' +
+            '{{carga}} Kgm/min{{etapaMetodo}}, alcanzando {{fcPico}} lpm ({{pctFCmax}} % de la FC máxima predicha) ' +
+            'y un doble producto de {{dobleProducto}}{{metsMetodo}}, deteniéndose la prueba por {{causaDetencion}}.',
+    metodoSinCarga: 'Se realizó ecocardiograma con ejercicio en cicloergómetro{{protocolo}}{{etapaMetodo}}, alcanzando ' +
+            '{{fcPico}} lpm ({{pctFCmax}} % de la FC máxima predicha) y un doble producto de {{dobleProducto}}' +
+            '{{metsMetodo}}, deteniéndose la prueba por {{causaDetencion}}.',
+
+    // Respuesta hemodinámica: una sola de estas, según el caso.
+    respuestaNormal:      'La respuesta tensional fue normotensiva y la respuesta cronotrópica adecuada.',
+    respuestaHipertensiva:'Durante el esfuerzo presentó respuesta hipertensiva, con TA pico de {{taPico}} mmHg partiendo de {{taBasal}} mmHg basal.',
+    // Si la basal ya era hipertensiva, el dato es del paciente y no sólo de la prueba.
+    respuestaHipertensivaBasalAlta:'Durante el esfuerzo presentó respuesta hipertensiva, con TA pico de {{taPico}} mmHg, ' +
+                          'partiendo de cifras basales ya elevadas ({{taBasal}} mmHg).',
+    respuestaHipotensiva: 'Durante el esfuerzo presentó descenso tensional, de {{taBasal}} mmHg basales a {{taPico}} mmHg en el pico, motivo por el cual se detuvo la prueba.',
+    // La oración de método ya dio la FC y el porcentaje: acá va sólo el juicio. Antes
+    // decía "alcanzando 110 lpm (70 %)... Alcanzó 110 lpm, correspondiente al 70 %...".
+    respuestaFCSuboptima: 'No se alcanzó el objetivo del 85 % de la FC máxima predicha{{betabloqueante}}.',
+
     // Motilidad en reposo: una frase por situación, sin mezclarse con FEy ni llenado,
     // que ahora se informan siempre por separado y con sus números.
     // Los marcadores salen de los puntajes de REPOSO del bull's eye, no de la

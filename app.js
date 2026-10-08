@@ -3332,6 +3332,39 @@ function antecedentesEnProsa(H) {
     return txt;
 }
 
+// El método, en prosa. Encabeza el bloque de reposo porque ese bloque se recorta solo
+// para pegarlo en el formulario de la institución: sin esta oración, el recorte sale
+// sin decir cómo se hizo el estudio. Las líneas rotuladas de Protocolo y Hemodinamia
+// quedan igual arriba — es redundancia a propósito, preferible a perder el contexto.
+function metodoEnProsa(H) {
+    const T = NARRATIVA, nada = '—';
+    if (!T.metodo) return '';
+    const partes = [rellenar(H.cargaKgm ? T.metodo : T.metodoSinCarga, {
+        protocolo: H.protocolo && H.protocolo !== 'otro' ? ' con protocolo de ' + H.protocoloTxt : '',
+        carga: H.cargaKgm || nada,
+        etapaMetodo: H.etapa ? `, en etapa ${H.etapa}` : '',
+        fcPico: H.fcPico || nada,
+        pctFCmax: H.pctFCmax || nada,
+        dobleProducto: H.dobleProducto ? H.dobleProducto.toLocaleString('es-AR') : nada,
+        metsMetodo: H.mets ? `, con ${nProsa(H.mets)} METs${H.pctMets ? ` (${H.pctMets} % del predicho para edad y sexo)` : ''}` : '',
+        causaDetencion: H.causaDetencionTxt || NARRATIVA.sinDatoF
+    })];
+
+    // Una sola frase de respuesta hemodinámica, en orden de gravedad.
+    if (H.hipotension)
+        partes.push(rellenar(T.respuestaHipotensiva, { taBasal: H.taBasal || nada, taPico: H.taPico || nada }));
+    else if (H.hipertension)
+        partes.push(rellenar(H.basalElevada ? T.respuestaHipertensivaBasalAlta : T.respuestaHipertensiva,
+            { taPico: H.taPico || nada, taBasal: H.taBasal || nada }));
+    else if (H.fcSuboptima)
+        partes.push(rellenar(T.respuestaFCSuboptima, {
+            betabloqueante: H.betabloqueante ? ', bajo tratamiento betabloqueante' : ''
+        }));
+    else if (H.pctFCmax >= 85) partes.push(T.respuestaNormal);
+
+    return partes.join(' ');
+}
+
 // El bloque de reposo, con forma estable: motilidad, FEy, llenado, geometría.
 function bloqueReposo(H, datosReposo, datosConduccion, hayAsincronia) {
     const T = NARRATIVA, nada = '—';
@@ -3513,7 +3546,11 @@ function construirNarrativa(H) {
     };
 
     // ── REPOSO ──
-    linea(T.lineaReposo, H.reposoLibre || bloqueReposo(H, datosReposo, datosConduccion, hayAsincronia));
+    // El método abre el bloque. El texto libre reemplaza la descripción del reposo,
+    // no el contexto de cómo se hizo el estudio: por eso va antes de los dos.
+    const prosaMetodo = metodoEnProsa(H);
+    linea(T.lineaReposo, (prosaMetodo ? prosaMetodo + ' ' : '') +
+        (H.reposoLibre || bloqueReposo(H, datosReposo, datosConduccion, hayAsincronia)));
 
     // ── ESFUERZO ──
     // Sólo motilidad y respuesta contráctil. Lo hemodinámico vive en su línea y el
