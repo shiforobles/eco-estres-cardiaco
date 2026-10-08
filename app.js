@@ -231,6 +231,40 @@ function marcarDiastolicoManual() {
 const IMVI_ALTO = { M: 115, F: 95 };   // g/m²
 const RWT_ALTO = 0.42;
 
+// Rangos de plausibilidad, en milímetros. La fórmula del cubo no valida nada: con un
+// DDVI de 3 y una pared de 13 devuelve un RWT de 8,67 con la misma cara que con 0,38.
+// Los `min`/`max` del input no alcanzan: el navegador no bloquea lo que se tipea.
+const RANGO_VI = {
+    ddvi: { min: 25, max: 80, nombre: 'el DDVI' },
+    siv:  { min: 4,  max: 25, nombre: 'el septum' },
+    pp:   { min: 4,  max: 25, nombre: 'la pared posterior' }
+};
+// Si las tres entran en el rango de centímetros, el error es de unidad y no de medida.
+// Cargar 4,8 / 0,9 / 0,9 devolvía un RWT de 0,38 —correcto— con masa indexada 0 y
+// geometría "normal": la falla más peligrosa, porque no se nota.
+const SOSPECHA_CM = { ddvi: 10, siv: 3, pp: 3 };
+// Guarda sobre lo derivado. Los rangos por campo son anchos a propósito —un DDVI de
+// 80 mm existe en una dilatada y un septum de 25 mm en una hipertrófica— pero la
+// COMBINACIÓN puede ser imposible: 25 mm de cavidad con 25 mm de pared da un RWT de
+// 2,0, y ningún corazón adulto tiene una masa indexada de 9 g/m².
+const RANGO_RWT = { min: 0.10, max: 1.00 };
+const RANGO_IMVI = { min: 10, max: 600 };
+
+// Qué tiene de implausible el trío de medidas. Devuelve [] si está todo bien.
+function problemasMedidasVI(ddvi, siv, pp) {
+    const vals = { ddvi, siv, pp };
+    const cargados = Object.keys(vals).filter(k => vals[k] > 0);
+    if (!cargados.length) return [];
+    if (cargados.every(k => vals[k] < SOSPECHA_CM[k]))
+        return [`Las medidas del ventrículo van en milímetros y las cargadas parecen estar en ` +
+                `centímetros (${cargados.map(k => nProsa(vals[k], 1)).join(' / ')}). ` +
+                `Un DDVI de 4,8 cm se carga como 48.`];
+    return cargados
+        .filter(k => vals[k] < RANGO_VI[k].min || vals[k] > RANGO_VI[k].max)
+        .map(k => `${RANGO_VI[k].nombre.replace(/^./, c => c.toUpperCase())} de ${nProsa(vals[k], 1)} mm está fuera del rango ` +
+                  `plausible (${RANGO_VI[k].min} a ${RANGO_VI[k].max} mm). Revisá la medida o la unidad.`);
+}
+
 // Un único lugar donde se calcula. Antes el informe leía la masa indexada del campo
 // de pantalla: al formatear ese campo con coma decimal, parseFloat lo habría truncado
 // en silencio. Los números se calculan de las medidas crudas y el campo es sólo vista.
@@ -239,19 +273,48 @@ function medidasVI() {
     const peso = num('peso'), altura = num('altura');
     const bsa = (peso > 0 && altura > 0)
         ? 0.007184 * Math.pow(altura, 0.725) * Math.pow(peso, 0.425) : null;
-    if (!(ddvi > 0 && siv > 0 && pp > 0)) return { ddvi, siv, pp, bsa, masa: null, imvi: null, rwt: null };
+    const problemas = problemasMedidasVI(ddvi, siv, pp);
+    const vacio = { ddvi, siv, pp, bsa, masa: null, imvi: null, rwt: null, problemas };
+    // Con una medida implausible no se calcula nada: un número absurdo con formato de
+    // resultado es peor que un campo vacío, porque se copia al informe sin sospecha.
+    if (problemas.length) return vacio;
+    if (!(ddvi > 0 && siv > 0 && pp > 0)) return vacio;
 
     // La fórmula del cubo va en centímetros
     const d = ddvi / 10, s = siv / 10, p = pp / 10;
     const masa = 0.8 * 1.04 * (Math.pow(d + s + p, 3) - Math.pow(d, 3)) + 0.6;
-    return { ddvi, siv, pp, bsa, masa, imvi: bsa ? masa / bsa : null, rwt: (2 * p) / d };
+    const imvi = bsa ? masa / bsa : null;
+    const rwt = (2 * p) / d;
+    // Guarda sobre lo derivado: ninguna combinación dentro de rango debería llegar acá,
+    // pero si llega, no se clasifica geometría sobre un número imposible.
+    if (rwt < RANGO_RWT.min || rwt > RANGO_RWT.max)
+        return { ...vacio, problemas: [`El espesor relativo calculado (${nProsa(rwt, 2)}) es imposible. ` +
+            `Revisá el DDVI y la pared posterior.`] };
+    if (imvi !== null && (imvi < RANGO_IMVI.min || imvi > RANGO_IMVI.max))
+        return { ...vacio, problemas: [`La masa indexada calculada (${nProsa(imvi, 0)} g/m²) es imposible. ` +
+            `Revisá las tres medidas, el peso y la altura.`] };
+    return { ddvi, siv, pp, bsa, masa, imvi, rwt, problemas: [] };
 }
 
 function calcGeometria() {
-    const { ddvi, siv, pp, bsa, masa, imvi, rwt } = medidasVI();
+    const { ddvi, siv, pp, bsa, masa, imvi, rwt, problemas } = medidasVI();
 
     const setVal2 = (id, txt) => { const el = document.getElementById(id); if (el) el.value = txt; };
     const box = document.getElementById('geometria_criterios');
+
+    // Medida implausible: los campos derivados quedan vacíos, no se propone geometría
+    // y el problema se dice al lado del campo. Lo mismo vuelve a salir en la
+    // validación al generar el informe.
+    if (problemas.length) {
+        setVal2('imvi', ''); setVal2('rwt', '');
+        if (box) {
+            box.style.display = 'block';
+            box.innerHTML = problemas.map(p =>
+                `<div class="criterio-ase criterio-alto">▲ ${p}</div>`).join('');
+        }
+        sugerir('geometria_vi', '', problemas[0]);
+        return;
+    }
 
     if (masa === null) {
         setVal2('imvi', ''); setVal2('rwt', '');
@@ -3704,6 +3767,10 @@ function validarEstudio(rama) {
     INCOHERENCIAS_INFORME.forEach(txt => av.push({ nivel: 'error',
         txt: 'INCOHERENCIA DEL INFORME — no lo firmes así. ' + txt +
              ' Avisá de este caso: es un error de la app, no de la carga.' }));
+    // Medidas del VI implausibles: no se calculó nada, y hay que decir por qué.
+    medidasVI().problemas.forEach(txt => av.push({ nivel: 'error',
+        txt: txt + ' Mientras siga así, no se calculan la masa ni el espesor relativo, ' +
+             'y la geometría queda sin consignar en el informe.' }));
     const cnt = contarMotilidad();
     const edad = parseInt(v('edad')) || 0;
     const fcPico = num('esf_max_fc');
