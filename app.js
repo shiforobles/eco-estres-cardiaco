@@ -3337,25 +3337,37 @@ function antecedentesEnProsa(H) {
 // sin decir cómo se hizo el estudio. Las líneas rotuladas de Protocolo y Hemodinamia
 // quedan igual arriba — es redundancia a propósito, preferible a perder el contexto.
 function metodoEnProsa(H) {
-    const T = NARRATIVA, nada = '—';
-    if (!T.metodo) return '';
-    const partes = [rellenar(H.cargaKgm ? T.metodo : T.metodoSinCarga, {
-        protocolo: H.protocolo && H.protocolo !== 'otro' ? ' con protocolo de ' + H.protocoloTxt : '',
-        carga: H.cargaKgm || nada,
-        etapaMetodo: H.etapa ? `, en etapa ${H.etapa}` : '',
-        fcPico: H.fcPico || nada,
-        pctFCmax: H.pctFCmax || nada,
-        dobleProducto: H.dobleProducto ? H.dobleProducto.toLocaleString('es-AR') : nada,
-        metsMetodo: H.mets ? `, con ${nProsa(H.mets)} METs${H.pctMets ? ` (${H.pctMets} % del predicho para edad y sexo)` : ''}` : '',
-        causaDetencion: H.causaDetencionTxt || NARRATIVA.sinDatoF
+    const T = NARRATIVA, ND = T.sinDato, NDF = T.sinDatoF;
+    if (!T.metodoSetup) return '';
+
+    // Cómo se hizo
+    const partes = [rellenar(T.metodoSetup, {
+        protocolo: H.protocoloTxt ? ' con protocolo de ' + H.protocoloTxt : '',
+        carga: H.cargaKgm ? rellenar(T.metodoCarga, { carga: H.cargaKgm }) : '',
+        etapa: H.etapa ? rellenar(T.metodoEtapa, { etapa: H.etapa }) : '',
+        duracion: H.duracion ? rellenar(T.metodoDuracion, { duracion: H.duracion }) : ''
     })];
 
-    // Una sola frase de respuesta hemodinámica, en orden de gravedad.
-    if (H.hipotension)
-        partes.push(rellenar(T.respuestaHipotensiva, { taBasal: H.taBasal || nada, taPico: H.taPico || nada }));
+    // Los números del esfuerzo. Van siempre, con "no consignado" donde falte: son los
+    // que antes garantizaba la línea de Hemodinamia, que ya no existe.
+    partes.push(rellenar(T.metodoHemo, {
+        fcBasal: H.fcBasal || ND,
+        fcPico: H.fcPico || ND,
+        pctFCmax: H.pctFCmax || ND,
+        betabloqueo: H.betabloqueante ? T.metodoBetabloqueo : '',
+        taBasal: H.taBasal || ND,
+        taPico: H.taPico || ND,
+        dobleProducto: H.dobleProducto ? H.dobleProducto.toLocaleString('es-AR') : ND,
+        metsMetodo: H.mets ? `, con ${nProsa(H.mets)} METs${H.pctMets ? ` (${H.pctMets} % del predicho para edad y sexo)` : ''}` : '',
+        hrr1: (H.hrr1 !== null && H.hrr1 >= 0) ? rellenar(T.metodoHrr1, { hrr1: H.hrr1 }) : NDF,
+        causaDetencion: H.causaDetencionTxt || NDF
+    }));
+
+    // Una sola frase de respuesta hemodinámica, en orden de gravedad. Sin números:
+    // los dio la oración anterior.
+    if (H.hipotension) partes.push(T.respuestaHipotensiva);
     else if (H.hipertension)
-        partes.push(rellenar(H.basalElevada ? T.respuestaHipertensivaBasalAlta : T.respuestaHipertensiva,
-            { taPico: H.taPico || nada, taBasal: H.taBasal || nada }));
+        partes.push(H.basalElevada ? T.respuestaHipertensivaBasalAlta : T.respuestaHipertensiva);
     else if (H.fcSuboptima)
         partes.push(rellenar(T.respuestaFCSuboptima, {
             betabloqueante: H.betabloqueante ? ', bajo tratamiento betabloqueante' : ''
@@ -3380,12 +3392,9 @@ function bloqueReposo(H, datosReposo, datosConduccion, hayAsincronia) {
     else partes.push(T.reposoMotilidadNormal);
     if (hayAsincronia) partes.push(rellenar(T.asincroniaSeptalSuelta, datosConduccion).trim());
 
-    // Función sistólica y llenado: siempre, con sus números
+    // Función sistólica: siempre, con su número. La diastólica se fue a párrafo
+    // propio: iba enganchada al final de esta frase y se perdía al leer.
     partes.push(`FEy ${H.feyReposo || nada} %`);
-    partes.push(`relación E/e' ${nProsa(H.eeReposo) || nada}${presionesLlenadoEnProsa(H.diastGrado)}`);
-    if (['g1', 'g2', 'g3'].includes(H.diastGrado))
-        partes.push(rellenar(fueCorregido('diast_grado') ? T.diastolicaGradoManual : T.diastolicaGrado,
-            { grado: DIAST_GRADO_PROSA[H.diastGrado] }).replace(/^La función/, 'función'));
 
     // Geometría: siempre que esté medida
     if (['remodelado', 'hvi_concentrica', 'hvi_excentrica'].includes(H.geometriaVI))
@@ -3396,6 +3405,16 @@ function bloqueReposo(H, datosReposo, datosConduccion, hayAsincronia) {
     else partes.push('geometría ' + NARRATIVA.sinDatoF);
 
     if (H.vdProsa) partes.push(H.vdProsa.replace(/^con /, ''));
+    return unirOraciones(partes);
+}
+
+// La función diastólica, en su propio párrafo y con su rótulo.
+function bloqueDiastolicaReposo(H) {
+    const T = NARRATIVA, nada = '—';
+    const partes = [`relación E/e' ${nProsa(H.eeReposo) || nada}${presionesLlenadoEnProsa(H.diastGrado)}`];
+    if (['g1', 'g2', 'g3'].includes(H.diastGrado))
+        partes.push(rellenar(fueCorregido('diast_grado') ? T.diastolicaGradoManual : T.diastolicaGrado,
+            { grado: DIAST_GRADO_PROSA[H.diastGrado] }).replace(/^La función/, 'función'));
     return unirOraciones(partes);
 }
 
@@ -3463,34 +3482,9 @@ function construirNarrativa(H) {
     // ── ANTECEDENTES ──
     linea(T.lineaAntecedentes, antecedentesEnProsa(H));
 
-    // ── PROTOCOLO ──
-    const prot = [
-        'cicloergómetro',
-        H.protocoloTxt ? 'protocolo de ' + H.protocoloTxt : null,
-        H.cargaKgm ? `carga hasta ${H.cargaKgm} Kgm/min` : `carga ${NDF}`,
-        H.etapa ? `etapa ${H.etapa}` : null,
-        H.duracion ? `duración ${H.duracion}` : null
-    ].filter(Boolean).join(', ');
-    linea(T.lineaProtocolo, unirOraciones([prot, 'detenido por ' + H.causaDetencionTxt]));
-
-    // ── HEMODINAMIA ──
-    // Todo lo hemodinámico junto y SIEMPRE con sus números. Antes la FC se decía dos
-    // veces (en el método y otra vez si era subóptima) y la TA sólo aparecía si había
-    // sido anormal, así que "control tensional subóptimo" quedaba sin respaldo.
-    const hemo = [];
-    hemo.push(H.fcPico
-        ? `FC ${H.fcBasal || ND} → ${H.fcPico} lpm (${H.pctFCmax || ND} % de la FCMT` +
-          `${H.betabloqueante ? ', bajo betabloqueo' : ''})`
-        : `FC pico ${NDF}`);
-    hemo.push(H.taPico ? `TA ${H.taBasal || ND} → ${H.taPico} mmHg` : `TA ${NDF}`);
-    hemo.push(H.dobleProducto ? `doble producto ${H.dobleProducto.toLocaleString('es-AR')}`
-                              : `doble producto ${ND}`);
-    hemo.push(H.mets ? `${nProsa(H.mets)} METs${H.pctMets ? ` (${H.pctMets} % del predicho)` : ''}`
-                     : `METs ${ND}`);
-    hemo.push(H.hrr1 !== null && H.hrr1 >= 0
-        ? `recuperación de la FC al primer minuto ${H.hrr1} lpm`
-        : `recuperación de la FC al primer minuto ${NDF}`);
-    linea(T.lineaHemodinamia, unirOraciones(hemo));
+    // Protocolo y Hemodinamia ya no tienen línea propia: decían exactamente lo mismo
+    // que el párrafo de método del bloque de reposo, que es el que se recorta para el
+    // formulario de la institución. Todos sus números viven ahora en metodoEnProsa().
 
     // ── CALIDAD ──
     const cal = [];
@@ -3546,11 +3540,16 @@ function construirNarrativa(H) {
     };
 
     // ── REPOSO ──
-    // El método abre el bloque. El texto libre reemplaza la descripción del reposo,
-    // no el contexto de cómo se hizo el estudio: por eso va antes de los dos.
-    const prosaMetodo = metodoEnProsa(H);
-    linea(T.lineaReposo, (prosaMetodo ? prosaMetodo + ' ' : '') +
-        (H.reposoLibre || bloqueReposo(H, datosReposo, datosConduccion, hayAsincronia)));
+    // Tres párrafos dentro del mismo bloque, separados por una línea en blanco: el
+    // método, el eco de reposo y la función diastólica. Antes iban pegados en una
+    // sola masa de texto y la diastólica se perdía al final de la frase de motilidad.
+    // El texto libre reemplaza la descripción del reposo, no el método ni la
+    // diastólica, que tienen sus propios datos.
+    linea(T.lineaReposo, [
+        metodoEnProsa(H),
+        H.reposoLibre || bloqueReposo(H, datosReposo, datosConduccion, hayAsincronia),
+        rellenar(T.reposoDiastolica, { contenido: bloqueDiastolicaReposo(H) })
+    ].filter(Boolean).join('\n\n'));
 
     // ── ESFUERZO ──
     // Sólo motilidad y respuesta contráctil. Lo hemodinámico vive en su línea y el

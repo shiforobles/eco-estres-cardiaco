@@ -29,8 +29,6 @@ const NARRATIVA = {
 
     lineaIndicacion:   'Indicación: {{contenido}}',
     lineaAntecedentes: 'Antecedentes: {{contenido}}',
-    lineaProtocolo:    'Protocolo: {{contenido}}',
-    lineaHemodinamia:  'Hemodinamia: {{contenido}}',
     lineaCalidad:      'Calidad del estudio: {{contenido}}',
     lineaReposo:       'Reposo: {{contenido}}',
     lineaEsfuerzo:     'Esfuerzo: {{contenido}}',
@@ -41,27 +39,36 @@ const NARRATIVA = {
     sinAntecedentes:   'sin antecedentes cardiovasculares consignados',
 
     // ── MÉTODO, EN PROSA ──────────────────────────────────────────────
-    // Vuelve al informe como PRIMERA oración del bloque de reposo. Las líneas
-    // rotuladas de Protocolo y Hemodinamia quedan arriba igual: el bloque de reposo
-    // se recorta solo para pegarlo en el formulario de la institución, y sin esta
-    // oración el recorte sale sin el contexto de cómo se hizo el estudio.
-    metodo: 'Se realizó ecocardiograma con ejercicio en cicloergómetro{{protocolo}}, con carga escalonada hasta ' +
-            '{{carga}} Kgm/min{{etapaMetodo}}, alcanzando {{fcPico}} lpm ({{pctFCmax}} % de la FC máxima predicha) ' +
-            'y un doble producto de {{dobleProducto}}{{metsMetodo}}, deteniéndose la prueba por {{causaDetencion}}.',
-    metodoSinCarga: 'Se realizó ecocardiograma con ejercicio en cicloergómetro{{protocolo}}{{etapaMetodo}}, alcanzando ' +
-            '{{fcPico}} lpm ({{pctFCmax}} % de la FC máxima predicha) y un doble producto de {{dobleProducto}}' +
-            '{{metsMetodo}}, deteniéndose la prueba por {{causaDetencion}}.',
+    // ÚNICO lugar donde vive el método: las líneas rotuladas de Protocolo y
+    // Hemodinamia se eliminaron porque decían lo mismo dos veces. Por eso esta prosa
+    // tiene que cargar TODOS los números que aquellas líneas garantizaban —FC basal,
+    // TA basal y pico aunque la respuesta sea normal, HRR₁, duración— o se pierden al
+    // recortar el bloque para el formulario de la institución.
+    metodoSetup: 'Se realizó ecocardiograma con ejercicio en cicloergómetro{{protocolo}}{{carga}}{{etapa}}{{duracion}}.',
+    metodoCarga:    ', con carga escalonada hasta {{carga}} Kgm/min',
+    metodoEtapa:    ', en etapa {{etapa}}',
+    metodoDuracion: ', con una duración de {{duracion}}',
 
-    // Respuesta hemodinámica: una sola de estas, según el caso.
+    // Los números del esfuerzo, siempre y en el mismo orden.
+    metodoHemo: 'La frecuencia cardíaca pasó de {{fcBasal}} a {{fcPico}} lpm ({{pctFCmax}} % de la FC máxima ' +
+            'predicha{{betabloqueo}}), la tensión arterial de {{taBasal}} a {{taPico}} mmHg y el doble producto ' +
+            'alcanzó {{dobleProducto}}{{metsMetodo}}. La recuperación de la frecuencia cardíaca al primer minuto ' +
+            'fue de {{hrr1}}. La prueba se detuvo por {{causaDetencion}}.',
+    metodoBetabloqueo: ', bajo tratamiento betabloqueante',
+    metodoHrr1:        '{{hrr1}} lpm',
+
+    // Respuesta hemodinámica: una sola de estas. Los números ya los dio la oración
+    // anterior, así que acá va sólo el juicio; antes la TA se decía dos veces.
     respuestaNormal:      'La respuesta tensional fue normotensiva y la respuesta cronotrópica adecuada.',
-    respuestaHipertensiva:'Durante el esfuerzo presentó respuesta hipertensiva, con TA pico de {{taPico}} mmHg partiendo de {{taBasal}} mmHg basal.',
+    respuestaHipertensiva:'La respuesta tensional fue hipertensiva.',
     // Si la basal ya era hipertensiva, el dato es del paciente y no sólo de la prueba.
-    respuestaHipertensivaBasalAlta:'Durante el esfuerzo presentó respuesta hipertensiva, con TA pico de {{taPico}} mmHg, ' +
-                          'partiendo de cifras basales ya elevadas ({{taBasal}} mmHg).',
-    respuestaHipotensiva: 'Durante el esfuerzo presentó descenso tensional, de {{taBasal}} mmHg basales a {{taPico}} mmHg en el pico, motivo por el cual se detuvo la prueba.',
-    // La oración de método ya dio la FC y el porcentaje: acá va sólo el juicio. Antes
-    // decía "alcanzando 110 lpm (70 %)... Alcanzó 110 lpm, correspondiente al 70 %...".
+    respuestaHipertensivaBasalAlta:'La respuesta tensional fue hipertensiva, partiendo de cifras basales ya elevadas.',
+    respuestaHipotensiva: 'Se registró descenso tensional durante el esfuerzo, motivo por el cual se detuvo la prueba.',
     respuestaFCSuboptima: 'No se alcanzó el objetivo del 85 % de la FC máxima predicha{{betabloqueante}}.',
+
+    // Sub-rótulo dentro del bloque de reposo: la diastólica iba enganchada al final de
+    // la frase de motilidad y se perdía.
+    reposoDiastolica: 'Función diastólica: {{contenido}}',
 
     // Motilidad en reposo: una frase por situación, sin mezclarse con FEy ni llenado,
     // que ahora se informan siempre por separado y con sus números.
