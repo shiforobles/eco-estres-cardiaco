@@ -2965,6 +2965,7 @@ function rellenar(plantilla, datos) {
 const HALLAZGOS = [
     {
         id: 'hipotension',
+        nivel: 'critico',
         peso: 'alto',
         activo: H => H.hipotension,
         // En su propia rama ya es el núcleo de la conclusión; en EAo asintomática la
@@ -2974,6 +2975,7 @@ const HALLAZGOS = [
     },
     {
         id: 'caidaFey',
+        nivel: 'critico',
         peso: 'alto',
         activo: H => H.caidaFey,
         informe: (H, rama) => (rama === 'positivaMulti' || rama === 'hipotensiva') ? null
@@ -2982,6 +2984,7 @@ const HALLAZGOS = [
     },
     {
         id: 'umbralBajo',
+        nivel: 'critico',
         peso: 'alto',
         activo: H => H.isquemicos.length && H.dobleProducto > 0 && H.dobleProducto < 20000,
         informe: H => rellenar(NARRATIVA.pronostico.umbralBajo, { dp: H.dobleProducto.toLocaleString('es-AR') }),
@@ -2989,6 +2992,7 @@ const HALLAZGOS = [
     },
     {
         id: 'isquemiaExtensa',
+        nivel: 'critico',
         peso: 'alto',
         activo: H => H.isquemicos.length >= 5,
         // El cuerpo enumera los segmentos; acá va lo que esa extensión significa.
@@ -2997,6 +3001,7 @@ const HALLAZGOS = [
     },
     {
         id: 'multiterritorial',
+        nivel: 'critico',
         peso: 'alto',
         activo: H => H.territoriosIsquemia.length > 1 && !H.patronApical,
         // La rama multiterritorial ya cierra con el marcador de alto riesgo.
@@ -3007,6 +3012,7 @@ const HALLAZGOS = [
     },
     {
         id: 'wmsiAlto',
+        nivel: 'critico',
         peso: 'alto',
         activo: H => H.wmsiEstres !== null && parseFloat(H.wmsiEstres) > 1.7,
         informe: H => rellenar(NARRATIVA.pronostico.wmsiAlto, { wmsi: nProsa(H.wmsiEstres, 2) }),
@@ -3014,6 +3020,7 @@ const HALLAZGOS = [
     },
     {
         id: 'feyReposoBaja',
+        nivel: 'segunda',
         peso: 'alto',
         activo: H => H.feyReposo > 0 && H.feyReposo <= 45,
         // El bloque de reposo informa el número; acá va lo que implica.
@@ -3022,6 +3029,7 @@ const HALLAZGOS = [
     },
     {
         id: 'arritmiaCompleja',
+        nivel: 'critico',
         // Una sola definición de "compleja": la que ya usa el informe. Antes la
         // categorización miraba tres tipos y el informe seis.
         peso: 'alto',
@@ -3035,6 +3043,7 @@ const HALLAZGOS = [
     },
     {
         id: 'metsBajos',
+        nivel: 'critico',
         peso: 'alto',
         activo: H => H.mets > 0 && H.mets < 5,
         informe: H => {
@@ -3053,6 +3062,7 @@ const HALLAZGOS = [
     },
     {
         id: 'hrr1',
+        nivel: H => H.hrr1 <= 6 ? 'segunda' : 'pantalla',
         // Un HRR₁ de 0 no es lo mismo que uno de 12. Antes no movía la categoría en
         // absoluto: un paciente sin ninguna recuperación de la FC salía "riesgo bajo".
         peso: H => H.hrr1 <= 6 ? 'alto' : 'intermedio',
@@ -3071,6 +3081,7 @@ const HALLAZGOS = [
     },
     {
         id: 'sinReservaContractil',
+        nivel: 'pantalla',
         peso: 'intermedio',
         activo: H => H.deltaFey !== null && !H.reservaGlobal && !H.caidaFey && H.feyReposo > 0,
         informe: H => rellenar(NARRATIVA.pronostico.sinReserva, { feyReposo: H.feyReposo, feyEstres: H.feyEstres }),
@@ -3078,6 +3089,8 @@ const HALLAZGOS = [
     },
     {
         id: 'hipertensiva',
+        nivel: 'segunda',
+        requiereSinCriticos: true,
         peso: 'intermedio',
         activo: H => H.hipertension,
         // Tres lecturas distintas según la basal y el antecedente: con basal normal,
@@ -3094,6 +3107,7 @@ const HALLAZGOS = [
     },
     {
         id: 'capacidadReducidaPct',
+        nivel: 'pantalla',
         // Un joven con 6 METs está mal aunque supere el corte absoluto. Se menciona,
         // pero no mueve la categoría: para eso está el corte de 5 METs.
         peso: null,
@@ -3103,6 +3117,7 @@ const HALLAZGOS = [
     },
     {
         id: 'wmsiIntermedio',
+        nivel: 'pantalla',
         peso: 'intermedio',
         activo: H => H.wmsiEstres !== null && parseFloat(H.wmsiEstres) > 1.0 && parseFloat(H.wmsiEstres) <= 1.7,
         informe: H => rellenar(NARRATIVA.pronostico.wmsiIntermedio, { wmsi: nProsa(H.wmsiEstres, 2) }),
@@ -3110,6 +3125,7 @@ const HALLAZGOS = [
     },
     {
         id: 'patronApical',
+        nivel: 'segunda',
         peso: 'intermedio',
         activo: H => H.patronApical,
         informe: () => NARRATIVA.pronostico.patronApicalPron,
@@ -3117,6 +3133,7 @@ const HALLAZGOS = [
     },
     {
         id: 'isquemiaUnTerritorio',
+        nivel: 'pantalla',
         peso: 'intermedio',
         activo: H => H.isquemicos.length && H.isquemicos.length < 5 && H.territoriosIsquemia.length <= 1 && !H.patronApical,
         // El WMSI dice lo mismo con un número publicado: si está, esta frase sobra.
@@ -3128,6 +3145,7 @@ const HALLAZGOS = [
     },
     {
         id: 'secuela',
+        nivel: 'segunda',
         peso: 'intermedio',
         activo: H => H.secuelas.length > 0,
         informe: () => NARRATIVA.pronostico.secuelaPron,
@@ -3135,6 +3153,7 @@ const HALLAZGOS = [
     },
     {
         id: 'diastolicoPositivo',
+        nivel: 'segunda',
         peso: 'intermedio',
         activo: H => H.diastResultado === 'positivo',
         // El modificador de la conclusión dice QUE fue positivo; acá va qué significa.
@@ -3144,6 +3163,7 @@ const HALLAZGOS = [
     },
     {
         id: 'incompetenciaCronotropica',
+        nivel: 'pantalla',
         peso: 'intermedio',
         // Mismo criterio que el panel de pantalla. Antes la tabla miraba el %FCMT
         // crudo —que en bici da falsos positivos, y por eso el panel no lo usa— y el
@@ -3174,25 +3194,79 @@ function hallazgosActivos(H) {
 const pesoDe = (h, H) => (typeof h.peso === 'function' ? h.peso(H) : h.peso);
 
 // ── El párrafo pronóstico de la conclusión ──
+// Isquemia extensa, multiterritorial y WMSI alto se disparan casi siempre juntos y
+// dicen lo mismo con tres números distintos. Cuando coinciden dos o más, sale una sola
+// frase de extensión con los números que correspondan.
+const HALLAZGOS_EXTENSION = ['isquemiaExtensa', 'multiterritorial', 'wmsiAlto'];
+
+function fraseExtensionIsquemia(H, ids) {
+    const presentes = HALLAZGOS_EXTENSION.filter(id => ids.has(id));
+    if (presentes.length < 2) return null;
+    const detalle = [];
+    if (ids.has('isquemiaExtensa')) detalle.push(`${H.isquemicos.length} segmentos`);
+    // Sin enumerar los vasos: el bloque de Esfuerzo y el veredicto ya los nombran.
+    if (ids.has('multiterritorial'))
+        detalle.push(`${H.territoriosIsquemia.length} territorios coronarios`);
+    if (ids.has('wmsiAlto')) detalle.push(`WMSI post-esfuerzo de ${nProsa(H.wmsiEstres, 2)}`);
+    return rellenar(NARRATIVA.pronostico.extensionIsquemia, { detalle: detalle.join(', ') });
+}
+
+// Cuántos hallazgos entran al párrafo. Los críticos no tienen tope: si un paciente
+// tiene cinco cosas que cambian la conducta, recortar una para respetar un número
+// sería volver a omitir en silencio. El tope se aplica sobre los de segunda línea.
+const CUPO_PRONOSTICO = 4;
+
+// Qué quedó fuera por el tope. Lo lee el panel de pantalla: nada se recorta sin que
+// el operador pueda verlo.
+let PRONOSTICO_RECORTADO = [];
+
 function oracionPronostica(H, rama) {
     const P = NARRATIVA.pronostico;
-    // Dos hallazgos distintos pueden traer el mismo mensaje: con un solo segmento
-    // isquémico se activan a la vez el WMSI intermedio y la isquemia de un territorio,
-    // y el párrafo decía "~3 % de eventos por año" y "menor riesgo de eventos" como si
-    // fueran dos cosas. `cubiertoPor` calla al que aporta menos; el peso para la
-    // categoría no cambia, sólo la redacción.
     const activos = hallazgosActivos(H);
     const ids = new Set(activos.map(h => h.id));
+    const nivelDe = h => (typeof h.nivel === 'function' ? h.nivel(H) : h.nivel) || 'pantalla';
+    const hayCritico = activos.some(h => nivelDe(h) === 'critico');
+
     // Por relevancia: primero lo que mueve a riesgo alto, después lo intermedio, y
-    // último lo que se menciona sin categorizar. El orden de la tabla ya era casi ese,
-    // pero `capacidadReducidaPct` —que no categoriza— caía en el medio.
+    // último lo que se menciona sin categorizar.
     const ORDEN = { alto: 0, intermedio: 1 };
-    const items = activos
+    const candidatos = activos
+        // `cubiertoPor` calla al hallazgo cuyo mensaje ya trae otro activo: con un solo
+        // segmento isquémico se activaban a la vez el WMSI y la isquemia de un
+        // territorio, y el párrafo decía "~3 % de eventos por año" y "menor riesgo de
+        // eventos" como si fueran dos cosas.
         .filter(h => !(h.cubiertoPor || []).some(id => ids.has(id)))
-        .map((h, i) => ({ h, i, orden: ORDEN[pesoDe(h, H)] ?? 2 }))
-        .sort((a, b) => a.orden - b.orden || a.i - b.i)
-        .map(({ h }) => h.informe(H, rama))
-        .filter(Boolean);
+        // Fuera del informe: siguen en el panel y siguen moviendo la categoría.
+        .filter(h => nivelDe(h) !== 'pantalla')
+        // La hipertensiva es el hallazgo de un estudio limpio y ruido al lado de uno
+        // crítico.
+        .filter(h => !(h.requiereSinCriticos && hayCritico))
+        .map((h, i) => ({ h, i, nivel: nivelDe(h), orden: ORDEN[pesoDe(h, H)] ?? 2 }))
+        .sort((a, b) => a.orden - b.orden || a.i - b.i);
+
+    // La frase única de extensión reemplaza a los dos o tres que la componen, en la
+    // posición del primero.
+    const extension = fraseExtensionIsquemia(H, ids);
+    let vistoExtension = false;
+    const conTexto = [];
+    candidatos.forEach(c => {
+        if (extension && HALLAZGOS_EXTENSION.includes(c.h.id)) {
+            if (vistoExtension) return;
+            vistoExtension = true;
+            conTexto.push({ ...c, texto: extension });
+            return;
+        }
+        let texto = null;
+        try { texto = c.h.informe(H, rama); } catch (e) { texto = null; }
+        if (texto) conTexto.push({ ...c, texto });
+    });
+
+    // Los críticos entran todos; los de segunda línea, hasta completar el cupo.
+    const criticos = conTexto.filter(c => c.nivel === 'critico');
+    const segunda  = conTexto.filter(c => c.nivel !== 'critico');
+    const cupo = Math.max(0, CUPO_PRONOSTICO - criticos.length);
+    PRONOSTICO_RECORTADO = segunda.slice(cupo).map(c => c.h.id);
+    const items = [...criticos, ...segunda.slice(0, cupo)].map(c => c.texto);
 
     if (!items.length) return '';
 
@@ -3834,6 +3908,17 @@ function validarEstudio(rama) {
     INCOHERENCIAS_INFORME.forEach(txt => av.push({ nivel: 'error',
         txt: 'INCOHERENCIA DEL INFORME — no lo firmes así. ' + txt +
              ' Avisá de este caso: es un error de la app, no de la carga.' }));
+    // Nada se recorta del párrafo pronóstico sin que el operador pueda verlo.
+    if (PRONOSTICO_RECORTADO.length) {
+        const H0 = recolectarHallazgos();
+        const nombres = PRONOSTICO_RECORTADO
+            .map(id => { const h = HALLAZGOS.find(x => x.id === id);
+                         try { return h && h.motivo(H0); } catch (e) { return null; } })
+            .filter(Boolean);
+        av.push({ nivel: 'info', txt:
+            `El párrafo pronóstico se limitó a ${CUPO_PRONOSTICO} hallazgos. Quedó fuera del informe: ` +
+            `${listarEnProsa(nombres)}. Sigue contando para la categoría de riesgo.` });
+    }
     // Medidas del VI implausibles: no se calculó nada, y hay que decir por qué.
     medidasVI().problemas.forEach(txt => av.push({ nivel: 'error',
         txt: txt + ' Mientras siga así, no se calculan la masa ni el espesor relativo, ' +
