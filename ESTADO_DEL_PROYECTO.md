@@ -1,6 +1,6 @@
 # Eco Estrés — continuidad del proyecto
 
-Actualizado: 14 de octubre de 2026.
+Actualizado: 14 de octubre de 2026, 16:40 (integración de cambios recientes).
 Repositorio: https://github.com/shiforobles/eco-estres-cardiaco
 
 ## Versión y publicación
@@ -17,6 +17,23 @@ No se validaron clínicamente los cálculos ni se probaron envíos a Google Shee
 - Antigravity: se abrió y verificó la nueva carpeta como espacio de trabajo. El agente requiere iniciar sesión; no se cambiaron credenciales ni se ejecutaron tareas del agente.
 - Work: el registro del proyecto todavía apunta a la copia anterior. Pendiente seleccionar la carpeta principal en la interfaz; el control automatizado de esa interfaz no está disponible.
 - Los historiales antiguos de las herramientas se conservan; para nuevo trabajo abrir la copia principal y leer estas notas. No se trasladan sesiones de forma implícita.
+
+## Integración del 14/10/2026 (rama integracion/cambios-recientes-20261014)
+Carpeta oficial: /Users/lucassebastianrobles/Proyectos de Apps/App Eco Estres. Es la única copia de trabajo.
+La copia de Documentos y el respaldo `Back Up de Apps/Eco Estres cambios recientes 20261014-141800` resultaron idénticos (SHA-256); no hubo ediciones posteriores al respaldo. Ambos se conservan sin cambios; no trabajar en Documentos.
+El commit 6f09134 de esta rama incorpora los cambios sin confirmar de app.js y report-templates.js (párrafo pronóstico por niveles, cupo de 4, frase única de extensión, nueva frase de secuela/viabilidad). Es idéntico byte a byte a cambios-recientes.patch. No está fusionado con main ni subido a GitHub.
+Pruebas: sintaxis correcta de los cuatro JavaScript; 14 casos sintéticos generados en navegador aislado antes y después, sin errores; la categoría de riesgo no cambió en ningún caso. No equivale a validación clínica.
+
+### Pendiente de aprobación clínica antes de fusionar o publicar
+1. Respuesta mixta (algunos segmentos mejoran y otros no): el bloque de Esfuerzo y la conclusión describen todo el territorio como sin reserva contráctil. Error previo a esta integración.
+2. Frase de extensión: "la revascularización ha mostrado beneficio pronóstico". Redacción a revisar.
+3. Hallazgos de nivel "pantalla" que salen del informe sin aviso (HRR1 7–11 lpm, WMSI intermedio, capacidad < % predicho, sin reserva global, isquemia de un territorio, incompetencia cronotrópica).
+4. Cupo de 4: puede excluir la secuela y el diastólico positivo.
+5. Respuesta hipertensiva omitida de la conclusión si hay críticos (se conserva en el cuerpo).
+Detalle y propuestas: revision-clinica-eco-estres.html entregado al propietario el 14/10/2026.
+
+### Para retomar con Claude Code
+Abrir esta carpeta oficial, rama integracion/cambios-recientes-20261014. Iniciar una sesión nueva: no reutilizar la conversación vinculada a Documentos. No implementar los puntos anteriores sin aprobación explícita.
 
 ## Pendientes
 Completar la selección de carpeta en Work y el inicio de sesión de Antigravity. Antes de cada tarea, comprobar que todas las herramientas trabajan en la misma raíz y evitar ediciones simultáneas.
