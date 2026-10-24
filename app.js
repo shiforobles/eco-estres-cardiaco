@@ -3204,7 +3204,10 @@ const pesoDe = (h, H) => (typeof h.peso === 'function' ? h.peso(H) : h.peso);
 // frase de extensión con los números que correspondan.
 const HALLAZGOS_EXTENSION = ['isquemiaExtensa', 'multiterritorial', 'wmsiAlto'];
 
-function fraseExtensionIsquemia(H, ids) {
+// Las ramas cuyo veredicto ya afirma el riesgo y sugiere la cinecoronariografía.
+const RAMAS_POSITIVAS = ['positivaUnico', 'positivaMulti', 'hipotensiva'];
+
+function fraseExtensionIsquemia(H, ids, rama) {
     const presentes = HALLAZGOS_EXTENSION.filter(id => ids.has(id));
     if (presentes.length < 2) return null;
     const detalle = [];
@@ -3212,8 +3215,13 @@ function fraseExtensionIsquemia(H, ids) {
     // Sin enumerar los vasos: el bloque de Esfuerzo y el veredicto ya los nombran.
     if (ids.has('multiterritorial'))
         detalle.push(`${H.territoriosIsquemia.length} territorios coronarios`);
-    if (ids.has('wmsiAlto')) detalle.push(`WMSI post-esfuerzo de ${nProsa(H.wmsiEstres, 2)}`);
-    return rellenar(NARRATIVA.pronostico.extensionIsquemia, { detalle: detalle.join(', ') });
+    if (ids.has('wmsiAlto')) detalle.push(`un WMSI post-esfuerzo de ${nProsa(H.wmsiEstres, 2)}`);
+    // En una rama positiva el juicio y la conducta ya están en el veredicto, dos
+    // oraciones antes: queda sólo lo que el veredicto no da, que son los números.
+    const P = NARRATIVA.pronostico;
+    return rellenar(RAMAS_POSITIVAS.includes(rama) ? P.extensionIsquemiaCuantifica
+                                                   : P.extensionIsquemia,
+                    { detalle: listarEnProsa(detalle) });
 }
 
 // Cuántos hallazgos entran al párrafo. Los críticos no tienen tope: si un paciente
@@ -3251,7 +3259,7 @@ function oracionPronostica(H, rama) {
 
     // La frase única de extensión reemplaza a los dos o tres que la componen, en la
     // posición del primero.
-    const extension = fraseExtensionIsquemia(H, ids);
+    const extension = fraseExtensionIsquemia(H, ids, rama);
     let vistoExtension = false;
     const conTexto = [];
     candidatos.forEach(c => {

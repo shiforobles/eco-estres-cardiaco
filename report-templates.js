@@ -441,6 +441,11 @@ const NARRATIVA = {
         extensionIsquemia: 'la isquemia es extensa ({{detalle}}), lo que define un grupo de alto riesgo de eventos ' +
                      'en el que la revascularización ha mostrado beneficio pronóstico; se sugiere evaluación de la ' +
                      'anatomía coronaria',
+        // En las ramas positivas el veredicto YA dijo extensa, alto riesgo y
+        // cinecoronariografía: repetir el juicio y la conducta dos oraciones después
+        // no agrega nada. Lo que el veredicto no da son los números, así que ahí la
+        // frase se queda sólo con la cuantificación.
+        extensionIsquemiaCuantifica: 'la carga isquémica es alta: {{detalle}}',
 
         wmsiAlto:    'el índice de motilidad parietal post-esfuerzo fue de {{wmsi}}, por encima de 1,7: ese estrato ' +
                      'se asocia a una tasa de eventos cardíacos cercana al 5 % anual',
