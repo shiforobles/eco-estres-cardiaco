@@ -435,6 +435,13 @@ const NARRATIVA = {
         multiterritorial: 'la isquemia compromete más de un territorio coronario ({{territorios}}), lo que sugiere ' +
                      'enfermedad de múltiples vasos; se sugiere evaluación de la anatomía coronaria',
 
+        // Isquemia extensa, multiterritorial y WMSI alto se disparan casi siempre juntos
+        // y dicen lo mismo con tres números distintos. Cuando coinciden dos o más, sale
+        // esta sola frase con los números que correspondan.
+        extensionIsquemia: 'la isquemia es extensa ({{detalle}}), lo que define un grupo de alto riesgo de eventos ' +
+                     'en el que la revascularización ha mostrado beneficio pronóstico; se sugiere evaluación de la ' +
+                     'anatomía coronaria',
+
         wmsiAlto:    'el índice de motilidad parietal post-esfuerzo fue de {{wmsi}}, por encima de 1,7: ese estrato ' +
                      'se asocia a una tasa de eventos cardíacos cercana al 5 % anual',
 
@@ -453,8 +460,14 @@ const NARRATIVA = {
                      'que se asocia a menor riesgo de eventos: la conducta puede guiarse por los síntomas y por la ' +
                      'respuesta al tratamiento médico',
 
-        secuelaPron: 'los segmentos con secuela no mostraron reserva contráctil, de modo que no cabe esperar ' +
-                     'recuperación funcional de ese territorio con la revascularización',
+        // CUIDADO: el eco de ESFUERZO no es un test de viabilidad. La demanda que impone
+        // el ejercicio es demasiado alta para el miocardio hibernado, así que la
+        // ausencia de mejoría no distingue cicatriz de hibernación. Esta frase decía
+        // "no cabe esperar recuperación funcional con la revascularización", que en un
+        // paciente ya revascularizado puede inclinar mal una decisión quirúrgica.
+        secuelaPron: 'la ausencia de mejoría con el esfuerzo no descarta viabilidad —el ejercicio impone una ' +
+                     'demanda demasiado alta para evaluarla—, de modo que si se plantea revascularización de ese ' +
+                     'territorio se sugiere confirmarla con dobutamina a dosis baja o resonancia con realce tardío',
 
         diastolicoPron: 'el aumento de las presiones de llenado inducido por el ejercicio es compatible con ' +
                      'insuficiencia cardíaca con fracción de eyección preservada y puede explicar la disnea de ' +
