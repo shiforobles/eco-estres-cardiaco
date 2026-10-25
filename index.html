@@ -1510,6 +1510,11 @@
                 <button class="btn btn-danger btn-sm" onclick="cerrarJornada()">🔒 Cerrar jornada</button>
                 <span class="historial-nota">Vacía el historial de esta computadora. Usalo al terminar el día.</span>
             </div>
+            <div class="historial-acciones">
+                <button class="btn btn-secondary btn-sm" onclick="mostrarRevisionEscalaWMSI()">⚠ Revisar por cambio de escala del WMSI</button>
+                <span class="historial-nota">Hasta el 25/10/2026 el WMSI iba inflado y podía disparar la frase del 5 % anual sin corresponder. Recalcula los estudios guardados acá.</span>
+            </div>
+            <div id="revision-wmsi" style="display:none; margin-top:0.75rem"></div>
             <div id="historial-lista"></div>
         </details>
     </section>

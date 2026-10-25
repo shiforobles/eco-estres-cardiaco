@@ -4237,6 +4237,129 @@ function guardarEnHistorial() {
 const CASUISTICA_KEY = 'eco-estres-casuistica';
 const CASUISTICA_MAX = 500;
 
+// ══════════════════════════════════════════════
+//  REVISIÓN POR CAMBIO DE ESCALA DEL WMSI
+//  Hasta el 25/10/2026 el índice sumaba el puntaje crudo 1-5 e iba inflado. El
+//  corte >1,7 dispara en el informe la frase "~5 % de eventos cardíacos por año",
+//  que sale de literatura hecha con la escala 1-4. Un informe ya firmado puede
+//  llevar esa cifra sin corresponder.
+//  El historial y la casuística guardan los puntajes por segmento, así que se puede
+//  saber exactamente a cuáles les pasó en vez de estimarlo.
+// ══════════════════════════════════════════════
+
+// El cálculo VIEJO, tal como estaba: puntaje crudo, los 17 segmentos.
+function wmsiEscalaVieja(wm, fase, excluir) {
+    if (!wm || !wm[fase]) return null;
+    let sum = 0, n = 0;
+    for (let id = 1; id <= 17; id++) {
+        if (excluir && excluir.includes(id)) continue;
+        const sc = wm[fase][id];
+        if (sc > 0) { sum += sc; n++; }
+    }
+    return n === 0 ? null : sum / n;
+}
+
+// El cálculo NUEVO, sobre los mismos puntajes guardados.
+function wmsiEscalaNueva(wm, fase, excluir) {
+    if (!wm || !wm[fase]) return null;
+    let sum = 0, n = 0;
+    for (let id = 1; id <= 17; id++) {
+        if (id === SEGMENTO_APEX) continue;
+        if (excluir && excluir.includes(id)) continue;
+        const peso = PESO_WMSI[wm[fase][id]];
+        if (peso) { sum += peso; n++; }
+    }
+    return n === 0 ? null : sum / n;
+}
+
+// Un estudio guardado puede tener trastorno de conducción: ahí los septales no
+// entraban al índice, ni antes ni ahora.
+function excluirSeptalesDe(campos) {
+    const c = (campos && campos.ecg_conduccion) || '';
+    return CONDUCCION_LIMITA_SEPTUM.includes(c) ? SEGMENTOS_SEPTALES : null;
+}
+
+// Devuelve los estudios guardados cuyo informe lleva la frase del corte de 1,7 sin
+// que el WMSI corregido lo sostenga.
+function revisarEscalaWMSI() {
+    const items = [];
+    leerHistorial().forEach(h => items.push({
+        origen: 'historial',
+        id: h.id && h.id !== 's/ID' ? h.id : '',
+        nombre: h.nombre || '',
+        ts: h.ts,
+        wm: h.estudio && h.estudio.wm,
+        campos: (h.estudio && h.estudio.fields) || {},
+        informe: h.reporte || ''
+    }));
+    leerCasuistica().forEach(c => items.push({
+        origen: 'casuística',
+        id: '', nombre: '', ts: c.ts,
+        wm: c.wm,
+        campos: { ecg_conduccion: c.conduccion || '' },
+        informe: c.informe || ''
+    }));
+
+    const revisar = [], sinPuntajes = [];
+    items.forEach(it => {
+        if (!it.wm) { sinPuntajes.push(it); return; }
+        const ex = excluirSeptalesDe(it.campos);
+        const viejo = wmsiEscalaVieja(it.wm, 'estres', ex);
+        const nuevo = wmsiEscalaNueva(it.wm, 'estres', ex);
+        if (viejo === null || nuevo === null) return;
+        // El criterio decisivo es el TEXTO del informe firmado, no la inferencia:
+        // sólo cuenta si la frase del corte de 1,7 salió impresa de verdad.
+        const loDice = /por encima de 1,7|5 % anual|cercana al 5 %/.test(it.informe);
+        if (viejo > 1.7 && nuevo <= 1.7)
+            revisar.push({ ...it, viejo, nuevo, loDice });
+    });
+    revisar.sort((a, b) => b.viejo - a.viejo);
+    return { revisar, sinPuntajes: sinPuntajes.length, total: items.length };
+}
+
+function mostrarRevisionEscalaWMSI() {
+    const r = revisarEscalaWMSI();
+    const cont = document.getElementById('revision-wmsi');
+    if (!cont) return;
+    cont.style.display = 'block';
+
+    if (!r.total) {
+        cont.innerHTML = '<div class="aviso-clinico aviso-atencion"><div class="aviso-titulo">' +
+            'No hay estudios guardados en esta computadora</div><div class="aviso-fundamento">' +
+            'El historial se vacía a las 12 horas y al cerrar la jornada. Si revisaste estudios en ' +
+            'otra computadora o en otro navegador, corré esto allá.</div></div>';
+        return;
+    }
+    const conFrase = r.revisar.filter(x => x.loDice);
+    const sinFrase = r.revisar.filter(x => !x.loDice);
+    const fecha = ts => new Date(ts).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    const fila = x =>
+        `<li><strong>${[x.id, x.nombre].filter(Boolean).join(' · ') || x.origen}</strong> — ${fecha(x.ts)}` +
+        `<span class="cat-conducta">WMSI pico ${nProsa(x.viejo.toFixed(2), 2)} con la escala vieja → ` +
+        `${nProsa(x.nuevo.toFixed(2), 2)} con la corregida</span></li>`;
+
+    let html = `<div class="aviso-clinico ${conFrase.length ? 'aviso-alto' : 'aviso-atencion'}">` +
+        `<div class="aviso-titulo">${conFrase.length
+            ? `${conFrase.length} informe${conFrase.length === 1 ? '' : 's'} con la frase del 5 % anual sin corresponder`
+            : 'Ningún informe guardado lleva la frase del 5 % anual sin corresponder'}</div>` +
+        `<div class="aviso-fundamento">Se revis${r.total === 1 ? 'ó 1 estudio guardado' : `aron ${r.total} estudios guardados`}` +
+        (r.sinPuntajes ? `; ${r.sinPuntajes} no tienen los puntajes por segmento y no se pudieron recalcular` : '') +
+        '.</div></div>';
+
+    if (conFrase.length)
+        html += '<p class="module-description"><strong>Estos informes tienen escrita la cifra y el WMSI corregido ' +
+            'no la sostiene.</strong> Son los que convendría revisar:</p><ul class="cat-motivos">' +
+            conFrase.map(fila).join('') + '</ul>';
+
+    if (sinFrase.length)
+        html += `<p class="module-description">${sinFrase.length === 1 ? 'Otro estudio cruzaba' : `Otros ${sinFrase.length} cruzaban`} el corte con la escala vieja ` +
+            'pero su informe no llegó a imprimir la frase (el párrafo pronóstico la omite si hay hallazgos ' +
+            'de más peso, o el estudio es anterior a esa frase). No requiere revisión:</p>' +
+            '<ul class="cat-motivos">' + sinFrase.map(fila).join('') + '</ul>';
+
+    cont.innerHTML = html;
+}
+
 function leerCasuistica() {
     try { return JSON.parse(localStorage.getItem(CASUISTICA_KEY)) || []; }
     catch (e) { return []; }
