@@ -616,9 +616,12 @@ function autocompletarInterpretacion() {
     sugerir('hal_arritmia',      H.hayArritmiaRelevante);
     sugerir('hal_extrasistoles', hayEV);
 
-    // Va acá y no sólo en calcEjercicio(): está anclada en el WMSI pico, y antes
-    // cambiar el bull's eye dejaba en pantalla una categoría de riesgo vieja.
+    // Van acá y no sólo en calcEjercicio(): dependen del WMSI pico y de los segmentos
+    // isquémicos, y antes cambiar el bull's eye dejaba en pantalla una categoría de
+    // riesgo vieja y un panel de avisos sin la extensión de la isquemia. Importa más
+    // desde que la conducta sugerida salió del informe y vive sólo en estos paneles.
     sugerirCategorizacion();
+    renderAvisosClinicos();
 
     // Depende de la TA basal y de esfuerzo, de los METs y de la VRT post-esfuerzo:
     // campos que viven fuera de su propio panel.
@@ -1146,7 +1149,10 @@ function evaluarCategorizacion() {
         if (!peso) return;                    // se menciona, no categoriza
         const m = h.motivo(H);
         if (!m) return;
-        (peso === 'alto' ? alto : intermedio).push(m);
+        // La conducta ya no va al informe: acompaña al motivo sólo en pantalla.
+        let c = '';
+        try { c = (h.conducta && h.conducta(H)) || ''; } catch (e) { c = ''; }
+        (peso === 'alto' ? alto : intermedio).push({ motivo: m, conducta: c });
     });
 
     const nivel = alto.length ? 'alto' : intermedio.length ? 'intermedio' : 'bajo';
@@ -1191,7 +1197,8 @@ function sugerirCategorizacion() {
     const etiqueta = { bajo: '1 · Bajo', intermedio: '2 · Intermedio', alto: '3 · Alto' }[r.nivel];
     let html = `<strong>Sugerido: ${etiqueta}</strong>`;
     html += r.motivos.length
-        ? '<ul class="cat-motivos">' + r.motivos.map(m => `<li>${m}</li>`).join('') + '</ul>'
+        ? '<ul class="cat-motivos">' + r.motivos.map(m =>
+            `<li>${m.motivo}${m.conducta ? `<span class="cat-conducta">${m.conducta}</span>` : ''}</li>`).join('') + '</ul>'
         : '<div class="cat-motivos">Sin criterios de riesgo: WMSI pico normal, sin isquemia inducible ' +
           'ni marcadores de mal pronóstico.</div>';
     el.innerHTML = html;
@@ -2965,6 +2972,7 @@ function rellenar(plantilla, datos) {
 const HALLAZGOS = [
     {
         id: 'hipotension',
+        conducta: () => 'Considerar evaluación de la anatomía coronaria sin demora.',
         nivel: 'critico',
         peso: 'alto',
         activo: H => H.hipotension,
@@ -2975,6 +2983,7 @@ const HALLAZGOS = [
     },
     {
         id: 'caidaFey',
+        conducta: () => 'Considerar evaluación de la anatomía coronaria.',
         nivel: 'critico',
         peso: 'alto',
         activo: H => H.caidaFey,
@@ -2984,6 +2993,7 @@ const HALLAZGOS = [
     },
     {
         id: 'umbralBajo',
+        conducta: () => 'Considerar evaluación coronaria a la brevedad.',
         nivel: 'critico',
         peso: 'alto',
         activo: H => H.isquemicos.length && H.dobleProducto > 0 && H.dobleProducto < 20000,
@@ -2992,6 +3002,7 @@ const HALLAZGOS = [
     },
     {
         id: 'isquemiaExtensa',
+        conducta: () => 'Considerar cinecoronariografía: es el estrato donde revascularizar tiene beneficio pronóstico.',
         nivel: 'critico',
         peso: 'alto',
         activo: H => H.isquemicos.length >= 5,
@@ -3001,6 +3012,7 @@ const HALLAZGOS = [
     },
     {
         id: 'multiterritorial',
+        conducta: () => 'Considerar cinecoronariografía.',
         nivel: 'critico',
         peso: 'alto',
         activo: H => H.territoriosIsquemia.length > 1 && !H.patronApical,
@@ -3012,6 +3024,7 @@ const HALLAZGOS = [
     },
     {
         id: 'wmsiAlto',
+        conducta: () => 'Considerar cinecoronariografía.',
         nivel: 'critico',
         peso: 'alto',
         activo: H => H.wmsiEstres !== null && parseFloat(H.wmsiEstres) > 1.7,
@@ -3020,6 +3033,7 @@ const HALLAZGOS = [
     },
     {
         id: 'feyReposoBaja',
+        conducta: () => 'Seguimiento de la función ventricular y optimización del tratamiento médico.',
         nivel: 'segunda',
         peso: 'alto',
         activo: H => H.feyReposo > 0 && H.feyReposo <= 45,
@@ -3029,6 +3043,7 @@ const HALLAZGOS = [
     },
     {
         id: 'arritmiaCompleja',
+        conducta: () => 'Considerar monitoreo ambulatorio para definir su carga.',
         nivel: 'critico',
         // Una sola definición de "compleja": la que ya usa el informe. Antes la
         // categorización miraba tres tipos y el informe seis.
@@ -3043,6 +3058,7 @@ const HALLAZGOS = [
     },
     {
         id: 'metsBajos',
+        conducta: () => 'Considerar rehabilitación cardiovascular supervisada.',
         nivel: 'critico',
         peso: 'alto',
         activo: H => H.mets > 0 && H.mets < 5,
@@ -3062,6 +3078,7 @@ const HALLAZGOS = [
     },
     {
         id: 'hrr1',
+        conducta: () => 'Marcador autonómico: refuerza la indicación de rehabilitación supervisada.',
         nivel: H => H.hrr1 <= 6 ? 'segunda' : 'pantalla',
         // Un HRR₁ de 0 no es lo mismo que uno de 12. Antes no movía la categoría en
         // absoluto: un paciente sin ninguna recuperación de la FC salía "riesgo bajo".
@@ -3081,6 +3098,7 @@ const HALLAZGOS = [
     },
     {
         id: 'sinReservaContractil',
+        conducta: () => 'Seguimiento de la función ventricular.',
         nivel: 'pantalla',
         peso: 'intermedio',
         activo: H => H.deltaFey !== null && !H.reservaGlobal && !H.caidaFey && H.feyReposo > 0,
@@ -3089,6 +3107,7 @@ const HALLAZGOS = [
     },
     {
         id: 'hipertensiva',
+        conducta: () => 'Considerar MAPA o ajuste del tratamiento antihipertensivo.',
         nivel: 'segunda',
         requiereSinCriticos: true,
         peso: 'intermedio',
@@ -3107,6 +3126,7 @@ const HALLAZGOS = [
     },
     {
         id: 'capacidadReducidaPct',
+        conducta: () => 'Considerar actividad física programada.',
         nivel: 'pantalla',
         // Un joven con 6 METs está mal aunque supere el corte absoluto. Se menciona,
         // pero no mueve la categoría: para eso está el corte de 5 METs.
@@ -3117,6 +3137,7 @@ const HALLAZGOS = [
     },
     {
         id: 'wmsiIntermedio',
+        conducta: () => 'Seguimiento clínico; la conducta la define el resto del cuadro.',
         nivel: 'pantalla',
         peso: 'intermedio',
         activo: H => H.wmsiEstres !== null && parseFloat(H.wmsiEstres) > 1.0 && parseFloat(H.wmsiEstres) <= 1.7,
@@ -3125,6 +3146,7 @@ const HALLAZGOS = [
     },
     {
         id: 'patronApical',
+        conducta: () => 'Descartar Takotsubo, miocardiopatía hipertrófica apical, aneurisma o descendente anterior envolvente.',
         nivel: 'segunda',
         // Exento del tope. Su valor no es pronóstico sino de INTERPRETACIÓN: es la
         // frase que impide que un ápex comprometido se lea como enfermedad de tres
@@ -3138,6 +3160,7 @@ const HALLAZGOS = [
     },
     {
         id: 'isquemiaUnTerritorio',
+        conducta: () => 'La conducta puede guiarse por los síntomas y la respuesta al tratamiento médico.',
         nivel: 'pantalla',
         peso: 'intermedio',
         activo: H => H.isquemicos.length && H.isquemicos.length < 5 && H.territoriosIsquemia.length <= 1 && !H.patronApical,
@@ -3150,6 +3173,7 @@ const HALLAZGOS = [
     },
     {
         id: 'secuela',
+        conducta: () => 'El esfuerzo NO evalúa viabilidad. Si se plantea revascularizar ese territorio, confirmarla con dobutamina a dosis baja o resonancia con realce tardío.',
         nivel: 'segunda',
         peso: 'intermedio',
         activo: H => H.secuelas.length > 0,
@@ -3158,6 +3182,7 @@ const HALLAZGOS = [
     },
     {
         id: 'diastolicoPositivo',
+        conducta: () => 'Considerar tratamiento dirigido a la congestión y control de la presión arterial.',
         nivel: 'segunda',
         peso: 'intermedio',
         activo: H => H.diastResultado === 'positivo',
@@ -3168,6 +3193,7 @@ const HALLAZGOS = [
     },
     {
         id: 'incompetenciaCronotropica',
+        conducta: () => 'Considerar rehabilitación supervisada; revisar betabloqueo si lo hubiera.',
         nivel: 'pantalla',
         peso: 'intermedio',
         // Mismo criterio que el panel de pantalla. Antes la tabla miraba el %FCMT
@@ -3292,7 +3318,10 @@ function oracionPronostica(H, rama) {
     // proposiciones con su implicancia dentro de una sola oración son ilegibles.
     if (items.length === 1) return rellenar(P.integrada, { hallazgo: items[0] });
 
-    const bisagra = rellenar(H.negativoBajoRiesgo ? P.bisagraNegativa : P.bisagraGeneral,
+    const bisagra = rellenar(
+        H.negativoBajoRiesgo ? P.bisagraNegativa
+        : RAMAS_POSITIVAS.includes(rama) ? P.bisagraPositiva
+        : P.bisagraGeneral,
         { n: enPalabras(items.length) });
     const mayus = t => t.charAt(0).toUpperCase() + t.slice(1);
     return '\n\n' + bisagra + ' ' + items.map(mayus).join('. ') + '.';
@@ -3748,8 +3777,7 @@ function construirNarrativa(H) {
         capacidadDilatada: H.mets ? ` La capacidad funcional fue ${adjetivoMETs(H.mets)}.` : '',
         territorioFrase: fraseTerritorioIsquemia(H),
         territorioSecuelaFrase: fraseTerritorioSecuela(H),
-        motivoNoConcluyente: motivoNoConcluyente(H),
-        sugerenciaNoConcluyente: 'repetir el estudio con contraste o un método alternativo de perfusión'
+        motivoNoConcluyente: motivoNoConcluyente(H)
     });
 
     // Modificadores: se insertan antes del punto final

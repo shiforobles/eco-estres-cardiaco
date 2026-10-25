@@ -133,7 +133,7 @@ const NARRATIVA = {
     viabGrosorFino:      'El grosor parietal telediastólico de {{mm}} mm muestra adelgazamiento, que sugiere cicatriz transmural.',
 
     viabImplicaBifasica:  ' La respuesta bifásica es el patrón de mayor valor predictivo de recuperación funcional ' +
-                 'tras la revascularización; se sugiere evaluar la anatomía coronaria del territorio comprometido.',
+                 'tras la revascularización.',
     viabImplicaSostenida: ' La mejoría sostenida indica miocardio hibernado con reserva contráctil conservada, ' +
                  'con probabilidad de recuperación funcional si se revasculariza.',
     viabImplicaCicatriz:  ' La ausencia de reserva contráctil hace improbable la recuperación funcional del ' +
@@ -288,23 +288,23 @@ const NARRATIVA = {
         negativaConduccion: 'Conclusión: prueba negativa para isquemia miocárdica inducible en los territorios evaluables. ' +
                   'La presencia de {{trastorno}} limita la valoración de los segmentos septales y reduce la especificidad del ' +
                   'estudio en territorio de la descendente anterior, además de invalidar el análisis del segmento ST. ' +
-                  'De persistir la sospecha clínica en dicho territorio, considerar apremio con dipiridamol o método de perfusión.',
+                  'Se sugiere correlación clínica.',
 
         positivaUnico: 'Conclusión: prueba de eco estrés con ejercicio positiva para isquemia miocárdica inducible en {{territorioFrase}}. ' +
-                  'Se sugiere correlación clínica y evaluación por cinecoronariografía.',
+                  'Se sugiere correlación clínica.',
 
         positivaMulti: 'Conclusión: prueba de eco estrés con ejercicio positiva para isquemia miocárdica inducible extensa, con compromiso de ' +
-                  'múltiples territorios coronarios, sugestiva de enfermedad de múltiples vasos. Hallazgo de alto riesgo: se sugiere evaluación ' +
-                  'por cinecoronariografía a la brevedad.',
+                  'múltiples territorios coronarios, sugestiva de enfermedad de múltiples vasos. Hallazgo de alto riesgo. ' +
+                  'Se sugiere correlación clínica.',
 
         secuela: 'Conclusión: prueba de eco estrés con ejercicio sin isquemia inducible adicional a la alteración segmentaria conocida en ' +
                   '{{territorioSecuelaFrase}}, la cual no mostró reserva contráctil (compatible con secuela).',
 
-        noConcluyente: 'Conclusión: estudio no concluyente por {{motivoNoConcluyente}}. No es posible descartar con seguridad isquemia ' +
-                  'miocárdica inducible. Se sugiere {{sugerenciaNoConcluyente}}.',
+        noConcluyente: 'Conclusión: estudio no concluyente por {{motivoNoConcluyente}}: no permite descartar con seguridad isquemia ' +
+                  'miocárdica inducible. Se sugiere correlación clínica.',
 
         hipotensiva: 'Conclusión: prueba de eco estrés con ejercicio positiva para isquemia, con respuesta hipotensiva al esfuerzo. ' +
-                  'La caída tensional inducida constituye un marcador de alto riesgo. Se sugiere evaluación por cinecoronariografía a la brevedad.',
+                  'La caída tensional inducida constituye un marcador de alto riesgo. Se sugiere correlación clínica.',
 
         diastolico: 'Conclusión: prueba de eco estrés con ejercicio negativa para isquemia miocárdica inducible, con test diastólico de esfuerzo ' +
                   'positivo, compatible con insuficiencia cardíaca con fracción de eyección preservada. Se sugiere correlación clínica.'
@@ -314,13 +314,13 @@ const NARRATIVA = {
     // Se insertan antes del punto final de la conclusión elegida.
     modificadores: {
         fcSuboptima:' al doble producto alcanzado, con la limitación de no haberse alcanzado la FC objetivo, lo que reduce la sensibilidad ' +
-                     'del estudio. De persistir la sospecha clínica, considerar apremio farmacológico',
+                     'del estudio',
 
         // Versión oración, para engancharse después de un núcleo que ya cerró con punto
         // (secuela, diastólico). Un estudio sin isquemia y con FC insuficiente no es
         // un negativo pleno, cualquiera sea la rama por la que haya salido.
         fcSuboptimaOracion: ' El estudio se realizó con la limitación de no haberse alcanzado la FC objetivo, ' +
-                     'lo que reduce su sensibilidad; de persistir la sospecha clínica, considerar apremio farmacológico.',
+                     'lo que reduce su sensibilidad.',
 
         // La adquisición tardía y la caída de la FEy salían acá como coletillas sueltas.
         // Ahora: la adquisición tardía es control de calidad del operador y se queda en
@@ -344,8 +344,7 @@ const NARRATIVA = {
         // Versión completa: no se demostró isquemia en la DA, así que su especificidad queda comprometida.
         conduccionSeptal: '. La presencia de {{trastorno}} limita la valoración de los segmentos septales y reduce la ' +
                      'especificidad del estudio en territorio de la descendente anterior, además de invalidar el análisis ' +
-                     'del segmento ST. De persistir la sospecha clínica en dicho territorio, considerar apremio con ' +
-                     'dipiridamol o método de perfusión',
+                     'del segmento ST',
 
         // Versión acotada: ya hay isquemia demostrada en la DA por segmentos valorables,
         // así que hablar de especificidad reducida en ese territorio contradiría el hallazgo.
@@ -358,12 +357,11 @@ const NARRATIVA = {
     // progresión hasta que se demuestre lo contrario, y eso cambia la conducta.
     // Por eso el vaso de la angioplastia se carga como dato y no como texto libre.
     reestenosis: ' El territorio comprometido ({{territorio}}) tiene angioplastia previa{{anio}}: el hallazgo ' +
-                 'sugiere reestenosis o progresión de la lesión tratada hasta que se demuestre lo contrario; ' +
-                 'se sugiere evaluación de la anatomía coronaria.',
+                 'sugiere reestenosis o progresión de la lesión tratada hasta que se demuestre lo contrario.',
     isquemiaOtroVaso: ' El territorio comprometido ({{territorio}}) no es el tratado en la angioplastia previa' +
                  '{{anio}}, lo que sugiere progresión de la enfermedad en otro vaso.',
-    injertos:    ' En un paciente con cirugía de revascularización previa{{anio}}, la isquemia inducible obliga ' +
-                 'a evaluar la permeabilidad de los injertos.',
+    injertos:    ' En un paciente con cirugía de revascularización previa{{anio}}, la isquemia inducible plantea ' +
+                 'como posibilidad el compromiso de los injertos.',
 
     // Texto libre del operador: va al final, después de todo lo deducido.
     conclusionLibre: '\n\n{{texto}}',
@@ -387,6 +385,9 @@ const NARRATIVA = {
         // lector apurado se quede con el veredicto y no lea lo que lo matiza.
         bisagraNegativa: 'Ese buen pronóstico coronario convive, sin embargo, con {{n}} hallazgos que lo modifican.',
         bisagraGeneral:  'Merecen señalarse además {{n}} hallazgos con valor pronóstico propio, independiente del resultado del estudio.',
+        // En una rama positiva la carga isquémica ES el resultado del estudio: decir
+        // que los hallazgos son independientes de él se contradice con el primero.
+        bisagraPositiva: 'Merecen señalarse además los siguientes hallazgos.',
 
         // El negativo afirma algo, no sólo niega
         negativoBajoRiesgo: ' La ausencia de isquemia con un estímulo suficiente se asocia a bajo riesgo de ' +
@@ -394,26 +395,26 @@ const NARRATIVA = {
 
         // ── Los hallazgos, ordenados por cuánto cambian la conducta ──
         hipotension: 'la respuesta hipotensiva al esfuerzo constituye un marcador de alto riesgo, que sugiere ' +
-                     'isquemia extensa o disfunción ventricular; se sugiere evaluación de la anatomía coronaria sin demora',
+                     'isquemia extensa o disfunción ventricular',
 
         caidaFey:    'la fracción de eyección cayó de {{feyReposo}} % a {{feyEstres}} % con el esfuerzo, marcador ' +
-                     'de isquemia extensa; se sugiere evaluación de la anatomía coronaria',
+                     'de isquemia extensa',
 
         umbralBajo:  'la isquemia apareció con un doble producto de {{dp}}, umbral isquémico bajo que sugiere ' +
-                     'lesión severa o enfermedad de múltiples vasos; se sugiere evaluación coronaria a la brevedad',
+                     'lesión severa o enfermedad de múltiples vasos',
 
         sinReserva:  'no hubo reserva contráctil global con el esfuerzo (FEy {{feyReposo}} % → {{feyEstres}} %), ' +
                      'hallazgo que se asocia a peor pronóstico',
 
         arritmia:    'se constató {{arritmias}}{{momento}}{{sintomas}}, hallazgo de significación pronóstica; ' +
-                     'se sugiere monitoreo ambulatorio para definir su carga',
+                     'hallazgo de significación pronóstica',
 
         mets:        'la capacidad funcional fue {{grado}} ({{mets}} METs{{pct}}), predictor independiente de ' +
-                     'mortalidad más allá del resultado del estudio; se sugiere rehabilitación cardiovascular supervisada',
+                     'mortalidad más allá del resultado del estudio',
         // Detenida por un límite muscular u ortopédico: el número no describe riesgo
         // cardiovascular y la sugerencia cambia de sentido.
         metsLimiteNoCV: 'la capacidad funcional fue {{grado}} ({{mets}} METs{{pct}}), con la prueba detenida por ' +
-                     '{{causa}}: conviene definir si el límite fue cardiovascular antes de atribuirle valor pronóstico',
+                     '{{causa}}: no es posible establecer si el límite fue cardiovascular',
         metsPct:     ', {{pct}} % del predicho para edad y sexo',
 
         hrr1:        'la recuperación de la frecuencia cardíaca al primer minuto fue de {{hrr1}} lpm, {{matiz}}, ' +
@@ -430,17 +431,16 @@ const NARRATIVA = {
         // redescriben el hallazgo —eso ya está arriba— sino lo que significa y qué
         // se sugiere hacer.
         isquemiaExtensa: 'la isquemia compromete {{n}} segmentos, extensión que define un grupo de alto riesgo ' +
-                     'de eventos; se sugiere evaluación de la anatomía coronaria',
+                     'de eventos',
 
         multiterritorial: 'la isquemia compromete más de un territorio coronario ({{territorios}}), lo que sugiere ' +
-                     'enfermedad de múltiples vasos; se sugiere evaluación de la anatomía coronaria',
+                     'enfermedad de múltiples vasos',
 
         // Isquemia extensa, multiterritorial y WMSI alto se disparan casi siempre juntos
         // y dicen lo mismo con tres números distintos. Cuando coinciden dos o más, sale
         // esta sola frase con los números que correspondan.
         extensionIsquemia: 'la isquemia es extensa ({{detalle}}), lo que define un grupo de alto riesgo de eventos ' +
-                     'en el que la revascularización ha mostrado beneficio pronóstico; se sugiere evaluación de la ' +
-                     'anatomía coronaria',
+                     'en el que la revascularización ha mostrado beneficio pronóstico',
         // En las ramas positivas el veredicto YA dijo extensa, alto riesgo y
         // cinecoronariografía: repetir el juicio y la conducta dos oraciones después
         // no agrega nada. Lo que el veredicto no da son los números, así que ahí la
@@ -453,13 +453,11 @@ const NARRATIVA = {
         wmsiIntermedio: 'el índice de motilidad parietal post-esfuerzo fue de {{wmsi}}, que se asocia a una tasa de ' +
                      'eventos cardíacos cercana al 3 % anual',
 
-        feyReposoBaja: 'la fracción de eyección en reposo ({{fey}} %) es por sí sola marcador de riesgo; se sugiere ' +
-                     'seguimiento de la función ventricular y optimización del tratamiento médico',
+        feyReposoBaja: 'la fracción de eyección en reposo ({{fey}} %) es por sí sola marcador de riesgo',
 
         patronApicalPron: 'el compromiso apical abarca segmentos de tres territorios coronarios por anatomía y no ' +
-                     'por enfermedad de tres vasos; conviene considerar otras causas de disfunción apical ' +
-                     '—aneurisma, síndrome de Takotsubo, miocardiopatía hipertrófica apical, descendente anterior ' +
-                     'envolvente— antes de leerlo como enfermedad coronaria difusa',
+                     'por enfermedad de tres vasos: el patrón es compatible también con aneurisma, síndrome de ' +
+                     'Takotsubo, miocardiopatía hipertrófica apical o descendente anterior envolvente',
 
         isquemiaUnTerritorio: 'la isquemia se limita a {{n}} {{plural}} de un solo territorio coronario, extensión ' +
                      'que se asocia a menor riesgo de eventos: la conducta puede guiarse por los síntomas y por la ' +
@@ -472,11 +470,11 @@ const NARRATIVA = {
         // paciente ya revascularizado puede inclinar mal una decisión quirúrgica.
         secuelaPron: 'la ausencia de mejoría con el esfuerzo no descarta viabilidad —el ejercicio impone una ' +
                      'demanda demasiado alta para evaluarla—, de modo que si se plantea revascularización de ese ' +
-                     'territorio se sugiere confirmarla con dobutamina a dosis baja o resonancia con realce tardío',
+                     'territorio no puede darse por descartada sobre la base de este estudio',
 
         diastolicoPron: 'el aumento de las presiones de llenado inducido por el ejercicio es compatible con ' +
                      'insuficiencia cardíaca con fracción de eyección preservada y puede explicar la disnea de ' +
-                     'esfuerzo; se sugiere tratamiento dirigido a la congestión y control de la presión arterial',
+                     'esfuerzo',
 
         incompetenciaCronotropica: 'el índice cronotrópico fue de {{indice}} con una reserva de frecuencia cardíaca ' +
                      'de {{reserva}}, por debajo de lo esperable sin betabloqueo: sugiere incompetencia ' +
@@ -485,21 +483,19 @@ const NARRATIVA = {
         // Un joven con 6 METs está mal aunque supere el corte absoluto de 5: se
         // menciona como capacidad reducida para su edad y sexo, sin mover la categoría.
         capacidadPct: 'la capacidad funcional alcanzada ({{mets}} METs) representa el {{pct}} % del predicho ' +
-                     'para edad y sexo, por debajo de lo esperable; se sugiere actividad física programada',
+                     'para edad y sexo, por debajo de lo esperable',
 
         // La implicancia depende de la basal y del antecedente. Con basal normal,
         // "control tensional subóptimo" es una afirmación que los datos no sostienen:
         // lo anormal ahí es la respuesta, no el control en reposo.
         hipertensionBasalAlta: 'la tensión arterial alcanzó {{taPico}} mmHg partiendo de cifras basales ya ' +
-                     'elevadas ({{taBasal}} mmHg), lo que sugiere control tensional subóptimo; se sugiere ' +
-                     'ajuste del tratamiento antihipertensivo',
+                     'elevadas ({{taBasal}} mmHg), respuesta compatible con control tensional subóptimo',
         hipertensionBasalNormalConHta: 'la tensión arterial alcanzó {{taPico}} mmHg partiendo de cifras basales ' +
                      'normales ({{taBasal}} mmHg): el control en reposo es adecuado pero la respuesta al esfuerzo ' +
-                     'es exagerada; se sugiere monitoreo ambulatorio de la presión arterial para evaluar el ' +
-                     'control fuera del consultorio',
+                     'es exagerada',
         hipertensionBasalNormalSinHta: 'la tensión arterial alcanzó {{taPico}} mmHg partiendo de cifras basales ' +
                      'normales ({{taBasal}} mmHg), respuesta exagerada que se asocia a mayor riesgo de desarrollar ' +
-                     'hipertensión arterial; se sugiere monitoreo ambulatorio de la presión arterial'
+                     'hipertensión arterial'
     },
 
     // ── FRASE DE ACOMPAÑAMIENTO (ST-T y síntomas) ─────────────────────

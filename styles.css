@@ -951,7 +951,17 @@ details[open] summary::after { content: ' ▲'; }
 .cat-panel.hint-intermedio { border-left-color: var(--color-warning); background: var(--color-warning-bg); }
 .cat-panel.hint-bajo { border-left-color: var(--color-success); background: var(--color-success-bg); }
 .cat-motivos { margin: 0.35rem 0 0 1rem; padding: 0; }
-.cat-motivos li { margin-bottom: 0.2rem; }
+.cat-motivos li { margin-bottom: 0.45rem; }
+/* La conducta sugerida vive sólo acá: salió del informe para no dejar escrita una
+   indicación que el médico tratante queda obligado a justificar si no la sigue. */
+.cat-conducta {
+    display: block;
+    margin-top: 0.1rem;
+    font-size: 0.92em;
+    opacity: 0.85;
+    font-style: italic;
+}
+.cat-conducta::before { content: '→ '; font-style: normal; }
 .cat-salvedad { margin-top: 0.4rem; font-weight: 600; }
 
 /* ── Panel de avisos clínicos (sólo pantalla) ── */
