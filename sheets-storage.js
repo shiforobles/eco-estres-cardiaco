@@ -52,7 +52,10 @@ const EstresSheets = {
         // Función ventricular
         'FEy reposo', 'FEy post', 'Delta FEy', 'Función VD',
         // Motilidad
-        'WMSI reposo', 'WMSI post', 'Delta WMSI',
+        // La escala con la que se calculó el índice. Sin esto, los estudios cargados
+        // antes del 25/10/2026 —con puntaje crudo 1-5, que inflaba el WMSI— se
+        // comparan con los nuevos sin que nada lo advierta.
+        'WMSI reposo', 'WMSI post', 'Delta WMSI', 'Escala WMSI',
         'Seg isquémicos', 'Seg secuela', 'Territorio', 'Patrón',
         // ECG
         'Ritmo', 'Conducción', 'ST basal', 'ST tipo', 'ST mm', 'ST morfología',
@@ -149,6 +152,7 @@ const EstresSheets = {
             H.vd ? textoSelect('vd_funcion') : nada,
 
             num_(H.wmsiReposo), num_(H.wmsiEstres), num_(H.deltaWMSI, true),
+            (typeof ESCALA_WMSI !== 'undefined' ? ESCALA_WMSI : nada),
             H.isquemicos.length, H.secuelas.length,
             H.territoriosIsquemia.join('+') || nada,
             H.patronGlobal ? 'Global' : 'Segmentaria',

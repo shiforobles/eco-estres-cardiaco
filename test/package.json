@@ -1,0 +1,14 @@
+{
+  "name": "eco-estres-test",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Batería de verificación del informe de eco estrés. Carga la app en jsdom y la ejercita como si fuera el navegador.",
+  "scripts": {
+    "test": "node motilidad-reposo.js && node medidas-vi.js && node parrafo-pronostico.js && node barrido.js 800",
+    "barrido": "node barrido.js 800",
+    "escala": "node escala-wmsi.js 2400"
+  },
+  "dependencies": {
+    "jsdom": "^29.1.1"
+  }
+}

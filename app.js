@@ -1480,12 +1480,26 @@ function addRingLabels(svg, NS) {
 // activación eléctrica anómala no describe contractilidad. Incluirlo hace que el
 // número se lea como disfunción inexistente y arruina la comparación entre
 // estudios seriados del mismo paciente.
+// El WMSI de la literatura (ASE) usa una escala de 1 a 4: normal, hipoquinesia,
+// aquinesia, disquinesia. La app puntúa de 1 a 5 para distinguir hipoquinesia leve de
+// moderada —distinción clínica que se mantiene en el bull's eye y en el informe— pero
+// sumar ese puntaje crudo inflaba el índice: la aquinesia pesaba 4 en vez de 3, la
+// disquinesia 5 en vez de 4 y la hipoquinesia moderada 3 en vez de 2.
+// Importa porque el corte >1,7 y su "~5 % de eventos cardíacos por año" salen de
+// estudios hechos con la escala 1-4: con la escala cruda, 139 de cada 150 informes que
+// cruzaban ese corte no lo cruzaban en realidad.
+const PESO_WMSI = { 1: 1, 2: 2, 3: 2, 4: 3, 5: 4 };
+// Marca de versión: los estudios guardados antes de este cambio tienen un índice en
+// otra escala y no son comparables sin saberlo.
+const ESCALA_WMSI = 'ASE 1-4';
+
 function calcWMSI(stateKey, excluir) {
     let sum = 0, n = 0;
     SEGMENTS.forEach(s => {
         if (excluir && excluir.includes(s.id)) return;
-        const score = WM[stateKey][s.id];
-        if (score > 0) { sum += score; n++; }
+        // El 0 es "no evaluado": queda fuera del numerador y del denominador.
+        const peso = PESO_WMSI[WM[stateKey][s.id]];
+        if (peso) { sum += peso; n++; }
     });
     if (n === 0) return null;
     return (sum / n).toFixed(2);

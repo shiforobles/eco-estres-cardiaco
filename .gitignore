@@ -1,3 +1,5 @@
 .DS_Store
 *.bak
 *.bak2
+test/node_modules/
+test/package-lock.json
