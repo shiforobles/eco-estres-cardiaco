@@ -128,6 +128,15 @@ for (let i = 0; i < N; i++) {
         [WMx.reposo[id], WMx.estres[id]].forEach(sc => { if (sc > 0) peorPeso = Math.max(peorPeso, PESO[sc] || 99); });
     if (peorPeso > 4) reportar('un puntaje pesa más de 4 en el índice', 'peso ' + peorPeso);
 
+    // La aclaración de qué quedó fuera del índice va una sola vez, en la línea de
+    // Motilidad: el informe dice "17 de 17 segmentos evaluables" y el WMSI se calcula
+    // sobre 16, así que tiene que estar — pero una vez.
+    const aclara = (texto.match(/calculado sobre/g) || []).length;
+    if (H.wmsiEstres !== null && aclara !== 1)
+        reportar('la aclaración del WMSI aparece ' + aclara + ' veces', 'debe aparecer exactamente una');
+    if (H.wmsiEstres !== null && !/Motilidad:[^\n]*calculado sobre/.test(texto))
+        reportar('la aclaración del WMSI no está en la línea de Motilidad', linea(texto, 'Motilidad').slice(0, 140));
+
     if (/undefined|NaN|\[object/.test(texto))
         reportar('valor roto en el texto', (texto.match(/.{0,60}(undefined|NaN|\[object).{0,60}/) || [])[0]);
 }

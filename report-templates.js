@@ -191,11 +191,11 @@ const NARRATIVA = {
                        'en ninguno de los territorios evaluados.',
 
     esfuerzoPositivoUnico: 'Nueva {{grado}} {{deSegmentos}}, con caída del engrosamiento sistólico ' +
-                       'respecto del reposo, en {{territorioFrase}}. El WMSI{{aclaracionWMSI}} {{frasewmsi}}.' +
+                       'respecto del reposo, en {{territorioFrase}}. El WMSI {{frasewmsi}}.' +
                        '{{acompanamiento}} El resto de los segmentos mostró adecuada respuesta hiperdinámica.',
 
     esfuerzoPositivoMulti: 'Nuevas alteraciones de la motilidad en los segmentos {{segmentos}}, con compromiso ' +
-                       'de más de un territorio coronario ({{territorios}}). El WMSI{{aclaracionWMSI}} {{frasewmsi}}{{caidaFey}}.' +
+                       'de más de un territorio coronario ({{territorios}}). El WMSI {{frasewmsi}}{{caidaFey}}.' +
                        '{{acompanamiento}} El hallazgo de isquemia extensa y multiterritorial constituye un marcador de alto riesgo.',
 
     esfuerzoSecuela:   'Los segmentos comprometidos no modificaron su motilidad, sin reserva contráctil regional ' +
@@ -506,7 +506,16 @@ const NARRATIVA = {
 
     // El WMSI es un índice de motilidad: con trastorno de conducción se calcula sin
     // los septales, y el informe deja constancia de cómo se obtuvo el número.
-    aclaracionWMSI: ' (calculado sobre los segmentos valorables, excluidos los septales por el trastorno de conducción)',
+    // Qué quedó fuera del índice. El ápex se excluye SIEMPRE —irrigación variable, y así
+    // lo hace también el motor de la app de Doppler— y los septales sólo cuando el
+    // trastorno de conducción los vuelve no valorables. Sin esto, el informe dice
+    // "17 de 17 segmentos evaluables" y el índice está calculado sobre otro número.
+    // Va SÓLO en la línea de Motilidad, que es donde está el índice. Antes también
+    // salía en la de Esfuerzo y, al pasar el ápex a excluirse siempre, la misma
+    // aclaración habría aparecido dos veces en todo informe positivo.
+    aclaracionWMSI:       ' (calculado sobre 16 segmentos, excluido el ápex por su irrigación variable)',
+    aclaracionWMSIAmbos:  ' (calculado sobre los segmentos valorables, excluidos el ápex por su irrigación ' +
+                          'variable y los septales por el trastorno de conducción)',
 
     categorizacion: 'Categorización: {{categorizacion}}.',
 

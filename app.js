@@ -3560,6 +3560,13 @@ function bloqueDiastolicaReposo(H) {
     return unirOraciones(partes);
 }
 
+// Qué segmentos quedaron fuera del índice: el ápex siempre, los septales cuando el
+// trastorno de conducción los vuelve no valorables.
+function aclaracionWMSIDe(H) {
+    const T = NARRATIVA;
+    return H.wmsiExcluyeSeptales ? T.aclaracionWMSIAmbos : T.aclaracionWMSI;
+}
+
 // La línea cuantitativa de motilidad, siempre presente.
 function lineaMotilidadEnProsa(H) {
     const T = NARRATIVA;
@@ -3580,7 +3587,7 @@ function lineaMotilidadEnProsa(H) {
         : comprometidos === 1 ? `1 segmento comprometido (${detalle.join(', ')})`
         : `${comprometidos} segmentos comprometidos (${detalle.join(', ')})`;
     return `WMSI ${nProsa(H.wmsiReposo, 2)} → ${nProsa(H.wmsiEstres, 2)} ` +
-           `(Δ ${(d > 0 ? '+' : '') + nProsa(d, 2)})${H.wmsiExcluyeSeptales ? T.aclaracionWMSI : ''}; ${segs}.`;
+           `(Δ ${(d > 0 ? '+' : '') + nProsa(d, 2)})${aclaracionWMSIDe(H)}; ${segs}.`;
 }
 
 // La isquemia en un vaso ya tratado se lee distinto. Sin el vaso de la angioplastia
@@ -3710,7 +3717,6 @@ function construirNarrativa(H) {
         // la plantilla decía "ascendió de X a Y" siempre y afirmaba lo contrario del
         // número que ella misma imprimía.
         frasewmsi: fraseWMSIEnProsa(H),
-        aclaracionWMSI: H.wmsiExcluyeSeptales ? NARRATIVA.aclaracionWMSI : '',
         acompanamiento: acompanamiento,
         caidaFey: H.caidaFey ? `, con caída de la FEy de ${H.feyReposo} % a ${H.feyEstres} % post-esfuerzo` : '',
         hallazgos: H.isquemicos.length
