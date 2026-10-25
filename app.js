@@ -1491,11 +1491,18 @@ function addRingLabels(svg, NS) {
 const PESO_WMSI = { 1: 1, 2: 2, 3: 2, 4: 3, 5: 4 };
 // Marca de versión: los estudios guardados antes de este cambio tienen un índice en
 // otra escala y no son comparables sin saberlo.
-const ESCALA_WMSI = 'ASE 1-4';
+const ESCALA_WMSI = 'ASE 1-4, 16 seg';
+
+// El ápex (17) queda fuera del índice. Es el único segmento del anillo apical interno,
+// tiene irrigación variable —por eso `territoriosDe` tampoco le asigna vaso— y el motor
+// de motilidad de la app de Doppler lo excluye: el índice tiene que ser el mismo en las
+// dos apps o los estudios de un mismo paciente no se comparan.
+const SEGMENTO_APEX = 17;
 
 function calcWMSI(stateKey, excluir) {
     let sum = 0, n = 0;
     SEGMENTS.forEach(s => {
+        if (s.id === SEGMENTO_APEX) return;
         if (excluir && excluir.includes(s.id)) return;
         // El 0 es "no evaluado": queda fuera del numerador y del denominador.
         const peso = PESO_WMSI[WM[stateKey][s.id]];
