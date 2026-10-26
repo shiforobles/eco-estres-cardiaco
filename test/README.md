@@ -6,9 +6,15 @@ revisa el texto que sale.
 
 ```bash
 cd test
-npm install      # sólo la primera vez (jsdom)
+npm run setup    # sólo la primera vez
 npm test
 ```
+
+> **jsdom NO se instala acá.** `Documents` está sincronizado con iCloud y los ~2000
+> archivos del módulo quedan sujetos a expulsión y re-descarga: medido, `require('jsdom')`
+> desde dentro del proyecto tardó **764 segundos**; desde `~/.eco-estres-test`, **2
+> milisegundos**. `npm run setup` lo instala ahí. Si lo tenés en otro lado, definí
+> `ECO_JSDOM` con la ruta al módulo.
 
 ## Qué hay
 
@@ -19,6 +25,8 @@ npm test
 | `medidas-vi.js` | Que una medida implausible del VI no produzca un RWT o una masa con cara de resultado |
 | `parrafo-pronostico.js` | Niveles, fusión de extensión, tope y exentos del párrafo pronóstico |
 | `barrido.js` | 800 casos al azar contra todas las invariantes a la vez |
+| `barra-motilidad.js` | Pincel de grado, grupos por unión, apagado, fase y filtro de vista |
+| `drift-grupos.js` | Que `motility-groups.js` no se separe del `motility-model.js` de la app de Doppler |
 | `escala-wmsi.js` | Herramienta de medición, no test: compara el WMSI en escala ASE contra la cruda |
 
 ## Las invariantes del barrido

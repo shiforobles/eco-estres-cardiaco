@@ -1,7 +1,24 @@
 // Arnés de prueba: carga index.html en jsdom y expone el window con app.js cargado.
 const fs = require('fs');
 const path = require('path');
-const { JSDOM } = require('jsdom');
+const os = require('os');
+
+// jsdom NO se instala dentro del proyecto: Documents está sincronizado con iCloud y
+// los ~2000 archivos del módulo quedan sujetos a expulsión y re-descarga. Medido:
+// `require('jsdom')` desde acá tardó 764 segundos; desde fuera, 2 milisegundos.
+// Instalación: ver test/README.md
+const { JSDOM } = (() => {
+    const candidatos = [
+        process.env.ECO_JSDOM,
+        path.join(os.homedir(), '.eco-estres-test', 'node_modules', 'jsdom'),
+        'jsdom',
+    ].filter(Boolean);
+    for (const c of candidatos) { try { return require(c); } catch (e) { /* siguiente */ } }
+    throw new Error(
+        'Falta jsdom, y no conviene instalarlo dentro del proyecto (iCloud).\n' +
+        '  mkdir -p ~/.eco-estres-test && cd ~/.eco-estres-test && npm init -y --scope=eco && npm install jsdom\n' +
+        'O definí ECO_JSDOM con la ruta al módulo.');
+})();
 
 // El proyecto es la carpeta que contiene a test/
 const PROJ = path.join(__dirname, '..');
@@ -30,7 +47,7 @@ function cargarApp() {
     w.Element.prototype.scrollIntoView = () => {};
     // Los scripts se inyectan como elementos: window.eval deja los `const` fuera del
     // ámbito global y nada queda visible después.
-    ['pearls.js', 'report-templates.js', 'sheets-storage.js', 'app.js'].forEach(f => {
+    ['pearls.js', 'motility-groups.js', 'report-templates.js', 'sheets-storage.js', 'app.js'].forEach(f => {
         const s = w.document.createElement('script');
         s.textContent = leer(f);
         w.document.body.appendChild(s);

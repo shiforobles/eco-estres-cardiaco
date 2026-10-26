@@ -3,3 +3,4 @@
 *.bak2
 test/node_modules/
 test/package-lock.json
+test/_*

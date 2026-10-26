@@ -58,6 +58,7 @@ document.addEventListener('DOMContentLoaded', () => {
     renderBullsEye('svg-reposo', 'reposo');
     renderBullsEye('svg-estres', 'estres');
     updateWMSI();
+    sincronizarBarraMotilidad();
 
     // Sincronizar peso dobutamina/dipiridamol con peso principal
     document.getElementById('peso').addEventListener('input', () => {
@@ -1387,7 +1388,15 @@ function renderBullsEye(svgId, stateKey) {
         path.style.cursor = 'pointer';
 
         path.addEventListener('click', () => {
-            WM[stateKey][seg.id] = (WM[stateKey][seg.id] + 1) % 6;
+            // Con pincel activo el toque aplica ese grado, y volver a tocar un segmento
+            // que ya lo tiene lo devuelve a normal: así se corrige un error con el mismo
+            // gesto. Sin pincel se conserva el ciclado de siempre.
+            // El clic va SIEMPRE al bull's eye que se tocó: el selector de fase gobierna
+            // los botones de grupo y nada más. Lo contrario sería una trampa.
+            const actual = WM[stateKey][seg.id];
+            WM[stateKey][seg.id] = (GRADO_PINCEL === null)
+                ? (actual + 1) % 6
+                : (actual === GRADO_PINCEL ? 1 : GRADO_PINCEL);
             path.setAttribute('fill', SCORE_COLORS[WM[stateKey][seg.id]]);
             updateWMSI();
             updateSegTableRow(seg.id);
@@ -1441,6 +1450,9 @@ function renderBullsEye(svgId, stateKey) {
 
     // Labels de anillos
     addRingLabels(svg, NS);
+
+    // Los paths se reconstruyen de cero: el resaltado de vista hay que reponerlo.
+    if (typeof VISTA_ACTIVA !== 'undefined' && VISTA_ACTIVA) aplicarResaltadoVista();
 }
 
 // Cada etiqueta va sobre una divisoria de SU anillo, apoyada contra el borde externo:
@@ -2185,6 +2197,90 @@ function calcMCH() {
 }
 
 // ── CARGA RÁPIDA POR TERRITORIO ───────────────
+// ══════════════════════════════════════════════
+//  BARRA DE CARGA DE MOTILIDAD
+//  Portada de la app de eco Doppler: un pincel de grado y botones que marcan
+//  una pared, un nivel o un territorio de una sola vez. Antes había que tocar
+//  segmento por segmento, en dos bull's eye.
+//  Lo propio de acá: el selector de fase (reposo / estrés / ambas), que Doppler
+//  no necesita, y los cinco grados (Doppler no distingue hipoquinesia leve de
+//  moderada).
+// ══════════════════════════════════════════════
+
+// Grado que se aplica al tocar. null = ciclado clásico 0→1→…→5→0.
+let GRADO_PINCEL = null;
+// A qué bull's eye escriben los botones de grupo. El clic directo no lo mira.
+let FASE_CARGA = 'reposo';
+// Vista apical resaltada. Es un FILTRO visual, no un pincel: atenúa lo que no se
+// ve en esa vista para puntuar sólo lo que hay en pantalla en la máquina.
+let VISTA_ACTIVA = null;
+
+const GRADO_SIN_PINCEL = 2;   // hipoquinesia leve: el grado del que se sube o se baja
+
+function fasesDeCarga() {
+    return FASE_CARGA === 'ambas' ? ['reposo', 'estres'] : [FASE_CARGA];
+}
+
+function setFaseCarga(fase) {
+    FASE_CARGA = fase;
+    sincronizarBarraMotilidad();
+}
+
+function setGradoPincel(grado) {
+    const g = parseInt(grado);
+    GRADO_PINCEL = (GRADO_PINCEL === g || !(g >= 0 && g <= 5)) ? null : g;
+    sincronizarBarraMotilidad();
+}
+
+/**
+ * Marca un grupo anatómico completo en la fase elegida.
+ *
+ * Se SUMA a lo que ya está marcado en vez de reemplazarlo, así se combinan varios
+ * grupos: "anterior" y después "apicales" deja la pared anterior más el anillo
+ * apical. Si el grupo entero ya tiene el grado que se iba a aplicar, el toque lo
+ * apaga: el mismo botón sirve para poner y para sacar.
+ */
+function aplicarGrupoMotilidad(clave) {
+    const ids = segmentosDeGrupo(clave);
+    if (!ids || !ids.length) return;
+    const grado = GRADO_PINCEL === null ? GRADO_SIN_PINCEL : GRADO_PINCEL;
+
+    fasesDeCarga().forEach(fase => {
+        const yaEsta = ids.every(id => WM[fase][id] === grado);
+        const destino = yaEsta ? 1 : grado;
+        ids.forEach(id => { WM[fase][id] = destino; });
+        renderBullsEye('svg-' + fase, fase);
+    });
+    buildSegmentsTable();
+    updateWMSI();
+    scheduleSave();
+}
+
+/** La vista se enciende y se apaga con el mismo botón. */
+function setVistaMotilidad(vista) {
+    VISTA_ACTIVA = (VISTA_ACTIVA === vista) ? null : vista;
+    aplicarResaltadoVista();
+    sincronizarBarraMotilidad();
+}
+
+function aplicarResaltadoVista() {
+    const visibles = VISTA_ACTIVA ? VISTAS_APICALES[VISTA_ACTIVA] : null;
+    document.querySelectorAll('#svg-reposo path[data-id], #svg-estres path[data-id]')
+        .forEach(path => {
+            const id = parseInt(path.getAttribute('data-id'));
+            path.setAttribute('opacity', !visibles || visibles.includes(id) ? '1' : '0.18');
+        });
+}
+
+/** Deja los botones reflejando qué fase, qué grado y qué vista están activos. */
+function sincronizarBarraMotilidad() {
+    const marcar = (sel, activo) => document.querySelectorAll(sel).forEach(btn =>
+        btn.setAttribute('aria-pressed', activo(btn) ? 'true' : 'false'));
+    marcar('[data-fase]',  b => b.dataset.fase === FASE_CARGA);
+    marcar('[data-grado]', b => parseInt(b.dataset.grado) === GRADO_PINCEL);
+    marcar('[data-vista]', b => b.dataset.vista === VISTA_ACTIVA);
+}
+
 function setTerritoryScore(stateKey, territory, score) {
     SEGMENTS.forEach(seg => {
         if (seg.territory === territory) WM[stateKey][seg.id] = score;

@@ -845,82 +845,61 @@
                 <button class="tc-quick-btn" onclick="setAllNormal('estres')">✓ Todo Normal — Estrés</button>
                 <button class="tc-quick-btn danger" onclick="resetAllScores()">✕ Limpiar todo</button>
             </div>
-            <details class="carga-territorio">
-                <summary class="tc-title" style="cursor:pointer; list-style:none">⚡ Carga rápida por territorio</summary>
-                <div style="margin-top:0.75rem">
-            <table class="tc-table">
-                <thead>
-                    <tr>
-                        <th></th><th></th>
-                        <th style="color:#9CA3AF">—</th>
-                        <th style="color:#16A34A">1 N</th>
-                        <th style="color:#CA8A04">2 HL</th>
-                        <th style="color:#EA580C">3 HM</th>
-                        <th style="color:#DC2626">4 AC</th>
-                        <th style="color:#9333EA">5 DC</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td rowspan="3">REPOSO</td>
-                        <td><span class="badge-da">DA</span></td>
-                        <td><button class="tc-btn" style="background:#9CA3AF;color:#111" onclick="setTerritoryScore('reposo','DA',0)">—</button></td>
-                        <td><button class="tc-btn" style="background:#22C55E;color:#111" onclick="setTerritoryScore('reposo','DA',1)">1</button></td>
-                        <td><button class="tc-btn" style="background:#FDE047;color:#111" onclick="setTerritoryScore('reposo','DA',2)">2</button></td>
-                        <td><button class="tc-btn" style="background:#FB923C;color:#111" onclick="setTerritoryScore('reposo','DA',3)">3</button></td>
-                        <td><button class="tc-btn" style="background:#EF4444;color:#fff" onclick="setTerritoryScore('reposo','DA',4)">4</button></td>
-                        <td><button class="tc-btn" style="background:#A855F7;color:#fff" onclick="setTerritoryScore('reposo','DA',5)">5</button></td>
-                    </tr>
-                    <tr>
-                        <td><span class="badge-cd">CD</span></td>
-                        <td><button class="tc-btn" style="background:#9CA3AF;color:#111" onclick="setTerritoryScore('reposo','CD',0)">—</button></td>
-                        <td><button class="tc-btn" style="background:#22C55E;color:#111" onclick="setTerritoryScore('reposo','CD',1)">1</button></td>
-                        <td><button class="tc-btn" style="background:#FDE047;color:#111" onclick="setTerritoryScore('reposo','CD',2)">2</button></td>
-                        <td><button class="tc-btn" style="background:#FB923C;color:#111" onclick="setTerritoryScore('reposo','CD',3)">3</button></td>
-                        <td><button class="tc-btn" style="background:#EF4444;color:#fff" onclick="setTerritoryScore('reposo','CD',4)">4</button></td>
-                        <td><button class="tc-btn" style="background:#A855F7;color:#fff" onclick="setTerritoryScore('reposo','CD',5)">5</button></td>
-                    </tr>
-                    <tr>
-                        <td><span class="badge-cx">Cx</span></td>
-                        <td><button class="tc-btn" style="background:#9CA3AF;color:#111" onclick="setTerritoryScore('reposo','Cx',0)">—</button></td>
-                        <td><button class="tc-btn" style="background:#22C55E;color:#111" onclick="setTerritoryScore('reposo','Cx',1)">1</button></td>
-                        <td><button class="tc-btn" style="background:#FDE047;color:#111" onclick="setTerritoryScore('reposo','Cx',2)">2</button></td>
-                        <td><button class="tc-btn" style="background:#FB923C;color:#111" onclick="setTerritoryScore('reposo','Cx',3)">3</button></td>
-                        <td><button class="tc-btn" style="background:#EF4444;color:#fff" onclick="setTerritoryScore('reposo','Cx',4)">4</button></td>
-                        <td><button class="tc-btn" style="background:#A855F7;color:#fff" onclick="setTerritoryScore('reposo','Cx',5)">5</button></td>
-                    </tr>
-                    <tr class="tc-sep">
-                        <td rowspan="3">ESTRÉS</td>
-                        <td><span class="badge-da">DA</span></td>
-                        <td><button class="tc-btn" style="background:#9CA3AF;color:#111" onclick="setTerritoryScore('estres','DA',0)">—</button></td>
-                        <td><button class="tc-btn" style="background:#22C55E;color:#111" onclick="setTerritoryScore('estres','DA',1)">1</button></td>
-                        <td><button class="tc-btn" style="background:#FDE047;color:#111" onclick="setTerritoryScore('estres','DA',2)">2</button></td>
-                        <td><button class="tc-btn" style="background:#FB923C;color:#111" onclick="setTerritoryScore('estres','DA',3)">3</button></td>
-                        <td><button class="tc-btn" style="background:#EF4444;color:#fff" onclick="setTerritoryScore('estres','DA',4)">4</button></td>
-                        <td><button class="tc-btn" style="background:#A855F7;color:#fff" onclick="setTerritoryScore('estres','DA',5)">5</button></td>
-                    </tr>
-                    <tr>
-                        <td><span class="badge-cd">CD</span></td>
-                        <td><button class="tc-btn" style="background:#9CA3AF;color:#111" onclick="setTerritoryScore('estres','CD',0)">—</button></td>
-                        <td><button class="tc-btn" style="background:#22C55E;color:#111" onclick="setTerritoryScore('estres','CD',1)">1</button></td>
-                        <td><button class="tc-btn" style="background:#FDE047;color:#111" onclick="setTerritoryScore('estres','CD',2)">2</button></td>
-                        <td><button class="tc-btn" style="background:#FB923C;color:#111" onclick="setTerritoryScore('estres','CD',3)">3</button></td>
-                        <td><button class="tc-btn" style="background:#EF4444;color:#fff" onclick="setTerritoryScore('estres','CD',4)">4</button></td>
-                        <td><button class="tc-btn" style="background:#A855F7;color:#fff" onclick="setTerritoryScore('estres','CD',5)">5</button></td>
-                    </tr>
-                    <tr>
-                        <td><span class="badge-cx">Cx</span></td>
-                        <td><button class="tc-btn" style="background:#9CA3AF;color:#111" onclick="setTerritoryScore('estres','Cx',0)">—</button></td>
-                        <td><button class="tc-btn" style="background:#22C55E;color:#111" onclick="setTerritoryScore('estres','Cx',1)">1</button></td>
-                        <td><button class="tc-btn" style="background:#FDE047;color:#111" onclick="setTerritoryScore('estres','Cx',2)">2</button></td>
-                        <td><button class="tc-btn" style="background:#FB923C;color:#111" onclick="setTerritoryScore('estres','Cx',3)">3</button></td>
-                        <td><button class="tc-btn" style="background:#EF4444;color:#fff" onclick="setTerritoryScore('estres','Cx',4)">4</button></td>
-                        <td><button class="tc-btn" style="background:#A855F7;color:#fff" onclick="setTerritoryScore('estres','Cx',5)">5</button></td>
-                    </tr>
-                </tbody>
-            </table>
+            <!-- Barra de carga: pincel de grado + grupos anatómicos, portada de la app
+                 de eco Doppler. Reemplaza la tabla plegada de 36 botones por territorio. -->
+            <div class="mb-barra">
+                <div class="mb-fila">
+                    <span class="mb-rotulo">Fase</span>
+                    <button class="mb-btn mb-fase" data-fase="reposo" aria-pressed="true"  onclick="setFaseCarga('reposo')">Reposo</button>
+                    <button class="mb-btn mb-fase" data-fase="estres" aria-pressed="false" onclick="setFaseCarga('estres')">Estrés</button>
+                    <button class="mb-btn mb-fase" data-fase="ambas"  aria-pressed="false" onclick="setFaseCarga('ambas')">Ambas</button>
+                    <span class="mb-nota">A qué bull's eye escriben los botones de grupo. El clic directo va siempre al diagrama que tocás.</span>
                 </div>
-            </details>
+
+                <div class="mb-fila">
+                    <span class="mb-rotulo">Grado</span>
+                    <button class="mb-btn mb-grado" data-grado="0" aria-pressed="false" style="--mb-color:#9CA3AF" onclick="setGradoPincel(0)">— No eval.</button>
+                    <button class="mb-btn mb-grado" data-grado="1" aria-pressed="false" style="--mb-color:#22C55E" onclick="setGradoPincel(1)">1 Normal</button>
+                    <button class="mb-btn mb-grado" data-grado="2" aria-pressed="false" style="--mb-color:#FDE047" onclick="setGradoPincel(2)">2 Hipo leve</button>
+                    <button class="mb-btn mb-grado" data-grado="3" aria-pressed="false" style="--mb-color:#FB923C" onclick="setGradoPincel(3)">3 Hipo mod</button>
+                    <button class="mb-btn mb-grado" data-grado="4" aria-pressed="false" style="--mb-color:#EF4444" onclick="setGradoPincel(4)">4 Aquinesia</button>
+                    <button class="mb-btn mb-grado" data-grado="5" aria-pressed="false" style="--mb-color:#A855F7" onclick="setGradoPincel(5)">5 Disquinesia</button>
+                    <span class="mb-nota">Tocalo de nuevo para soltarlo. Sin pincel, el clic cicla y los grupos aplican hipoquinesia leve.</span>
+                </div>
+
+                <div class="mb-fila">
+                    <span class="mb-rotulo">Pared</span>
+                    <button class="mb-btn" onclick="aplicarGrupoMotilidad('paredes.anterior')">Anterior</button>
+                    <button class="mb-btn" onclick="aplicarGrupoMotilidad('paredes.septal')">Septal</button>
+                    <button class="mb-btn" onclick="aplicarGrupoMotilidad('paredes.inferior')">Inferior</button>
+                    <button class="mb-btn" onclick="aplicarGrupoMotilidad('paredes.lateral')">Lateral</button>
+                    <span class="mb-sep"></span>
+                    <span class="mb-rotulo">Nivel</span>
+                    <button class="mb-btn" onclick="aplicarGrupoMotilidad('niveles.basales')">Basales</button>
+                    <button class="mb-btn" onclick="aplicarGrupoMotilidad('niveles.medios')">Medios</button>
+                    <button class="mb-btn" onclick="aplicarGrupoMotilidad('niveles.apicales')">Apicales</button>
+                </div>
+
+                <div class="mb-fila">
+                    <span class="mb-rotulo">Territorio</span>
+                    <button class="mb-btn" onclick="aplicarGrupoMotilidad('territorios.DA')"><span class="badge-da">DA</span></button>
+                    <button class="mb-btn" onclick="aplicarGrupoMotilidad('territorios.CD')"><span class="badge-cd">CD</span></button>
+                    <button class="mb-btn" onclick="aplicarGrupoMotilidad('territorios.Cx')"><span class="badge-cx">Cx</span></button>
+                    <button class="mb-btn" onclick="aplicarGrupoMotilidad('territorios.global')">Global</button>
+                    <span class="mb-sep"></span>
+                    <span class="mb-rotulo">Vista</span>
+                    <button class="mb-btn mb-vista" data-vista="A4C" aria-pressed="false" onclick="setVistaMotilidad('A4C')">A4C</button>
+                    <button class="mb-btn mb-vista" data-vista="A2C" aria-pressed="false" onclick="setVistaMotilidad('A2C')">A2C</button>
+                    <button class="mb-btn mb-vista" data-vista="A3C" aria-pressed="false" onclick="setVistaMotilidad('A3C')">A3C</button>
+                    <span class="mb-nota">La vista atenúa lo que no se ve en ese corte. No pinta nada.</span>
+                </div>
+
+                <div class="mb-fila mb-ayuda">
+                    Los grupos se SUMAN: «Anterior» y después «Apicales» deja las dos cosas marcadas.
+                    Si el grupo entero ya tiene ese grado, el botón lo apaga.
+                    El ápex entra en «Apicales» pero no en los territorios: su irrigación es variable y no se le asigna vaso.
+                </div>
+            </div>
         </div>
 
         <div class="bulls-eye-container">
@@ -1522,6 +1501,7 @@
 
 </div>
 <script src="pearls.js?v=2.2"></script>
+<script src="motility-groups.js?v=2.2"></script>
 <script src="report-templates.js?v=2.2"></script>
 <script src="sheets-storage.js?v=2.2"></script>
 <script src="app.js?v=2.2"></script>
