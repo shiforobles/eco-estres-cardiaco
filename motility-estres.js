@@ -97,7 +97,14 @@
             texto = mayuscula(`${NOMBRE_GRADO[st[APEX]]} del ápex.`);
         } else {
             texto = limpiarNiveles(MotorA5.describe(sinApex));
-            if (apexAnormal)
+            // La cláusula del ápex se agrega salvo que el texto ya lo cubra: en el
+            // patrón apical puro —los cuatro apicales con el mismo grado que el 17—
+            // el motor ya dijo "de los segmentos apicales" y repetirlo deja la frase
+            // diciendo "apical" tres veces.
+            const anilloApical = [13, 14, 15, 16];
+            const apicalPuro = anilloApical.every(id => st[id] === st[APEX]) &&
+                               /apical/i.test(texto);
+            if (apexAnormal && !apicalPuro)
                 texto = texto.replace(/\.\s*$/, '') +
                     `, con ${NOMBRE_GRADO[st[APEX]]} del ápex.`;
         }

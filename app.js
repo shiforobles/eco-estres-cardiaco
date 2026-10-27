@@ -3688,7 +3688,17 @@ function textoDopplerReposo(H) {
         const r = MotilidadDoppler.describirFase(WM.reposo, excluir);
         // El territorio de Motor C sustituye al paréntesis propio: decirlo dos veces
         // con dos criterios distintos sería peor que no decirlo.
-        return r.territorio ? r.texto.replace(/\.\s*$/, '') + `, ${r.territorio}` : r.texto;
+        //
+        // SALVO en el patrón apical, donde manda el criterio de acá. Motor C lo
+        // atribuye a la descendente anterior distal; nosotros no le asignamos vaso
+        // porque un ápex comprometido puede ser Takotsubo, miocardiopatía hipertrófica
+        // apical o DA envolvente, y porque es coherente con excluir el 17 del
+        // territorio y del WMSI. Esa decisión no cambia por elegir el otro motor.
+        // En el patrón apical el criterio propio es NO asignar vaso, y el texto del
+        // motor ya dice que el compromiso es apical: omitir la cláusula es
+        // exactamente eso, sin repetir "apical" una tercera vez.
+        const territorio = H.patronApicalReposo ? '' : r.territorio;
+        return territorio ? r.texto.replace(/\.\s*$/, '') + `, ${territorio}` : r.texto;
     } catch (e) { return ''; }
 }
 
