@@ -47,7 +47,9 @@ function cargarApp() {
     w.Element.prototype.scrollIntoView = () => {};
     // Los scripts se inyectan como elementos: window.eval deja los `const` fuera del
     // ámbito global y nada queda visible después.
-    ['pearls.js', 'motility-groups.js', 'report-templates.js', 'sheets-storage.js', 'app.js'].forEach(f => {
+    ['vendor/doppler/motility-model.js', 'vendor/doppler/motility-engine.js',
+     'vendor/doppler/territory-engine.js', 'motility-estres.js',
+     'pearls.js', 'motility-groups.js', 'report-templates.js', 'sheets-storage.js', 'app.js'].forEach(f => {
         const s = w.document.createElement('script');
         s.textContent = leer(f);
         w.document.body.appendChild(s);

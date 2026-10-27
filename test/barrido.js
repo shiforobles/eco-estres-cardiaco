@@ -8,6 +8,10 @@ const w = cargarApp();
 const WMx = w.eval('WM');
 const PESO = { 1: 1, 2: 2, 3: 2, 4: 3, 5: 4 };
 const N = Number(process.argv[2] || 800);
+// Con --doppler el barrido corre entero con el texto de los motores de Doppler: las
+// mismas invariantes tienen que valer con cualquiera de los dos motores.
+const MOTOR = process.argv.includes('--doppler') ? 'doppler' : 'actual';
+if (MOTOR === 'doppler') console.log('(barrido con el texto de Doppler)');
 const rnd = (a) => a[Math.floor(Math.random() * a.length)];
 const ri = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
 
@@ -40,6 +44,7 @@ for (let i = 0; i < N; i++) {
     set(w, 'ventana', rnd(['buena', 'regular', 'limitada']));
     set(w, 'patron_motilidad', rnd(['segmentaria', 'segmentaria', 'segmentaria', 'global']));
     set(w, 'ant_betabloq', Math.random() < 0.3);
+    set(w, 'motor_texto', MOTOR);
     const dr = w.document.getElementById('diast_resultado');
     if (dr) set(w, 'diast_resultado', rnd(['', 'negativo', 'positivo', 'no_evaluado']));
 

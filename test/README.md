@@ -27,6 +27,9 @@ npm test
 | `barrido.js` | 800 casos al azar contra todas las invariantes a la vez |
 | `barra-motilidad.js` | Pincel de grado, grupos por unión, apagado, fase y filtro de vista |
 | `drift-grupos.js` | Que `motility-groups.js` no se separe del `motility-model.js` de la app de Doppler |
+| `segmentos-uno-a-uno.js` | Que cada segmento 1-17, cargado solo, se nombre exactamente a sí mismo, y que la numeración coincida con la de Doppler |
+| `drift-motores.js` | Que `vendor/doppler/` siga siendo copia byte a byte de los motores originales |
+| `comparar-motores.js` | Tabla de los dos textos lado a lado (`npm run comparar`), no es un test |
 | `escala-wmsi.js` | Herramienta de medición, no test: compara el WMSI en escala ASE contra la cruda |
 
 ## Las invariantes del barrido

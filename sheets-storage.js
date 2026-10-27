@@ -56,6 +56,8 @@ const EstresSheets = {
         // antes del 25/10/2026 —con puntaje crudo 1-5, que inflaba el WMSI— se
         // comparan con los nuevos sin que nada lo advierta.
         'WMSI reposo', 'WMSI post', 'Delta WMSI', 'Escala WMSI',
+        // Qué motor redactó la motilidad de reposo: se elige por estudio.
+        'Motor texto',
         'Seg isquémicos', 'Seg secuela', 'Territorio', 'Patrón',
         // ECG
         'Ritmo', 'Conducción', 'ST basal', 'ST tipo', 'ST mm', 'ST morfología',
@@ -153,6 +155,7 @@ const EstresSheets = {
 
             num_(H.wmsiReposo), num_(H.wmsiEstres), num_(H.deltaWMSI, true),
             (typeof ESCALA_WMSI !== 'undefined' ? ESCALA_WMSI : nada),
+            H.motorTexto === 'doppler' ? 'Doppler A+C' : 'propio',
             H.isquemicos.length, H.secuelas.length,
             H.territoriosIsquemia.join('+') || nada,
             H.patronGlobal ? 'Global' : 'Segmentaria',

@@ -623,6 +623,7 @@ function autocompletarInterpretacion() {
     // desde que la conducta sugerida salió del informe y vive sólo en estos paneles.
     sugerirCategorizacion();
     renderAvisosClinicos();
+    renderComparacionMotilidad();
 
     // Depende de la TA basal y de esfuerzo, de los METs y de la VRT post-esfuerzo:
     // campos que viven fuera de su propio panel.
@@ -2842,6 +2843,10 @@ function recolectarHallazgos() {
     // Sólo se puede atribuir el reposo a un evento previo si TODOS los segmentos
     // basales anormales quedaron sin cambio con el esfuerzo. Si alguno mejoró o
     // quedó sin par, el reposo describe y no interpreta.
+    // Qué motor escribe la motilidad de reposo. Por estudio, no global: si el texto
+    // de Doppler no convence en un caso, se vuelve al propio con un clic.
+    H.motorTexto = v('motor_texto') === 'doppler' ? 'doppler' : 'actual';
+
     H.reposoTodoSecuela = anormalesReposo.length > 0 &&
                           anormalesReposo.every(s => s.respuesta === 'cicatriz');
 
@@ -3615,6 +3620,78 @@ function metodoEnProsa(H) {
     return partes.join(' ');
 }
 
+// Vista previa en vivo: los dos textos de motilidad de reposo, lado a lado, con el
+// que va al informe marcado. Se mira mientras se carga el bull's eye.
+function renderComparacionMotilidad() {
+    const cont = document.getElementById('comparacion-motilidad');
+    if (!cont) return;
+
+    let H;
+    try { H = recolectarHallazgos(); }
+    catch (e) { cont.innerHTML = ''; return; }
+
+    const T = NARRATIVA;
+    const propio = H.patronGlobal ? T.reposoMotilidadGlobal
+        : !H.anormalesReposo.length ? T.reposoMotilidadNormal
+        : rellenar(H.reposoTodoSecuela ? T.reposoMotilidadSecuela : T.reposoMotilidadAlterada,
+            datosReposoDe(H));
+    const doppler = H.patronGlobal ? T.reposoMotilidadGlobal : textoDopplerReposo(H);
+
+    const may = t => t ? t.charAt(0).toUpperCase() + t.slice(1).replace(/\.?$/, '.') : '';
+    const elegido = H.motorTexto;
+    const caja = (clave, rotulo, txt) =>
+        `<div class="mb-texto${elegido === clave ? ' elegido' : ''}">` +
+        `<span class="mb-texto-rotulo">${rotulo}${elegido === clave ? ' · va al informe' : ''}</span>` +
+        `${txt ? may(txt) : '<em>no disponible</em>'}</div>`;
+
+    cont.innerHTML =
+        caja('actual', 'Texto actual', propio) +
+        caja('doppler', 'Motor A + C', doppler) +
+        (doppler && may(propio) !== may(doppler)
+            ? '<div class="mb-difiere">Los dos textos difieren. El informe sale con el que está marcado.</div>'
+            : '');
+}
+
+// Los marcadores del bloque de reposo, para poder armar el texto propio fuera de
+// construirNarrativa(). Antes vivían sueltos ahí adentro.
+function datosReposoDe(H) {
+    return {
+        gradoReposo: gradoEnProsa(H.anormalesReposo, 'scoreReposo'),
+        deSegmentosReposo: deSegmentos(H.anormalesReposo),
+        territorioReposoFrase: fraseTerritorioReposo(H),
+    };
+}
+
+// La motilidad de reposo, con el motor que el estudio tenga elegido.
+//
+// El texto de Doppler (Motor A) describe la anatomía mucho mejor —"de las paredes
+// anterior y anteroseptal, a nivel basal y medio" donde el propio enumera cuatro
+// segmentos— pero es una pieza nueva: se elige por estudio y arranca en el propio.
+function motilidadReposoEnProsa(H, datosReposo) {
+    const T = NARRATIVA;
+    if (H.motorTexto === 'doppler') {
+        const d = textoDopplerReposo(H);
+        if (d) return d;
+        // Si los motores no cargaron, el informe sale con el texto propio y no vacío.
+    }
+    if (!H.anormalesReposo.length) return T.reposoMotilidadNormal;
+    return rellenar(H.reposoTodoSecuela ? T.reposoMotilidadSecuela
+                                        : T.reposoMotilidadAlterada, datosReposo);
+}
+
+// Texto de los motores de Doppler para la fase de reposo, o '' si no están cargados.
+// Los septales salen del análisis con trastorno de conducción, igual que del WMSI.
+function textoDopplerReposo(H) {
+    if (typeof MotilidadDoppler === 'undefined') return '';
+    try {
+        const excluir = H.hayConduccion ? SEGMENTOS_SEPTALES : null;
+        const r = MotilidadDoppler.describirFase(WM.reposo, excluir);
+        // El territorio de Motor C sustituye al paréntesis propio: decirlo dos veces
+        // con dos criterios distintos sería peor que no decirlo.
+        return r.territorio ? r.texto.replace(/\.\s*$/, '') + `, ${r.territorio}` : r.texto;
+    } catch (e) { return ''; }
+}
+
 // El bloque de reposo, con forma estable: motilidad, FEy, llenado, geometría.
 function bloqueReposo(H, datosReposo, datosConduccion, hayAsincronia) {
     const T = NARRATIVA, nada = '—';
@@ -3624,10 +3701,7 @@ function bloqueReposo(H, datosReposo, datosConduccion, hayAsincronia) {
     // ninguna otra clasificación. La hipoquinesia global es una declaración explícita
     // del operador y manda sobre la descripción segmentaria, igual que en elegirRama().
     if (H.patronGlobal) partes.push(T.reposoMotilidadGlobal);
-    else if (H.anormalesReposo.length)
-        partes.push(rellenar(H.reposoTodoSecuela ? T.reposoMotilidadSecuela
-                                                 : T.reposoMotilidadAlterada, datosReposo));
-    else partes.push(T.reposoMotilidadNormal);
+    else partes.push(motilidadReposoEnProsa(H, datosReposo));
     if (hayAsincronia) partes.push(rellenar(T.asincroniaSeptalSuelta, datosConduccion).trim());
 
     // Función sistólica: siempre, con su número. La diastólica se fue a párrafo
@@ -3991,7 +4065,10 @@ let INCOHERENCIAS_INFORME = [];
 function incoherenciasInforme(texto, H) {
     const malos = [];
     const nAnormales = (H.anormalesReposo || []).length;
-    if (nAnormales && /Reposo:[^\n]*motilidad parietal normal/i.test(texto))
+    // Los dos motores tienen su propia frase de normalidad: la guarda mira las dos, o
+    // dejaría de proteger justo al cambiar de motor.
+    const REPOSO_NORMAL = /Reposo:[^]*?(motilidad parietal normal|motilidad parietal global y segmentaria conservada)/i;
+    if (nAnormales && REPOSO_NORMAL.test(texto.split('\n\nEsfuerzo:')[0]))
         malos.push(`El informe afirma motilidad parietal normal en reposo, pero hay ` +
             `${nAnormales} segmento${nAnormales === 1 ? '' : 's'} con puntaje anormal en el reposo ` +
             `del bull's eye (${segmentosEnProsa(H.anormalesReposo)}).`);

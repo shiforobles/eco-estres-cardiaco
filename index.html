@@ -894,6 +894,16 @@
                     <span class="mb-nota">La vista atenúa lo que no se ve en ese corte. No pinta nada.</span>
                 </div>
 
+                <div class="mb-fila" style="border-top:1px dashed var(--color-border); padding-top:0.5rem">
+                    <span class="mb-rotulo">Texto</span>
+                    <select id="motor_texto" class="mb-select" onchange="renderComparacionMotilidad()">
+                        <option value="actual">Texto actual</option>
+                        <option value="doppler">Texto Doppler (Motor A + C)</option>
+                    </select>
+                    <span class="mb-nota">Cuál de los dos va al informe, en ESTE estudio. Se guarda con el borrador.</span>
+                </div>
+                <div id="comparacion-motilidad" class="mb-comparacion"></div>
+
                 <div class="mb-fila mb-ayuda">
                     Los grupos se SUMAN: «Anterior» y después «Apicales» deja las dos cosas marcadas.
                     Si el grupo entero ya tiene ese grado, el botón lo apaga.
@@ -1500,6 +1510,10 @@
 
 
 </div>
+<script src="vendor/doppler/motility-model.js?v=2.2"></script>
+<script src="vendor/doppler/motility-engine.js?v=2.2"></script>
+<script src="vendor/doppler/territory-engine.js?v=2.2"></script>
+<script src="motility-estres.js?v=2.2"></script>
 <script src="pearls.js?v=2.2"></script>
 <script src="motility-groups.js?v=2.2"></script>
 <script src="report-templates.js?v=2.2"></script>
