@@ -165,6 +165,14 @@ const NARRATIVA = {
                  'amerita evaluación por el equipo de válvulas.',
     eaoEjAsintomatico:   ' El paciente completó el esfuerzo sin síntomas y con respuesta tensional normal, ' +
                  'confirmándose la condición de asintomático.',
+    // Respuesta tensional anormal SIN síntomas y sin caída mayor a 20 mmHg: es un
+    // hallazgo, no una demostración de síntomas. Antes un 120 → 130 concluía que el
+    // paciente dejaba de considerarse asintomático y que eso movía la indicación
+    // quirúrgica, que es mucho más de lo que el dato sostiene.
+    eaoEjSinSintomasTaAnormal: ' El paciente completó el esfuerzo sin síntomas, con respuesta tensional ' +
+                 'anormal: la tensión arterial sistólica {{tension}}. El hallazgo no equivale a la ' +
+                 'aparición de síntomas ni a intolerancia hemodinámica, que requeriría una caída mayor ' +
+                 'a 20 mmHg. Se sugiere correlación clínica.',
     // Cuando el operador sostiene "asintomático" pese a haber criterios cargados: se
     // informa su criterio sin afirmar lo que los datos contradicen.
     eaoEjAsintomaticoPeseA: ' Pese a los hallazgos descritos, se interpreta que el paciente mantiene su ' +

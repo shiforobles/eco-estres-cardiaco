@@ -134,7 +134,7 @@
             <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="ant_dislipemia"><label for="ant_dislipemia">Dislipemia</label></div>
             <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="ant_isquemia"><label for="ant_isquemia">C. Isquémica</label></div>
             <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="ant_iam"><label for="ant_iam">IAM Previo</label></div>
-            <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="ant_crm"><label for="ant_crm">CRM / ATC Previa</label></div>
+            <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="ant_crm"><label for="ant_crm" title="Sólo cirugía. La angioplastia se carga con los vasos tratados, más abajo.">CRM previa (cirugía)</label></div>
             <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="ant_fa"><label for="ant_fa">FA</label></div>
             <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="ant_betabloq"><label for="ant_betabloq">Beta-bloqueante activo</label></div>
             <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="ant_epoc"><label for="ant_epoc">EPOC / Asma</label></div>
@@ -755,7 +755,7 @@
         <h2 class="section-title">Eco post-esfuerzo</h2>
         <div class="grid">
             <div class="form-group">
-                <label for="fevi_pico">FEy Pico Estrés (%)</label>
+                <label for="fevi_pico">FEy post-esfuerzo (%)</label>
                 <input autocomplete="off" type="number" id="fevi_pico" placeholder="%" min="10" max="80" oninput="calcFEVI()">
             </div>
             <div class="form-group">
@@ -920,7 +920,7 @@
             </div>
             <div class="bulls-eye-arrow">→</div>
             <div class="bulls-eye-wrapper">
-                <h3 class="bulls-eye-title">Pico Estrés</h3>
+                <h3 class="bulls-eye-title">Post-esfuerzo</h3>
                 <svg id="svg-estres" width="280" height="280" viewBox="0 0 300 300" class="bulls-eye-svg"></svg>
                 <div class="wmsi-display">WMSI Estrés: <strong id="wmsi-estres">—</strong></div>
             </div>
@@ -1203,7 +1203,7 @@
                         <input autocomplete="off" type="number" id="strain_gls_rep" placeholder="Ej: -20" step="0.1" oninput="calcStrain()">
                     </div>
                     <div class="form-group">
-                        <label for="strain_gls_est">GLS Pico Estrés (%)</label>
+                        <label for="strain_gls_est">GLS post-esfuerzo (%)</label>
                         <input autocomplete="off" type="number" id="strain_gls_est" placeholder="Ej: -24" step="0.1" oninput="calcStrain()">
                     </div>
                     <div class="form-group">
@@ -1373,6 +1373,11 @@
             <span class="firma-nota">Se guarda sólo en este navegador: no viaja al repositorio ni a ningún servidor. Se agrega al pie del informe.</span>
         </div>
         <div id="validacion-panel" class="validacion-panel" style="display:none"></div>
+        <div id="informe-desactualizado" class="aviso-desactualizado" style="display:none">
+            ⚠ <strong>Este informe quedó desactualizado.</strong> Cambiaste datos después de generarlo.
+            Al guardar en el historial o en la planilla se regenera solo, para que el texto y los datos
+            sean la misma versión.
+        </div>
         <div id="reporte-output" class="reporte-output" style="display:none"></div>
     </section>
 

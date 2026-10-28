@@ -624,6 +624,7 @@ function autocompletarInterpretacion() {
     sugerirCategorizacion();
     renderAvisosClinicos();
     renderComparacionMotilidad();
+    marcarInformeDesactualizado();
 
     // Depende de la TA basal y de esfuerzo, de los METs y de la VRT post-esfuerzo:
     // campos que viven fuera de su propio panel.
@@ -1086,7 +1087,11 @@ function evaluarAvisosClinicos() {
     }
 
     // 7 · Angina sin correlato. Abre la pregunta, no cierra el diagnóstico.
-    const hayAngina = /angina|precordial|opresi|dolor/i.test(H.sintomasEsfuerzo || '') ||
+    // "sin angina ni dolor precordial" disparaba el aviso: la expresión no miraba la
+    // negación. Se recorta el texto desde cualquier negador hasta el próximo punto.
+    const sinNegados = (H.sintomasEsfuerzo || '')
+        .replace(/\b(sin|no refiere|niega|ausencia de|sin signos de)\b[^.;]*/gi, ' ');
+    const hayAngina = /angina|precordial|opresi|dolor/i.test(sinNegados) ||
                       H.causaDetencion === 'angina';
     if (hayAngina && !H.isquemicos.length && !H.stIsquemico)
         atencion('Angina durante el estudio sin isquemia por imagen ni cambios del ST',
@@ -1406,7 +1411,10 @@ function renderBullsEye(svgId, stateKey) {
 
         // Tooltip
         const title = document.createElementNS(NS, 'title');
-        title.textContent = `${seg.id}. ${seg.name} (${seg.territory}) — ${SCORE_LABELS[WM[stateKey][seg.id]]}`;
+        // El ápex no tiene vaso asignado: ni territoriosDe() ni los grupos se lo dan,
+        // y el tooltip seguía diciendo DA.
+        const terrTxt = seg.id === SEGMENTO_APEX ? 'sin vaso asignado' : seg.territory;
+        title.textContent = `${seg.id}. ${seg.name} (${terrTxt}) — ${SCORE_LABELS[WM[stateKey][seg.id]]}`;
         path.appendChild(title);
         path.addEventListener('click', () => {
             title.textContent = `${seg.id}. ${seg.name} (${seg.territory}) — ${SCORE_LABELS[WM[stateKey][seg.id]]}`;
@@ -1959,13 +1967,21 @@ function respuestaTensionalEAo() {
     const d = pico - basal;
     // Las tres empiezan con verbo: se insertan detrás de "La respuesta tensional".
     // `corto` va en la conclusión, donde el texto ya está dentro de un paréntesis.
-    if (d < 0) return { d, anormal: true,
+    // `fuerte` = criterio de intolerancia hemodinámica, el que saca al paciente de
+    // la condición de asintomático: caída de TAS mayor a 20 mmHg. Un ascenso plano
+    // es una respuesta ANORMAL y merece atención, pero no demuestra síntomas: antes
+    // un 120 → 130 concluía que el paciente "deja de considerarse asintomático" y
+    // que eso modificaba la indicación quirúrgica.
+    if (d <= -20) return { d, anormal: true, fuerte: true,
         txt: `cayó ${nProsa(-d, 0)} mmHg por debajo del basal (${basal} → ${pico} mmHg)`,
         corto: `caída de ${nProsa(-d, 0)} mmHg respecto del basal` };
-    if (d < 20) return { d, anormal: true,
+    if (d < 0) return { d, anormal: true, fuerte: false,
+        txt: `cayó ${nProsa(-d, 0)} mmHg por debajo del basal (${basal} → ${pico} mmHg)`,
+        corto: `caída de ${nProsa(-d, 0)} mmHg respecto del basal` };
+    if (d < 20) return { d, anormal: true, fuerte: false,
         txt: `ascendió sólo ${nProsa(d, 0)} mmHg (${basal} → ${pico} mmHg), sin alcanzar los 20 mmHg esperados`,
         corto: `ascenso de sólo ${nProsa(d, 0)} mmHg` };
-    return { d, anormal: false,
+    return { d, anormal: false, fuerte: false,
         txt: `ascendió ${nProsa(d, 0)} mmHg (${basal} → ${pico} mmHg), dentro de lo esperado`,
         corto: `ascenso de ${nProsa(d, 0)} mmHg` };
 }
@@ -2119,7 +2135,10 @@ function calcEAoEjercicio() {
     const criterios = [];
     if (E.sintomas.length) criterios.push({ cumple: true,
         txt: `Síntomas con el esfuerzo: ${listarEnProsa(E.sintomas.map(x => x.txt))}${E.momento ? ' (' + E.momento + ')' : ''}` });
-    if (E.ta) criterios.push({ cumple: E.ta.anormal, txt: `Respuesta tensional: ${E.ta.txt}` });
+    // Sólo la caída >20 mmHg cuenta como criterio para dejar de ser asintomático.
+    // El ascenso plano se muestra como hallazgo, sin cumplir criterio.
+    if (E.ta) criterios.push({ cumple: !!E.ta.fuerte, anormal: E.ta.anormal,
+        txt: `Respuesta tensional: ${E.ta.txt}` });
 
     const box = document.getElementById('eaoej_criterios');
     if (!criterios.length) {
@@ -2129,10 +2148,14 @@ function calcEAoEjercicio() {
         return;
     }
     const hayCriterio = criterios.some(c => c.cumple);
+    const soloTensional = !hayCriterio && criterios.some(c => c.anormal);
     sugerir('eaoej_veredicto', hayCriterio ? 'no_asintomatico' : 'asintomatico',
         hayCriterio
             ? 'Cumple criterio para dejar de considerarse asintomático. Podés corregirlo.'
-            : 'Sin criterios positivos: se mantiene asintomático. Podés corregirlo.');
+            : soloTensional
+                ? 'Respuesta tensional anormal, pero SIN síntomas y sin caída mayor a 20 mmHg: ' +
+                  'no alcanza para dejar de considerarse asintomático. Podés corregirlo.'
+                : 'Sin criterios positivos: se mantiene asintomático. Podés corregirlo.');
 
     if (box) {
         box.style.display = 'block';
@@ -2432,8 +2455,11 @@ ${v('nc_descripcion') ? 'Descripción: ' + v('nc_descripcion') : ''}`;
     });
     const wmsiRep = calcWMSI('reposo') || '—';
     const wmsiEst = calcWMSI('estres') || '—';
+    // El MISMO criterio que el informe: sólo BCRI, marcapasos y preexcitación generan
+    // movimiento septal paradójico. Con BCRD la planilla excluía los septales y el
+    // informe no, así que el mismo estudio mostraba dos índices según la salida.
     const conduccionPlanilla = document.getElementById('ecg_conduccion').value;
-    const wmsiValorableTxt = (conduccionPlanilla && conduccionPlanilla !== 'ninguno')
+    const wmsiValorableTxt = CONDUCCION_LIMITA_SEPTUM.includes(conduccionPlanilla)
         ? `\n  WMSI sobre segmentos valorables (sin septales): ${calcWMSI('reposo', SEGMENTOS_SEPTALES) || '—'} → ${calcWMSI('estres', SEGMENTOS_SEPTALES) || '—'}`
         : '';
     const cnt = contarMotilidad();
@@ -2721,7 +2747,8 @@ function recolectarHallazgos() {
     H.eeEstres = H.eeEstresNum === null ? '' : H.eeEstresNum.toFixed(1);
     H.vrtReposo = v('vrt_rep');
     H.vrtEstres = v('vrt_est');
-    H.diastolicoPositivo = (H.eeEstresNum || 0) > 14 && num('vrt_est') > 2.8;
+    // Resultado CALCULADO del estudio diastólico, a partir de los números.
+    H.diastolicoCalculado = (H.eeEstresNum || 0) > 14 && num('vrt_est') > 2.8;
 
     // ECG
     H.stTipo = document.getElementById('ecg_st_tipo').value;
@@ -2735,7 +2762,8 @@ function recolectarHallazgos() {
     // El infradesnivel ascendente rápido es respuesta fisiológica al esfuerzo:
     // describirlo como isquémico inventaría una discordancia que no existe.
     const mm = parseFloat(H.stMm) || 0;
-    H.stIsquemico = H.stTipo === 'supra' ||
+    // El CAMBIO observado del ST: existe, se describe y se informa siempre.
+    H.stCambio = H.stTipo === 'supra' ||
         (H.stTipo === 'infra' && H.stMorfologia !== 'ascendente_rapido' && mm >= 1);
 
     // Trastorno de conducción
@@ -2751,6 +2779,14 @@ function recolectarHallazgos() {
     H.conduccionTxt = H.conduccion === 'ninguno' ? '' : (CONDUCCION_SIGLA[H.conduccion] || textoSelect('ecg_conduccion'));
     H.stBasal = document.getElementById('ecg_st_basal').value;
     H.stBasalTxt = textoSelect('ecg_st_basal');
+
+    // Si el ST es INTERPRETABLE es otra pregunta, y se responde con el basal y la
+    // conducción. Antes `stIsquemico` las mezclaba: con BCRI un ST que la propia app
+    // declara ilegible seguía valiendo como respuesta eléctrica positiva, evitaba la
+    // rama de estímulo insuficiente y podía abrir la de discordancia.
+    H.stInterpretable = !H.hayConduccion && H.stBasal !== 'no_interpretable';
+    // Isquémico = hubo cambio Y el trazado permitía leerlo.
+    H.stIsquemico = H.stCambio && H.stInterpretable;
     H.otrosBasal = v('ecg_otros_basal');
 
     // Arritmias
@@ -2870,6 +2906,16 @@ function recolectarHallazgos() {
         ? (parseFloat(H.wmsiEstres) - parseFloat(H.wmsiReposo)) : null;
     H.wmsiSubio = H.wmsiReposo !== null && H.wmsiEstres !== null &&
                   parseFloat(H.wmsiEstres) > parseFloat(H.wmsiReposo);
+
+    // Resultado EFECTIVO: el del selector si el operador lo corrigió, el calculado
+    // si no. Antes la conclusión usaba el calculado y el cuerpo el selector, así que
+    // corregir el diastólico a negativo dejaba un informe que decía "Negativo" en el
+    // cuerpo y hablaba de ICFEp en la conclusión. Un solo resultado por campo, leído
+    // por el informe, la conclusión, la categoría y la planilla.
+    H.diastolicoManual = fueCorregido('diast_resultado');
+    H.diastolicoPositivo = H.diastolicoManual
+        ? H.diastResultado === 'positivo'
+        : H.diastolicoCalculado;
 
     H.categorizacion = document.getElementById('categorizacion').value
         ? textoSelect('categorizacion').toLowerCase() : '';
@@ -3577,8 +3623,13 @@ function cierreEAoEjercicio(H, rama) {
     // "sin síntomas y con respuesta tensional normal" cuando hay síntomas tildados o
     // la TA fue anormal: sería falso. Ahí se dice que es SU criterio, sin negar los datos.
     if (H.eaoEjVeredicto === 'asintomatico') {
-        const huboCriterios = E.sintomas.length > 0 || !!(E.ta && E.ta.anormal);
-        return huboCriterios ? T.eaoEjAsintomaticoPeseA : T.eaoEjAsintomatico;
+        // Síntomas tildados o caída >20 mmHg contradicen el veredicto: se informa que
+        // es criterio del operador, sin negar los datos.
+        if (E.sintomas.length > 0 || !!(E.ta && E.ta.fuerte)) return T.eaoEjAsintomaticoPeseA;
+        // Respuesta tensional anormal pero sin criterio fuerte: se describe tal cual.
+        if (E.ta && E.ta.anormal)
+            return rellenar(T.eaoEjSinSintomasTaAnormal, { tension: E.ta.txt });
+        return T.eaoEjAsintomatico;
     }
     if (H.eaoEjVeredicto !== 'no_asintomatico') return '';
 
@@ -3788,7 +3839,13 @@ function bloqueReposo(H, datosReposo, datosConduccion, hayAsincronia) {
 // La función diastólica, en su propio párrafo y con su rótulo.
 function bloqueDiastolicaReposo(H) {
     const T = NARRATIVA, nada = '—';
-    const partes = [`relación E/e' ${nProsa(H.eeReposo) || nada}${presionesLlenadoEnProsa(H.diastGrado)}`];
+    // Sin E/e' cargado no se afirma nada sobre las presiones: "relación E/e' —, sin
+    // datos de aumento de las presiones de llenado" leía como una conclusión negativa
+    // sobre un dato que no se midió.
+    const hayEE = !!nProsa(H.eeReposo);
+    const partes = [hayEE
+        ? `relación E/e' ${nProsa(H.eeReposo)}${presionesLlenadoEnProsa(H.diastGrado)}`
+        : `relación E/e' ${NARRATIVA.sinDatoF}`];
     if (['g1', 'g2', 'g3'].includes(H.diastGrado))
         partes.push(rellenar(fueCorregido('diast_grado') ? T.diastolicaGradoManual : T.diastolicaGrado,
             { grado: DIAST_GRADO_PROSA[H.diastGrado] }).replace(/^La función/, 'función'));
@@ -4173,6 +4230,60 @@ function motivoNoConcluyente(H) {
     return listarEnProsa(m) || 'limitaciones técnicas del estudio';
 }
 
+// ══════════════════════════════════════════════
+//  VERSIÓN DEL INFORME
+//
+//  El texto del informe y los datos del estudio son UNA SOLA versión. Antes se
+//  podía generar el informe, cambiar la FEy post y guardar en la planilla y en el
+//  historial con el texto viejo: la fila quedaba con la FEy nueva y la prosa
+//  anterior, afirmando una reserva contráctil que los números ya no sostenían.
+// ══════════════════════════════════════════════
+
+// Huella de los datos con los que se generó el texto que está en pantalla.
+let HUELLA_INFORME = null;
+
+// Campos que NO alimentan el informe: cambiarlos no lo desactualiza.
+const CAMPOS_AJENOS_AL_INFORME = ['categorizacion', 'firma_medico', 'paciente_nombre'];
+
+function huellaDelEstudio() {
+    const campos = {};
+    document.querySelectorAll('input[id], textarea[id], select[id]').forEach(el => {
+        if (CAMPOS_AJENOS_AL_INFORME.includes(el.id)) return;
+        campos[el.id] = el.type === 'checkbox' ? el.checked : el.value;
+    });
+    return JSON.stringify({ campos, reposo: WM.reposo, estres: WM.estres });
+}
+
+function informeEstaAlDia() {
+    const out = document.getElementById('reporte-output');
+    if (!out || !out.textContent.trim()) return false;
+    return HUELLA_INFORME === huellaDelEstudio();
+}
+
+// Cartel sobre el informe cuando dejó de corresponder a los datos cargados.
+function marcarInformeDesactualizado() {
+    const out = document.getElementById('reporte-output');
+    const aviso = document.getElementById('informe-desactualizado');
+    if (!out || !aviso) return;
+    const viejo = out.textContent.trim() && !informeEstaAlDia();
+    aviso.style.display = viejo ? 'block' : 'none';
+    out.classList.toggle('informe-viejo', !!viejo);
+}
+
+// Antes de guardar en cualquier lado: el texto tiene que ser de esta versión.
+// Devuelve el informe al día, o '' si el operador decidió no regenerarlo.
+function informeParaGuardar() {
+    const out = document.getElementById('reporte-output');
+    let texto = out ? out.textContent.trim() : '';
+    if (!texto) { generarInforme(); return out ? out.textContent.trim() : ''; }
+    if (informeEstaAlDia()) return texto;
+    // Se regenera solo: guardar datos nuevos con texto viejo no es una opción.
+    generarInforme();
+    texto = out.textContent.trim();
+    showNotice('Se regeneró el informe: habías cambiado datos después de generarlo.', 'warn');
+    return texto;
+}
+
 // ── Botón "Generar informe" ───────────────────
 function generarInforme() {
     // Si report-templates.js no cargó (caché vieja del index.html, archivo faltante),
@@ -4199,6 +4310,10 @@ function generarInforme() {
         if (campo) { campo.scrollIntoView({ behavior: 'smooth', block: 'center' }); campo.focus(); }
         return;
     }
+    // Todo lo derivado se recalcula AHORA, de una sola instantánea: el refresco
+    // diferido de 250 ms dejaba la categoría anterior en el primer informe.
+    if (deducirTimer) { clearTimeout(deducirTimer); deducirTimer = null; }
+    autocompletarInterpretacion();
     const H = recolectarHallazgos();
     const { rama, texto } = construirNarrativa(H);
 
@@ -4224,6 +4339,8 @@ function generarInforme() {
     const out = document.getElementById('reporte-output');
     out.style.display = 'block';
     out.textContent = informe;
+    HUELLA_INFORME = huellaDelEstudio();
+    marcarInformeDesactualizado();
     out.scrollIntoView({ behavior: 'smooth', block: 'start' });
     scheduleSave();
 }
@@ -4357,7 +4474,7 @@ function validarEstudio(rama) {
         av.push({ nivel: 'info', txt: 'Marcaste patrón global sin que se cumpla el criterio automático. El informe respeta tu criterio.' });
 
     const conduccion = document.getElementById('ecg_conduccion').value;
-    if (conduccion && conduccion !== 'ninguno') {
+    if (CONDUCCION_LIMITA_SEPTUM.includes(conduccion)) {
         if (document.getElementById('ecg_st_tipo').value)
             av.push({ nivel: 'warn', txt: 'Cargaste cambios del ST con un trastorno de conducción: el informe los describe pero deja constancia de que el análisis del ST no es valorable.' });
         const septalesAlterados = SEGMENTOS_SEPTALES.filter(id => WM.reposo[id] > 1 || WM.estres[id] > 1);
@@ -4447,7 +4564,8 @@ function cerrarJornada() {
 }
 
 function guardarEnHistorial() {
-    const reporte = document.getElementById('reporte-output').textContent;
+    // Texto y datos son una misma versión: si cambiaron los datos, se regenera.
+    const reporte = informeParaGuardar();
     if (!reporte) { alert('Primero generá el informe.'); return; }
 
     // Sin HC el estudio no se puede identificar después: se avisa y se pide confirmación
@@ -4473,6 +4591,9 @@ function guardarEnHistorial() {
         reporte,
         estudio: {
             fields: captureFields(),
+            // Sin esto, recuperar un estudio del historial perdía las correcciones
+            // manuales: una geometría corregida a mano volvía a la calculada.
+            corregidos: { ...camposCorregidos },
             wm: { reposo: { ...WM.reposo }, estres: { ...WM.estres } },
             protocol: currentProtocol,
             specialTab: currentSpecialTab,
@@ -4721,11 +4842,7 @@ function borrarCasuistica() {
 async function guardarEnPlanilla() {
     // El informe es lo que se quiere poder graficar y leer después:
     // si no se generó, se genera antes de armar la fila.
-    let informe = document.getElementById('reporte-output').textContent.trim();
-    if (!informe) {
-        generarInforme();
-        informe = document.getElementById('reporte-output').textContent.trim();
-    }
+    const informe = informeParaGuardar();
     if (!informe) { alert('No se pudo generar el informe: revisá los datos del estudio.'); return; }
 
     if (!EstresSheets.estaConfigurado()) {
@@ -4741,11 +4858,20 @@ async function guardarEnPlanilla() {
     // Primero al respaldo local, después al envío: el POST no-cors no permite
     // confirmar la recepción, así que el estudio no puede depender de él.
     const etiqueta = (v('paciente_id') || v('paciente_nombre') || 's/ID');
-    const ts = Date.now();
-    const cola = EstresSheets.leerCola();
-    cola.push({ ts, etiqueta, fila, enviado: false });
-    EstresSheets.guardarCola(cola);
+    // El respaldo local se VERIFICA antes de enviar: si no se escribió, decir después
+    // "quedó guardado localmente" sería mentira. Y nada se descarta en silencio.
+    const guardado = EstresSheets.encolar(fila, etiqueta);
     renderPendientes();
+    if (!guardado.ok) {
+        const motivo = guardado.motivo === 'COLA_LLENA'
+            ? `La cola llegó a ${guardado.max} estudios pendientes y no entra uno más.`
+            : `No se pudo escribir el respaldo local (${guardado.detalle || 'almacenamiento lleno'}).`;
+        alert('NO se envió el estudio.\n\n' + motivo + '\n\n' +
+              'Confirmá los pendientes que ya estén en el Sheet para liberar lugar, ' +
+              'o exportá la jornada antes de seguir.');
+        return;
+    }
+    const ts = guardado.ts || Date.now();
 
     try {
         await EstresSheets.enviar(fila);
@@ -4764,13 +4890,18 @@ async function guardarEnPlanilla() {
 async function reintentarPendientes() {
     const pend = EstresSheets.pendientes();
     if (!pend.length) { showNotice('No hay envíos pendientes.', 'ok'); return; }
-    let ok = 0;
+    let ok = 0, fallaron = 0;
     for (const p of pend) {
         try { await EstresSheets.enviar(p.fila); ok++; }
-        catch (e) { /* sigue sin confirmar */ }
+        catch (e) { fallaron++; }
     }
     renderPendientes();
-    showNotice(`Reenviados ${pend.length}. Verificá el Sheet y marcalos como confirmados.`, 'ok');
+    // El aviso decía "Reenviados N" usando el total de pendientes: podía afirmar que
+    // se reenviaron todos aunque hubieran fallado todos.
+    const msg = fallaron === 0
+        ? `Reenviados ${ok} de ${pend.length}. Verificá el Sheet y marcalos como confirmados.`
+        : `Reenviados ${ok} de ${pend.length}; ${fallaron} siguen sin salir y quedan pendientes.`;
+    showNotice(msg, fallaron ? 'warn' : 'ok');
 }
 
 // Confirmar es un acto del operador: mirar el Sheet y decir "está".
@@ -5456,6 +5587,12 @@ function setupAutosave() {
     // Un solo "escucha" general cubre todos los campos, incluso los que se crean al vuelo
     document.addEventListener('input', scheduleSave, true);
     document.addEventListener('change', scheduleSave, true);
+    // Una última edición seguida de cierre inmediato se perdía: el debounce no
+    // llegaba a disparar.
+    window.addEventListener('pagehide', () => { try { saveDraft(); } catch (e) {} });
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden') { try { saveDraft(); } catch (e) {} }
+    });
     document.addEventListener('input', refrescarDeducidos, true);
     document.addEventListener('change', refrescarDeducidos, true);
 

@@ -181,14 +181,37 @@ const EstresSheets = {
         try { return JSON.parse(localStorage.getItem(this.COLA_KEY)) || []; }
         catch (e) { return []; }
     },
+    COLA_MAX: 200,
+
+    // Nunca se descarta un pendiente en silencio: antes `slice(0, 200)` cortaba el
+    // final de la lista, que es justo donde se agregan los nuevos, así que el envío
+    // 201 desaparecía y el aviso igual decía que había quedado local. Y el catch vacío
+    // ocultaba un almacenamiento lleno.
     guardarCola(c) {
-        try { localStorage.setItem(this.COLA_KEY, JSON.stringify(c.slice(0, 200))); } catch (e) { /* noop */ }
+        if (c.length > this.COLA_MAX) {
+            return { ok: false, motivo: 'COLA_LLENA', pendientes: c.length, max: this.COLA_MAX };
+        }
+        try {
+            localStorage.setItem(this.COLA_KEY, JSON.stringify(c));
+            return { ok: true, pendientes: c.length };
+        } catch (e) {
+            return { ok: false, motivo: 'ALMACENAMIENTO_LLENO', detalle: String(e && e.message || e) };
+        }
     },
-    encolar(fila, etiqueta) {
+    // Identificador propio del estudio: sin esto, reintentar podía duplicar la fila
+    // si el primer envío sí había llegado y lo que falló fue la respuesta.
+    nuevoId() {
+        return 'ee-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
+    },
+
+    encolar(fila, etiqueta, id) {
         const cola = this.leerCola();
-        cola.push({ ts: Date.now(), etiqueta, fila, enviado: false });
-        this.guardarCola(cola);
-        return cola.length;
+        cola.push({ ts: Date.now(), id: id || this.nuevoId(), etiqueta, fila, enviado: false });
+        const ts = cola[cola.length - 1].ts;
+        const r = this.guardarCola(cola);
+        // El resultado del guardado viaja al llamador: sólo puede decir "quedó local"
+        // quien sepa que efectivamente se escribió.
+        return { ...r, ts, pendientes: cola.length };
     },
     marcarEnviado(ts) {
         const cola = this.leerCola().map(x => x.ts === ts ? { ...x, enviado: true } : x);

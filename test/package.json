@@ -5,7 +5,7 @@
   "description": "Batería de verificación del informe de eco estrés. Carga la app en jsdom y la ejercita como si fuera el navegador. jsdom se instala FUERA de este directorio: Documents está sincronizado con iCloud y el módulo queda inutilizable ahí.",
   "scripts": {
     "setup": "mkdir -p ~/.eco-estres-test && cd ~/.eco-estres-test && npm init -y --scope=eco >/dev/null && npm install jsdom",
-    "test": "node motilidad-reposo.js && node medidas-vi.js && node parrafo-pronostico.js && node barra-motilidad.js && node segmentos-uno-a-uno.js && node evaluabilidad.js && node contrato-planilla.js && node drift-grupos.js && node drift-motores.js && node barrido.js 800 && node barrido.js 400 --doppler",
+    "test": "node motilidad-reposo.js && node medidas-vi.js && node parrafo-pronostico.js && node barra-motilidad.js && node segmentos-uno-a-uno.js && node evaluabilidad.js && node contrato-planilla.js && node auditoria-tanda-a.js && node drift-grupos.js && node drift-motores.js && node barrido.js 800 && node barrido.js 400 --doppler",
     "barrido": "node barrido.js 800",
     "escala": "node escala-wmsi.js 2400",
     "drift": "node drift-grupos.js",
