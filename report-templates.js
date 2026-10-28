@@ -313,6 +313,13 @@ const NARRATIVA = {
     // ── MODIFICADORES DE LA CONCLUSIÓN ────────────────────────────────
     // Se insertan antes del punto final de la conclusión elegida.
     modificadores: {
+        // Un territorio sin par suficiente no se evaluó: el veredicto tiene que
+        // decir sobre QUÉ territorios se pronuncia. Antes el informe salía negativo
+        // sin aclarar que a la circunfleja no se la había mirado.
+        territoriosNoEvaluables: '. La valoración se limita a {{evaluables}}, ya que ' +
+                     '{{noEvaluables}} no pudo{{plural}} valorarse por falta de pares ' +
+                     'reposo/post-esfuerzo en sus segmentos',
+
         fcSuboptima:' al doble producto alcanzado, con la limitación de no haberse alcanzado la FC objetivo, lo que reduce la sensibilidad ' +
                      'del estudio',
 

@@ -2851,7 +2851,14 @@ function recolectarHallazgos() {
                           anormalesReposo.every(s => s.respuesta === 'cicatriz');
 
     const cnt = contarMotilidad();
-    H.segEvaluados = Math.min(cnt.evalRep, cnt.evalEst);
+    // Pares reales: el mínimo de los dos conteos afirmaba que había algo que
+    // comparar cuando los segmentos puntuados no eran los mismos en las dos fases.
+    H.segEvaluados = contarPares();
+    const ev = evaluabilidadPorTerritorio();
+    H.territoriosEvaluables = ev.evaluables;
+    H.territoriosNoEvaluables = ev.noEvaluables;
+    H.motilidadNoValorable = ev.ningunoEvaluable;
+    H.evaluabilidad = ev.estado;
     // Con trastorno de conducción el septum no es valorable, esté normal o alterado:
     // queda fuera del índice y así se aclara en el informe.
     const excluirDelWMSI = H.hayConduccion ? SEGMENTOS_SEPTALES : null;
@@ -2881,6 +2888,51 @@ function gradoFeyEnProsa(fey) {
 // DA, 15 a la CD, 16 a la Cx). Repartir por vaso un ápex comprometido en bloque lo hace
 // leer como enfermedad de tres vasos, que es justo lo que NO es: es un patrón apical
 // —aneurisma, Takotsubo, MCH apical, DA envolvente— y así hay que decirlo.
+// ══════════════════════════════════════════════
+//  EVALUABILIDAD POR TERRITORIO
+//
+//  "No evaluado" no es "normal". Con los 17 segmentos en 0 el informe salía
+//  "ecocardiográficamente negativa para isquemia" con riesgo menor al 1 % anual:
+//  afirmaba un eco negativo sin que se hubiera puntuado un solo segmento.
+//
+//  El corte es POR TERRITORIO y no global: un total global deja pasar un estudio
+//  con la circunfleja entera sin par —cuatro segmentos— si los otros dos
+//  territorios están completos. Ese informe saldría negativo sin haber mirado Cx.
+//
+//  CRITERIO PROPIO DE ESTA APP, no de guía. El umbral de dos segmentos sin par
+//  por territorio es una convención razonable que todavía no verificamos contra
+//  una recomendación puntual de ASE; mientras tanto se declara como criterio de
+//  la app, igual que el DP <20.000 y el HRR₁ ≤6.
+// ══════════════════════════════════════════════
+const SIN_PAR_MAX_POR_TERRITORIO = 2;
+
+// El ápex no cuenta para ningún territorio: no tiene vaso asignado y ya está
+// fuera del WMSI y de territoriosDe().
+function evaluabilidadPorTerritorio() {
+    const terr = { DA: [], CD: [], Cx: [] };
+    SEGMENTS.forEach(s => {
+        if (s.id === SEGMENTO_APEX) return;
+        if (terr[s.territory]) terr[s.territory].push(s.id);
+    });
+    const estado = {}, evaluables = [], noEvaluables = [];
+    Object.keys(terr).forEach(t => {
+        // Par = el segmento tiene puntaje en LAS DOS fases.
+        const sinPar = terr[t].filter(id => !(WM.reposo[id] > 0 && WM.estres[id] > 0));
+        const ok = sinPar.length < SIN_PAR_MAX_POR_TERRITORIO;
+        estado[t] = { sinPar, evaluable: ok, total: terr[t].length };
+        (ok ? evaluables : noEvaluables).push(t);
+    });
+    return { estado, evaluables, noEvaluables, ningunoEvaluable: evaluables.length === 0 };
+}
+
+// Pares reales, no el mínimo de dos conteos: con seis segmentos puntuados sólo en
+// reposo y otros seis sólo en esfuerzo, el mínimo daba 6 y los pares eran 0.
+function contarPares() {
+    let n = 0;
+    SEGMENTS.forEach(s => { if (WM.reposo[s.id] > 0 && WM.estres[s.id] > 0) n++; });
+    return n;
+}
+
 const SEGMENTOS_APICALES = [13, 14, 15, 16, 17];
 
 function esPatronApical(segs) {
@@ -2896,6 +2948,9 @@ function territoriosDe(segs) {
 
 // ── Capa 2: selector de rama ──────────────────
 function elegirRama(H) {
+    // Sin ningún territorio evaluable no se puede afirmar nada sobre la motilidad:
+    // "no evaluado" no es "normal". Va antes que todo lo demás.
+    if (H.motilidadNoValorable) return 'noConcluyente';
     if (H.ventana === 'limitada') return 'noConcluyente';
     // Estímulo insuficiente: por debajo de ese DP no se puede descartar isquemia.
     // No aplica si el estudio YA dio resultado, por imagen o por ECG.
@@ -3990,6 +4045,16 @@ function construirNarrativa(H) {
     // Modificadores: se insertan antes del punto final
     const extras = [];            // coletillas: se enganchan antes del punto final
     const oracionesFinales = [];  // oraciones completas: van después
+    // Qué territorios se pudieron valorar. Va en todas las ramas salvo la no
+    // concluyente, donde el motivo ya lo dice.
+    if (H.territoriosNoEvaluables.length && rama !== 'noConcluyente') {
+        const n = H.territoriosNoEvaluables.length;
+        extras.push(rellenar(T.modificadores.territoriosNoEvaluables, {
+            evaluables: territoriosEnProsa(H.territoriosEvaluables),
+            noEvaluables: territoriosEnProsa(H.territoriosNoEvaluables),
+            plural: n === 1 ? '' : 'ieron'
+        }));
+    }
     if (H.fcSuboptima && rama === 'negativa') extras.push(T.modificadores.fcSuboptima);
     // En un positivo la isquemia ya quedó demostrada y la FC insuficiente no lo invalida;
     // en un estudio sin isquemia, sí: no es un negativo pleno.
@@ -4021,8 +4086,11 @@ function construirNarrativa(H) {
     // Un negativo con estímulo suficiente afirma algo, no sólo niega: el bajo riesgo
     // de eventos es la información que el clínico se lleva. Se calcula ANTES del
     // bloque pronóstico porque decide cómo se encabeza el párrafo que lo matiza.
+    // La cifra de "<1 % anual" sale de poblaciones con el eco completo: no puede
+    // afirmarse con un territorio sin evaluar.
     H.negativoBajoRiesgo = rama === 'negativa' && !H.isquemicos.length &&
-                           !H.fcSuboptima && !H.estimuloInsuficiente;
+                           !H.fcSuboptima && !H.estimuloInsuficiente &&
+                           !H.territoriosNoEvaluables.length;
     if (H.negativoBajoRiesgo) oracionesFinales.push(T.pronostico.negativoBajoRiesgo);
 
     // Todo lo que le cambia la conducta al clínico: integrado si es uno, en párrafo
@@ -4091,6 +4159,11 @@ function incoherenciasInforme(texto, H) {
 
 function motivoNoConcluyente(H) {
     const m = [];
+    if (H.motilidadNoValorable)
+        m.push(H.segEvaluados === 0
+            ? 'no haberse registrado la motilidad segmentaria'
+            : `motilidad no valorable en ninguno de los territorios coronarios ` +
+              `(${H.segEvaluados} de 16 segmentos con par reposo/post-esfuerzo)`);
     if (H.ventana === 'limitada') m.push('ventana acústica limitada');
     if (H.estimuloInsuficiente)
         m.push(`estímulo insuficiente (doble producto ${H.dobleProducto.toLocaleString('es-AR')})` +
