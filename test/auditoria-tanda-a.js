@@ -85,5 +85,46 @@ H = w.recolectarHallazgos();
 exigir(!H.hayConduccion, 'BCRD no limita el septum');
 exigir(!H.wmsiExcluyeSeptales, 'con BCRD el WMSI no excluye septales en ninguna salida');
 
-console.log(fallas ? `${fallas} FALLAS` : 'Sin fallas');
+// ── Edición a mano: no se pisa sin preguntar ─────────────────────
+casoBase(w); todoNormal(w);
+w.generarInforme();
+exigir(!w.informeFueEditado(), 'recién generado no está editado');
+const out = w.document.getElementById('reporte-output');
+out.textContent = out.textContent + '\n\nAgregado a mano por el operador.';
+out.dispatchEvent(new w.Event('input', { bubbles: true }));
+exigir(w.informeFueEditado(), 'la edición a mano se detecta');
+// Con el operador eligiendo "conservar mi edición" (Cancelar en el confirm)
+w.confirm = () => false;
+let guardado = w.informeParaGuardar();
+exigir(/Agregado a mano/.test(guardado), 'si elige conservar, la edición no se pisa');
+// Y eligiendo regenerar
+w.confirm = () => true;
+guardado = w.informeParaGuardar();
+exigir(!/Agregado a mano/.test(guardado), 'si elige regenerar, el texto se rehace');
+w.confirm = () => true;
+
+// ── CRM/ATC de estudios viejos: no se convierten en cirugía ──────
+casoBase(w); todoNormal(w);
+w.document.getElementById('ant_crm').checked = true;
+w.marcarCrmResuelto();
+let ant = informe(w).texto.split('\n\n').find(p => p.startsWith('Antecedentes:')) || '';
+exigir(/cirugía de revascularización/i.test(ant),
+    `tildada ahora, la casilla sí significa cirugía: "${ant}"`);
+
+// Estudio recuperado sin el marcador de esquema
+w.aplicarEstudio({ fields: w.captureFields(), wm: { reposo: { ...WM.reposo }, estres: { ...WM.estres } } });
+ant = informe(w).texto.split('\n\n').find(p => p.startsWith('Antecedentes:')) || '';
+exigir(!/cirugía de revascularización miocárdica/i.test(ant),
+    `un estudio viejo no puede convertirse en cirugía: "${ant}"`);
+exigir(/por cirugía o angioplastia/i.test(ant),
+    `debe quedar como dato previo al cambio: "${ant}"`);
+
+// Y con el marcador, se respeta tal cual
+w.aplicarEstudio({ fields: w.captureFields(), crmSoloCirugia: true,
+    wm: { reposo: { ...WM.reposo }, estres: { ...WM.estres } } });
+ant = informe(w).texto.split('\n\n').find(p => p.startsWith('Antecedentes:')) || '';
+exigir(/cirugía de revascularización/i.test(ant),
+    `con el marcador nuevo sí es cirugía: "${ant}"`);
+
+console.log(fallas ? `${fallas} FALLAS (total)` : 'Sin fallas (ajustes incluidos)');
 process.exit(fallas ? 1 : 0);

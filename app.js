@@ -632,6 +632,13 @@ function autocompletarInterpretacion() {
     calcViabilidad();
 }
 
+// Estudio recuperado de antes del 28/10/2026, cuando `ant_crm` era "CRM / ATC".
+// Mientras esté en true, el informe no afirma cirugía: dice que el dato es previo
+// al cambio. Se limpia en cuanto el operador toca la casilla, porque ahí sí eligió.
+let CRM_AMBIGUO = false;
+
+function marcarCrmResuelto() { CRM_AMBIGUO = false; refrescarDeducidos(); }
+
 // Campos que la app deduce: al tocarlos, el operador toma el control del campo.
 const CAMPOS_DEDUCIDOS = [
     'patron_motilidad', 'diast_resultado', 'diast_grado', 'geometria_vi', 'eaoej_veredicto', 'viab_respuesta',
@@ -2668,6 +2675,7 @@ function recolectarHallazgos() {
     H.crmAnio = v('crm_anio');
     H.antOtros = normalizarTexto(v('ant_otros'));
     H.antCrm = document.getElementById('ant_crm').checked;
+    H.crmAmbiguo = H.antCrm && CRM_AMBIGUO;
     H.indicacionTxt = document.getElementById('indicacion').value ? textoSelect('indicacion') : '';
     H.indicacionLibre = normalizarTexto(v('indicacion_libre'));
     H.contraste = document.getElementById('contraste_usado').value;
@@ -3671,7 +3679,9 @@ function antecedentesEnProsa(H) {
         vasos: listarEnProsa(H.atcVasos),
         anio: H.atcAnio ? ` (${H.atcAnio})` : ''
     }));
-    if (H.crmAnio || H.antCrm) partes.push(rellenar(T.antecedentesCRM, {
+    if (H.crmAmbiguo) partes.push(rellenar(T.antecedentesCrmAmbiguo, {
+        anio: H.crmAnio ? ` (${H.crmAnio})` : '' }));
+    else if (H.crmAnio || H.antCrm) partes.push(rellenar(T.antecedentesCRM, {
         anio: H.crmAnio ? ` (${H.crmAnio})` : ''
     }));
     if (H.antOtros) partes.push(H.antOtros);
@@ -4254,6 +4264,22 @@ function huellaDelEstudio() {
     return JSON.stringify({ campos, reposo: WM.reposo, estres: WM.estres });
 }
 
+// Texto tal como lo dejó el generador. Si el que está en pantalla difiere, la
+// diferencia la escribió el operador a mano y no se pisa sin preguntar.
+let TEXTO_GENERADO = '';
+
+function informeFueEditado() {
+    const out = document.getElementById('reporte-output');
+    if (!out || !TEXTO_GENERADO) return false;
+    return out.textContent.trim() !== TEXTO_GENERADO.trim();
+}
+
+function marcarInformeEditado() {
+    const aviso = document.getElementById('informe-editado');
+    if (aviso) aviso.style.display = informeFueEditado() ? 'block' : 'none';
+    marcarInformeDesactualizado();
+}
+
 function informeEstaAlDia() {
     const out = document.getElementById('reporte-output');
     if (!out || !out.textContent.trim()) return false;
@@ -4271,16 +4297,28 @@ function marcarInformeDesactualizado() {
 }
 
 // Antes de guardar en cualquier lado: el texto tiene que ser de esta versión.
-// Devuelve el informe al día, o '' si el operador decidió no regenerarlo.
+// Devuelve el informe a guardar, o '' si no hay nada que guardar.
 function informeParaGuardar() {
     const out = document.getElementById('reporte-output');
     let texto = out ? out.textContent.trim() : '';
     if (!texto) { generarInforme(); return out ? out.textContent.trim() : ''; }
-    if (informeEstaAlDia()) return texto;
-    // Se regenera solo: guardar datos nuevos con texto viejo no es una opción.
+    if (informeEstaAlDia() && !informeFueEditado()) return texto;
+
+    // Una edición a mano NO se pisa en silencio: la decisión es del operador. Antes
+    // de este cambio el informe se regeneraba solo y una corrección escrita a mano
+    // se perdía sin aviso.
+    if (informeFueEditado()) {
+        const regenerar = confirm(
+            'Editaste el informe a mano' +
+            (informeEstaAlDia() ? '.' : ' y además cambiaste datos después de generarlo.') +
+            '\n\nAceptar: regenerar el informe desde los datos actuales. Se PIERDE tu edición.' +
+            '\nCancelar: guardar el informe tal como lo escribiste.');
+        if (!regenerar) return texto;
+    }
+
     generarInforme();
     texto = out.textContent.trim();
-    showNotice('Se regeneró el informe: habías cambiado datos después de generarlo.', 'warn');
+    showNotice('Se regeneró el informe desde los datos actuales.', 'warn');
     return texto;
 }
 
@@ -4340,7 +4378,8 @@ function generarInforme() {
     out.style.display = 'block';
     out.textContent = informe;
     HUELLA_INFORME = huellaDelEstudio();
-    marcarInformeDesactualizado();
+    TEXTO_GENERADO = informe;
+    marcarInformeEditado();
     out.scrollIntoView({ behavior: 'smooth', block: 'start' });
     scheduleSave();
 }
@@ -4594,6 +4633,10 @@ function guardarEnHistorial() {
             // Sin esto, recuperar un estudio del historial perdía las correcciones
             // manuales: una geometría corregida a mano volvía a la calculada.
             corregidos: { ...camposCorregidos },
+            // Desde el 28/10/2026 la casilla `ant_crm` significa SÓLO cirugía. Los
+            // estudios guardados antes no distinguían CRM de ATC, y convertirlos en
+            // "cirugía" les atribuiría un antecedente que nadie afirmó.
+            crmSoloCirugia: true,
             wm: { reposo: { ...WM.reposo }, estres: { ...WM.estres } },
             protocol: currentProtocol,
             specialTab: currentSpecialTab,
@@ -5384,7 +5427,8 @@ function saveDraft() {
             medicacion: medicacionActual.map(m => ({ ...m })),
             // Qué campos deducidos corrigió el operador. Sin esto el valor corregido
             // se restaura y el primer recálculo lo pisa: la corrección se pierde sola.
-            corregidos: { ...camposCorregidos },
+            crmSoloCirugia: true,
+        corregidos: { ...camposCorregidos },
             // El informe ya redactado también se guarda: si se cierra el navegador
             // después de generarlo, vuelve tal cual y no hay que rehacerlo.
             reporte: document.getElementById('reporte-output').textContent || ''
@@ -5473,6 +5517,10 @@ function aplicarEstudio(d) {
     // Las correcciones manuales se restauran ANTES que nada: los recálculos de más
     // abajo consultan esta marca, y si llega después ya pisaron el valor corregido.
     camposCorregidos = (d.corregidos && typeof d.corregidos === 'object') ? { ...d.corregidos } : {};
+
+    // Estudio guardado antes de que `ant_crm` pasara a significar sólo cirugía: el
+    // dato no distingue CRM de ATC y el informe no puede elegir uno por él.
+    CRM_AMBIGUO = !d.crmSoloCirugia;
 
     restoreFields(d.fields);
 

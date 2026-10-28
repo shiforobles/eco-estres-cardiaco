@@ -134,7 +134,7 @@
             <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="ant_dislipemia"><label for="ant_dislipemia">Dislipemia</label></div>
             <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="ant_isquemia"><label for="ant_isquemia">C. Isquémica</label></div>
             <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="ant_iam"><label for="ant_iam">IAM Previo</label></div>
-            <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="ant_crm"><label for="ant_crm" title="Sólo cirugía. La angioplastia se carga con los vasos tratados, más abajo.">CRM previa (cirugía)</label></div>
+            <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="ant_crm" onchange="marcarCrmResuelto()"><label for="ant_crm" title="Sólo cirugía. La angioplastia se carga con los vasos tratados, más abajo.">CRM previa (cirugía)</label></div>
             <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="ant_fa"><label for="ant_fa">FA</label></div>
             <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="ant_betabloq"><label for="ant_betabloq">Beta-bloqueante activo</label></div>
             <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="ant_epoc"><label for="ant_epoc">EPOC / Asma</label></div>
@@ -1373,12 +1373,19 @@
             <span class="firma-nota">Se guarda sólo en este navegador: no viaja al repositorio ni a ningún servidor. Se agrega al pie del informe.</span>
         </div>
         <div id="validacion-panel" class="validacion-panel" style="display:none"></div>
+        <div id="informe-editado" class="aviso-desactualizado" style="display:none">
+            ✎ <strong>Editaste este informe a mano.</strong> Al guardar se te pregunta si
+            querés conservar tu edición o regenerarlo desde los datos.
+        </div>
         <div id="informe-desactualizado" class="aviso-desactualizado" style="display:none">
             ⚠ <strong>Este informe quedó desactualizado.</strong> Cambiaste datos después de generarlo.
             Al guardar en el historial o en la planilla se regenera solo, para que el texto y los datos
             sean la misma versión.
         </div>
-        <div id="reporte-output" class="reporte-output" style="display:none"></div>
+        <div id="reporte-output" class="reporte-output" style="display:none"
+             contenteditable="true" spellcheck="true"
+             oninput="marcarInformeEditado()"
+             aria-label="Informe generado, editable"></div>
     </section>
 
     <div class="bloque-sep">

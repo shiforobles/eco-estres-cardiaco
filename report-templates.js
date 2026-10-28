@@ -90,6 +90,10 @@ const NARRATIVA = {
 
     antecedentesATC:   'angioplastia a {{vasos}}{{anio}}',
     antecedentesCRM:   'cirugía de revascularización miocárdica{{anio}}',
+    // Estudio guardado cuando la casilla era "CRM / ATC": el dato no distingue
+    // una cosa de la otra, así que el informe no elige por el operador.
+    antecedentesCrmAmbiguo: 'revascularización previa, por cirugía o angioplastia{{anio}} '
+                     + '(dato previo al cambio de registro, sin precisar cuál)',
     antecedentesBB:    'Bajo tratamiento betabloqueante.',
 
     // ── VEREDICTO DE SUFICIENCIA ──────────────────────────────────────
