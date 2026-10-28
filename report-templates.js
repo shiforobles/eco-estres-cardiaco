@@ -613,10 +613,30 @@ const CONDUCCION_PROSA = {
         trastorno:     'preexcitación ventricular',
         alTrastorno:   'a la preexcitación ventricular',
         hallazgoSeptal:'alteración del movimiento septal por activación ventricular anómala'
+    },
+    // No es un trastorno de conducción, pero deja el septum igual de no valorable: el
+    // movimiento septal anómalo post-quirúrgico es casi universal tras una esternotomía
+    // y no se puede leer como isquemia ni como necrosis.
+    postquirurgico: {
+        trastorno:     'cirugía cardíaca previa',
+        alTrastorno:   'a la cirugía cardíaca previa',
+        hallazgoSeptal:'movimiento septal anómalo post-quirúrgico'
     }
 };
 
 // Cómo se nombra cada trastorno en la línea "ECG reposo:" (sigla, como se escribe a mano)
+// Frases del septum no valorable, por la causa que sea. Antes sólo existían para los
+// trastornos de conducción; la cirugía cardíaca produce el mismo problema.
+const SEPTUM_NO_VALORABLE = {
+    reposo:   'El movimiento septal no es valorable por {{alTrastorno}}: {{hallazgoSeptal}} ' +
+              'en {{segmentosSeptales}}.',
+    esfuerzo: 'Los segmentos septales no se valoran por {{alTrastorno}}, de modo que la ' +
+              'respuesta contráctil se informa sobre el resto del ventrículo.',
+    conclusion: '. La presencia de {{trastorno}} deja los segmentos septales fuera del ' +
+              'análisis, lo que reduce la sensibilidad del estudio en el territorio de la ' +
+              'descendente anterior',
+};
+
 const CONDUCCION_SIGLA = {
     bcri: 'BCRI',
     marcapasos: 'ritmo de marcapasos',

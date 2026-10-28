@@ -54,6 +54,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initTheme();
     document.getElementById('btn-theme-toggle').addEventListener('click', toggleTheme);
 
+    pintarIndicacionesPropias();
     buildSegmentsTable();
     renderBullsEye('svg-reposo', 'reposo');
     renderBullsEye('svg-estres', 'estres');
@@ -624,6 +625,7 @@ function autocompletarInterpretacion() {
     sugerirCategorizacion();
     renderAvisosClinicos();
     renderComparacionMotilidad();
+    renderAntecedentesHeredados();
     marcarInformeDesactualizado();
     calcProgresion();
 
@@ -2155,6 +2157,112 @@ const VIAB_PROSA = {
 // y pico — o sea, en todos los estudios. Leerlo como evidencia era circular, y por eso
 // la conclusión de EAo se coló en informes sin un solo dato valvular.
 // ══════════════════════════════════════════════
+//  INDICACIONES PROPIAS
+//  La lista cubre lo habitual, pero nadie tiene la lista completa de antemano. Las
+//  que se agregan quedan guardadas en esta computadora y aparecen la próxima vez.
+// ══════════════════════════════════════════════
+const INDICACIONES_KEY = 'ecoestres_indicaciones';
+
+function leerIndicacionesPropias() {
+    try { return JSON.parse(localStorage.getItem(INDICACIONES_KEY)) || []; }
+    catch (e) { return []; }
+}
+
+function pintarIndicacionesPropias() {
+    const sel = document.getElementById('indicacion');
+    if (!sel) return;
+    leerIndicacionesPropias().forEach(ind => {
+        if (sel.querySelector(`option[value="${ind.id}"]`)) return;
+        const op = document.createElement('option');
+        op.value = ind.id; op.textContent = ind.txt;
+        sel.appendChild(op);
+    });
+}
+
+function agregarIndicacion() {
+    const txt = (prompt('Indicación nueva (queda guardada para la próxima):') || '').trim();
+    if (!txt) return;
+    const lista = leerIndicacionesPropias();
+    const id = 'propia_' + txt.toLowerCase().replace(/[^a-z0-9]+/gi, '_').slice(0, 40);
+    if (!lista.some(x => x.id === id)) {
+        lista.push({ id, txt });
+        try { localStorage.setItem(INDICACIONES_KEY, JSON.stringify(lista)); }
+        catch (e) { showNotice('No se pudo guardar la indicación nueva.', 'warn'); }
+    }
+    pintarIndicacionesPropias();
+    const sel = document.getElementById('indicacion');
+    if (sel) { sel.value = id; sel.dispatchEvent(new Event('change', { bubbles: true })); }
+}
+
+// Las casillas de BCRI y marcapasos y el selector del bloque de ECG describen lo
+// mismo: se mantienen alineados para que no digan cosas distintas.
+function sincronizarConduccion() {
+    const sel = document.getElementById('ecg_conduccion');
+    if (!sel) return;
+    const bcri = (document.getElementById('ant_bcri') || {}).checked;
+    const mcp  = (document.getElementById('ant_marcapasos') || {}).checked;
+    if (bcri) sel.value = 'bcri';
+    else if (mcp) sel.value = 'marcapasos';
+    else if (sel.value === 'bcri' || sel.value === 'marcapasos') sel.value = 'ninguno';
+    refrescarDeducidos();
+}
+
+// Y al revés: si se elige en el selector, la casilla lo refleja.
+function sincronizarCasillasConduccion() {
+    const sel = document.getElementById('ecg_conduccion');
+    if (!sel) return;
+    const bcri = document.getElementById('ant_bcri');
+    const mcp = document.getElementById('ant_marcapasos');
+    if (bcri) bcri.checked = sel.value === 'bcri';
+    if (mcp) mcp.checked = sel.value === 'marcapasos';
+}
+
+// ══════════════════════════════════════════════
+//  DATOS DE ESTUDIOS ANTERIORES AL REDISEÑO
+//  Los campos que salieron de la pantalla siguen existiendo ocultos: un estudio
+//  guardado con ellos tiene que abrir completo y salir igual en su informe. Acá se
+//  muestran de sólo lectura, para que no se pierdan de vista.
+// ══════════════════════════════════════════════
+const CAMPOS_HEREDADOS = [
+    { id: 'resumen_hc',      txt: 'Resumen de historia clínica' },
+    { id: 'indicacion_libre',txt: 'Motivo / detalle clínico' },
+    { id: 'atc_anio',        txt: 'Año de la angioplastia' },
+    { id: 'crm_anio',        txt: 'Año de la cirugía' },
+];
+const CASILLAS_HEREDADAS = [
+    { id: 'ant_iam', txt: 'Infarto de miocardio previo' },
+    { id: 'atc_da',  txt: 'Angioplastia a la DA' },
+    { id: 'atc_cd',  txt: 'Angioplastia a la CD' },
+    { id: 'atc_cx',  txt: 'Angioplastia a la Cx' },
+];
+
+function renderAntecedentesHeredados() {
+    const box = document.getElementById('antecedentes-heredados');
+    if (!box) return;
+    const items = [];
+    CAMPOS_HEREDADOS.forEach(c => {
+        const el = document.getElementById(c.id);
+        const val = el && (el.value || '').trim();
+        if (val) items.push(`<li><strong>${c.txt}:</strong> ${val}</li>`);
+    });
+    CASILLAS_HEREDADAS.forEach(c => {
+        const el = document.getElementById(c.id);
+        if (el && el.checked) items.push(`<li>${c.txt}</li>`);
+    });
+    // "Otros antecedentes" ya no se carga pero sigue saliendo en el informe.
+    const otros = (document.getElementById('ant_otros') || {}).value;
+    if (otros && otros.trim()) items.push(`<li><strong>Otros antecedentes:</strong> ${otros.trim()}</li>`);
+    const notas = (document.getElementById('notas_privadas') || {}).value;
+    if (notas && notas.trim()) items.push(`<li><strong>Notas privadas</strong> (no salen del navegador): ${notas.trim()}</li>`);
+
+    if (!items.length) { box.style.display = 'none'; box.innerHTML = ''; return; }
+    box.style.display = 'block';
+    box.innerHTML = '<strong>Datos de este estudio cargados antes del rediseño.</strong> ' +
+        'Ya no se cargan desde la pantalla, pero siguen guardados y siguen saliendo en el ' +
+        'informe de este estudio.<ul class="cat-motivos">' + items.join('') + '</ul>';
+}
+
+// ══════════════════════════════════════════════
 //  MIGRACIÓN DEL "RESUMEN DE HISTORIA CLÍNICA"
 //  Era un campo que se cargaba con esfuerzo y no salía en ninguna parte: ni en el
 //  informe ni en la planilla. Su contenido pasa a "Otros antecedentes relevantes",
@@ -2815,8 +2923,7 @@ function recolectarHallazgos() {
     H.atcAnio = v('atc_anio');
     H.crmAnio = v('crm_anio');
     H.antOtros = normalizarTexto(v('ant_otros'));
-    H.antCrm = document.getElementById('ant_crm').checked;
-    H.crmAmbiguo = H.antCrm && CRM_AMBIGUO;
+
     H.indicacion = document.getElementById('indicacion').value;
     H.indicacionTxt = H.indicacion ? textoSelect('indicacion') : '';
     H.indicacionLibre = normalizarTexto(v('indicacion_libre'));
@@ -2877,7 +2984,9 @@ function recolectarHallazgos() {
     H.valvTipoTxt = H.valvTipo ? textoSelect('valv_tipo') : '';
     H.valvSeveridad = v('valv_severidad');
     H.valvSeveridadTxt = H.valvSeveridad ? textoSelect('valv_severidad').toLowerCase() : '';
-    H.valvBicuspide = v('valv_bicuspide');
+    // La casilla manda; el selector viejo sólo sostiene lo guardado antes del cambio.
+    H.valvBicuspide = (document.getElementById('ant_bicuspide') || {}).checked
+        ? 'si' : v('valv_bicuspide');
 
     H.eaoEj = datosEAoEjercicio();
     H.eaoEjVeredicto = document.getElementById('eaoej_veredicto').value;
@@ -2937,11 +3046,31 @@ function recolectarHallazgos() {
         (H.stTipo === 'infra' && H.stMorfologia !== 'ascendente_rapido' && mm >= 1);
 
     // Trastorno de conducción
-    H.conduccion = document.getElementById('ecg_conduccion').value;
+    // Las casillas de antecedentes mandan: son las que el operador tilda al cargar el
+    // estudio. El selector del bloque de ECG queda para el resto (BCRD, hemibloqueos,
+    // preexcitación) y se mantiene sincronizado.
+    H.antBcri = !!(document.getElementById('ant_bcri') || {}).checked;
+    H.antMarcapasos = !!(document.getElementById('ant_marcapasos') || {}).checked;
+    H.conduccion = H.antBcri ? 'bcri'
+                 : H.antMarcapasos ? 'marcapasos'
+                 : document.getElementById('ecg_conduccion').value;
+
+    // Cirugía cardíaca previa: el movimiento septal anómalo post-quirúrgico deja el
+    // septum tan poco valorable como un bloqueo de rama, por otro mecanismo.
+    H.antCrm = !!(document.getElementById('ant_crm') || {}).checked;
+    H.antRva = !!(document.getElementById('ant_rva') || {}).checked;
+    H.antRvm = !!(document.getElementById('ant_rvm') || {}).checked;
+    H.cirugiaPrevia = H.antCrm || H.antRva || H.antRvm;
+    // Estudio guardado cuando la casilla era "CRM / ATC": no se convierte en cirugía.
+    H.crmAmbiguo = H.antCrm && CRM_AMBIGUO;
     // BCRD y hemibloqueos se informan, pero no generan movimiento septal paradójico:
     // no disparan el modificador ni excluyen segmentos del WMSI.
-    H.hayConduccion = CONDUCCION_LIMITA_SEPTUM.includes(H.conduccion);
-    H.conduccionProsa = H.hayConduccion ? CONDUCCION_PROSA[H.conduccion] : null;
+    // El septum queda fuera del análisis por conducción O por cirugía previa.
+    H.conduccionLimita = CONDUCCION_LIMITA_SEPTUM.includes(H.conduccion);
+    H.hayConduccion = H.conduccionLimita || H.cirugiaPrevia;
+    // Si hay las dos cosas manda la eléctrica: es la que además invalida el ST.
+    H.causaSeptal = H.conduccionLimita ? H.conduccion : (H.cirugiaPrevia ? 'postquirurgico' : null);
+    H.conduccionProsa = H.causaSeptal ? CONDUCCION_PROSA[H.causaSeptal] : null;
 
     // ECG en reposo
     H.ritmo = document.getElementById('ecg_ritmo').value;
@@ -2954,7 +3083,9 @@ function recolectarHallazgos() {
     // conducción. Antes `stIsquemico` las mezclaba: con BCRI un ST que la propia app
     // declara ilegible seguía valiendo como respuesta eléctrica positiva, evitaba la
     // rama de estímulo insuficiente y podía abrir la de discordancia.
-    H.stInterpretable = !H.hayConduccion && H.stBasal !== 'no_interpretable';
+    // La cirugía previa no invalida el ST: lo que lo invalida es la activación
+    // eléctrica anómala. Por eso mira `conduccionLimita` y no `hayConduccion`.
+    H.stInterpretable = !H.conduccionLimita && H.stBasal !== 'no_interpretable';
     // Isquémico = hubo cambio Y el trazado permitía leerlo.
     H.stIsquemico = H.stCambio && H.stInterpretable;
     H.otrosBasal = v('ecg_otros_basal');
@@ -5779,6 +5910,8 @@ function aplicarEstudio(d) {
     // El "Resumen de HC" de los estudios viejos pasa a "Otros antecedentes
     // relevantes", que sí sale en el informe.
     migrarResumenHC();
+    sincronizarCasillasConduccion();
+    renderAntecedentesHeredados();
 
     // Pestañas activas
     if (d.protocol) setProtocol(d.protocol);

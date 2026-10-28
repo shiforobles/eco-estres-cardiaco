@@ -99,10 +99,15 @@
          SECCIÓN 2: INDICACIÓN Y ANTECEDENTES
          ══════════════════════════════════════ -->
     <section class="card card-blue">
-        <h2 class="section-title">Indicación y Antecedentes Clínicos</h2>
+        <h2 class="section-title">Indicación y Antecedentes</h2>
+
+        <!-- ── 1 · INDICACIÓN ────────────────────────────────────────
+             Sólo la lista. El cuadro de texto libre de al lado se fue: duplicaba la
+             indicación y no alimentaba ninguna decisión. Las indicaciones nuevas se
+             agregan a la lista y quedan guardadas para la próxima. -->
         <div class="grid grid-2col">
             <div class="form-group">
-                <label for="indicacion">Indicación del Estudio</label>
+                <label for="indicacion">Indicación del estudio</label>
                 <select autocomplete="off" id="indicacion">
                     <option value="">Seleccionar...</option>
                     <option value="diagnostico_isquemia">Diagnóstico de Isquemia</option>
@@ -117,76 +122,86 @@
                     <option value="diastolico">Función Diastólica con Estrés</option>
                     <option value="coronarias_normales">Coronarias Normales / Angina Microvascular</option>
                     <option value="chagas">Enfermedad de Chagas</option>
-                    <option value="otra">Otra</option>
                 </select>
-            </div>
-            <div class="form-group">
-                <label for="indicacion_libre">Motivo / Detalle clínico</label>
-                <textarea autocomplete="off" id="indicacion_libre" rows="2" placeholder="Ej: disnea de esfuerzo, control post-IAM anterior..."></textarea>
-                <div id="chips-indicacion" class="chips-banco"></div>
+                <button type="button" class="btn btn-secondary btn-sm" style="margin-top:0.4rem"
+                    onclick="agregarIndicacion()">+ Agregar indicación a la lista</button>
+                <span class="firma-nota">Las que agregues quedan guardadas en esta computadora.</span>
             </div>
         </div>
 
-        <h3 class="subsection-title" style="margin-top:1.25rem">Medicación Habitual</h3>
-        <div id="med-lista" class="med-lista"></div>
-        <div id="chips-medicacion" class="chips-banco"></div>
-        <div class="med-nueva">
-            <input autocomplete="off" type="text" id="med_nombre" placeholder="Fármaco">
-            <input autocomplete="off" type="text" id="med_dosis" placeholder="Dosis (opcional)">
-            <button type="button" class="btn btn-secondary btn-sm" onclick="agregarMedicacion()">+ Agregar</button>
+        <!-- ── 2 · ANTECEDENTES QUE CAMBIAN EL INFORME ───────────────
+             Cada casilla de acá dispara algo: una exclusión, una frase, un módulo.
+             Las que sólo se listaban en la línea de antecedentes están más abajo. -->
+        <h3 class="subsection-title" style="margin-top:1.25rem">Antecedentes que cambian el estudio</h3>
+        <p class="firma-nota" style="margin-bottom:0.6rem">
+            Cada una de estas casillas modifica el informe al tildarla: excluye segmentos,
+            invalida el ST, agrega una frase o abre un módulo.
+        </p>
+        <div class="grid grid-2col">
+            <div class="checkbox-group">
+                <input autocomplete="off" type="checkbox" id="ant_bcri" onchange="sincronizarConduccion()">
+                <label for="ant_bcri">Bloqueo de rama izquierda
+                    <span class="firma-nota">Septum no valorable, fuera del WMSI y del territorio. ST no interpretable.</span>
+                </label>
+            </div>
+            <div class="checkbox-group">
+                <input autocomplete="off" type="checkbox" id="ant_marcapasos" onchange="sincronizarConduccion()">
+                <label for="ant_marcapasos">Marcapasos
+                    <span class="firma-nota">Misma exclusión septal y ST no interpretable.</span>
+                </label>
+            </div>
+            <div class="checkbox-group">
+                <input autocomplete="off" type="checkbox" id="ant_crm" onchange="marcarCrmResuelto()">
+                <label for="ant_crm">Cirugía de revascularización (CRM)
+                    <span class="firma-nota">Movimiento septal anómalo post-quirúrgico: septum no valorable.</span>
+                </label>
+            </div>
+            <div class="checkbox-group">
+                <input autocomplete="off" type="checkbox" id="ant_rva" onchange="refrescarDeducidos()">
+                <label for="ant_rva">Reemplazo valvular aórtico
+                    <span class="firma-nota">Ídem: septum no valorable por la cirugía.</span>
+                </label>
+            </div>
+            <div class="checkbox-group">
+                <input autocomplete="off" type="checkbox" id="ant_rvm" onchange="refrescarDeducidos()">
+                <label for="ant_rvm">Reemplazo valvular mitral
+                    <span class="firma-nota">Ídem: septum no valorable por la cirugía.</span>
+                </label>
+            </div>
+            <div class="checkbox-group">
+                <input autocomplete="off" type="checkbox" id="ant_bicuspide" onchange="refrescarDeducidos()">
+                <label for="ant_bicuspide">Válvula aórtica bicúspide
+                    <span class="firma-nota">Abre el módulo de EAo y sale en la línea de antecedentes.</span>
+                </label>
+            </div>
+            <div class="checkbox-group">
+                <input autocomplete="off" type="checkbox" id="ant_betabloq">
+                <label for="ant_betabloq">Betabloqueado
+                    <span class="firma-nota">El objetivo sigue siendo el 85 %. Si no se alcanza, la conclusión lo aclara.</span>
+                </label>
+            </div>
         </div>
-        <div class="grid grid-3col" style="margin-top:0.75rem">
+
+        <h3 class="subsection-title" style="margin-top:1.25rem">Factores de riesgo y otros</h3>
+        <p class="firma-nota" style="margin-bottom:0.6rem">
+            Salen en la línea de antecedentes del informe. La HTA además cambia cómo se
+            lee una respuesta tensional exagerada.
+        </p>
+        <div class="grid grid-3col">
             <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="ant_hta"><label for="ant_hta">HTA</label></div>
-            <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="ant_dm"><label for="ant_dm">Diabetes (DM)</label></div>
+            <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="ant_dm"><label for="ant_dm">Diabetes</label></div>
             <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="ant_tabaquismo"><label for="ant_tabaquismo">Tabaquismo</label></div>
             <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="ant_dislipemia"><label for="ant_dislipemia">Dislipemia</label></div>
-            <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="ant_isquemia"><label for="ant_isquemia">C. Isquémica</label></div>
-            <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="ant_iam"><label for="ant_iam">IAM Previo</label></div>
-            <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="ant_crm" onchange="marcarCrmResuelto()"><label for="ant_crm" title="Sólo cirugía. La angioplastia se carga con los vasos tratados, más abajo.">CRM previa (cirugía)</label></div>
+            <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="ant_isquemia"><label for="ant_isquemia">C. isquémica</label></div>
             <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="ant_fa"><label for="ant_fa">FA</label></div>
-            <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="ant_betabloq"><label for="ant_betabloq">Beta-bloqueante activo</label></div>
-            <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="ant_epoc"><label for="ant_epoc">EPOC / Asma</label></div>
+            <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="ant_epoc"><label for="ant_epoc">EPOC / asma</label></div>
             <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="ant_mcd"><label for="ant_mcd">MCD conocida</label></div>
             <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="ant_valv"><label for="ant_valv">Valvulopatía conocida</label></div>
         </div>
 
-        <h3 class="subsection-title" style="margin-top:1.25rem">Revascularización previa</h3>
-        <p class="firma-nota" style="margin-bottom:0.6rem">
-            El vaso importa: isquemia en un territorio ya tratado se lee como reestenosis o progresión
-            hasta que se demuestre lo contrario, y eso cambia la conducta. Sin el vaso, el informe no puede decirlo.
-        </p>
-        <div class="grid">
-            <div class="form-group" style="grid-column: 1 / -1">
-                <label>Angioplastia previa — vasos tratados</label>
-                <div class="grid grid-3col" style="margin-top:0.2rem">
-                    <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="atc_da"><label for="atc_da">ATC a DA</label></div>
-                    <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="atc_cd"><label for="atc_cd">ATC a CD</label></div>
-                    <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="atc_cx"><label for="atc_cx">ATC a Cx</label></div>
-                </div>
-            </div>
-            <div class="form-group">
-                <label for="atc_anio">Año de la angioplastia</label>
-                <input autocomplete="off" type="number" id="atc_anio" placeholder="Ej: 2019" min="1980" max="2100" step="1">
-            </div>
-            <div class="form-group">
-                <label for="crm_anio">Año de la cirugía de revascularización</label>
-                <input autocomplete="off" type="number" id="crm_anio" placeholder="Ej: 2017" min="1980" max="2100" step="1">
-            </div>
-            <div class="form-group" style="grid-column: 1 / -1">
-                <label for="ant_otros">Otros antecedentes relevantes</label>
-                <textarea autocomplete="off" id="ant_otros" rows="3"
-                    placeholder="Ej: válvula aórtica bicúspide, miocardiopatía chagásica, marcapasos bicameral 2021"></textarea>
-                <span class="firma-nota">
-                    <strong>⚠ Sale en el informe y en la planilla.</strong> La planilla es anónima:
-                    no pongas nombre, DNI ni notas personales. Para eso está <em>Notas privadas</em>.
-                    Es texto libre: la app lo muestra y lo deja buscar, pero no calcula con él.
-                </span>
-            </div>
-
-            <!-- ── Valvulopatía de base ──────────────────────────────
-                 Estructurada y no en texto libre: con texto libre no hay forma de
-                 contar cuántas EAo bicúspides se hicieron en el año, porque cada vez
-                 se escribe distinto. -->
+        <!-- Valvulopatía estructurada y estudio previo: alimentan el módulo de EAo y
+             el cálculo de progresión. -->
+        <div class="grid grid-3col" style="margin-top:1rem">
             <div class="form-group">
                 <label for="valv_tipo">Valvulopatía de base</label>
                 <select autocomplete="off" id="valv_tipo">
@@ -206,50 +221,70 @@
                     <option value="severa">Severa</option>
                 </select>
             </div>
-            <div class="form-group">
-                <label for="valv_bicuspide">Válvula aórtica bicúspide</label>
-                <select autocomplete="off" id="valv_bicuspide">
-                    <option value="">No consignado</option>
-                    <option value="si">Sí</option>
-                    <option value="no">No</option>
-                </select>
-            </div>
+        </div>
 
-            <!-- ── Estudio previo ────────────────────────────────────
-                 Permite calcular la progresión anual sola. Con estos datos en texto
-                 libre ("gradiente previo 28") el número no sirve para calcular. -->
-            <div class="form-group" style="grid-column: 1 / -1">
-                <details class="carga-territorio">
-                    <summary class="tc-title" style="cursor:pointer; list-style:none">
-                        📈 Estudio previo (para calcular progresión)
-                    </summary>
-                    <div class="form-grid" style="margin-top:0.75rem">
-                        <div class="form-group">
-                            <label for="prev_fecha">Fecha del estudio previo</label>
-                            <input autocomplete="off" type="date" id="prev_fecha" onchange="calcProgresion()">
-                        </div>
-                        <div class="form-group">
-                            <label for="prev_vmax">Vmax aórtica (m/s)</label>
-                            <input autocomplete="off" type="number" id="prev_vmax" placeholder="m/s" step="0.1" min="0.5" max="7" onchange="calcProgresion()">
-                        </div>
-                        <div class="form-group">
-                            <label for="prev_grad">Gradiente medio (mmHg)</label>
-                            <input autocomplete="off" type="number" id="prev_grad" placeholder="mmHg" step="1" min="0" max="150" onchange="calcProgresion()">
-                        </div>
-                        <div class="form-group">
-                            <label for="prev_ava">Área valvular (cm²)</label>
-                            <input autocomplete="off" type="number" id="prev_ava" placeholder="cm²" step="0.01" min="0.1" max="5" onchange="calcProgresion()">
-                        </div>
-                        <div class="form-group">
-                            <label for="prev_aorta">Aorta ascendente (mm)</label>
-                            <input autocomplete="off" type="number" id="prev_aorta" placeholder="mm" step="1" min="15" max="90" onchange="calcProgresion()">
-                        </div>
-                        <div class="form-group" style="grid-column: 1 / -1">
-                            <div id="progresion-resultado" class="hint-sugerida" style="display:none"></div>
-                        </div>
+        <div class="form-group" style="margin-top:0.5rem">
+            <details class="carga-territorio">
+                <summary class="tc-title" style="cursor:pointer; list-style:none">
+                    📈 Estudio previo (para calcular progresión)
+                </summary>
+                <div class="grid grid-3col" style="margin-top:0.75rem">
+                    <div class="form-group">
+                        <label for="prev_fecha">Fecha del estudio previo</label>
+                        <input autocomplete="off" type="date" id="prev_fecha" onchange="calcProgresion()">
                     </div>
-                </details>
-            </div>
+                    <div class="form-group">
+                        <label for="prev_vmax">Vmax aórtica (m/s)</label>
+                        <input autocomplete="off" type="number" id="prev_vmax" placeholder="m/s" step="0.1" min="0.5" max="7" onchange="calcProgresion()">
+                    </div>
+                    <div class="form-group">
+                        <label for="prev_grad">Gradiente medio (mmHg)</label>
+                        <input autocomplete="off" type="number" id="prev_grad" placeholder="mmHg" step="1" min="0" max="150" onchange="calcProgresion()">
+                    </div>
+                    <div class="form-group">
+                        <label for="prev_ava">Área valvular (cm²)</label>
+                        <input autocomplete="off" type="number" id="prev_ava" placeholder="cm²" step="0.01" min="0.1" max="5" onchange="calcProgresion()">
+                    </div>
+                    <div class="form-group">
+                        <label for="prev_aorta">Aorta ascendente (mm)</label>
+                        <input autocomplete="off" type="number" id="prev_aorta" placeholder="mm" step="1" min="15" max="90" onchange="calcProgresion()">
+                    </div>
+                    <div class="form-group" style="grid-column: 1 / -1">
+                        <div id="progresion-resultado" class="hint-sugerida" style="display:none"></div>
+                    </div>
+                </div>
+            </details>
+        </div>
+
+        <!-- ── Datos de estudios anteriores al rediseño ──────────────
+             Los campos de abajo ya no se cargan, pero los estudios guardados con ellos
+             tienen que seguir abriendo completos y saliendo igual en su informe. Se
+             muestran acá, de sólo lectura, cuando el estudio los trae. -->
+        <div id="antecedentes-heredados" class="aviso-desactualizado" style="display:none"></div>
+
+        <!-- Campos retirados de la pantalla. No se borran: un estudio viejo los
+             restaura acá y siguen alimentando su informe y su fila de planilla. -->
+        <div style="display:none" aria-hidden="true">
+            <textarea id="resumen_hc"></textarea>
+            <textarea id="ant_otros"></textarea>
+            <textarea id="notas_privadas"></textarea>
+            <input type="checkbox" id="ant_iam">
+            <input type="checkbox" id="atc_da">
+            <input type="checkbox" id="atc_cd">
+            <input type="checkbox" id="atc_cx">
+            <input type="number" id="atc_anio">
+            <input type="number" id="crm_anio">
+            <select id="valv_bicuspide">
+                <option value="">No consignado</option>
+                <option value="si">Sí</option>
+                <option value="no">No</option>
+            </select>
+            <textarea id="indicacion_libre"></textarea>
+            <div id="chips-indicacion"></div>
+            <div id="med-lista"></div>
+            <div id="chips-medicacion"></div>
+            <input type="text" id="med_nombre">
+            <input type="text" id="med_dosis">
         </div>
     </section>
 
@@ -398,7 +433,7 @@
             </div>
             <div class="form-group">
                 <label for="ecg_conduccion">Trastorno de conducción</label>
-                <select autocomplete="off" id="ecg_conduccion" onchange="calcEjercicio()">
+                <select autocomplete="off" id="ecg_conduccion" onchange="sincronizarCasillasConduccion(); calcEjercicio()">
                     <option value="ninguno">Ninguno</option>
                     <option value="bcri">BCRI — bloqueo completo de rama izquierda</option>
                     <option value="marcapasos">Estimulación por marcapasos</option>
