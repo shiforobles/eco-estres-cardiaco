@@ -36,11 +36,18 @@
          RESUMEN DE HISTORIA CLÍNICA
          ══════════════════════════════════════ -->
     <section class="card card-blue">
-        <h2 class="section-title">Resumen de Historia Clínica</h2>
+        <h2 class="section-title">Notas privadas</h2>
         <div class="form-group">
-            <textarea autocomplete="off" id="resumen_hc" rows="4"
-                placeholder="Antecedentes, motivo de derivación, estudios previos, contexto clínico. Se guarda junto con el estudio."></textarea>
-            <span class="firma-nota">Queda guardado con el estudio, para entender el contexto en el archivo sin releer todo. No sale en el informe.</span>
+            <textarea autocomplete="off" id="notas_privadas" rows="3"
+                placeholder="Apuntes tuyos sobre este estudio. No salen del navegador."></textarea>
+            <span class="firma-nota">
+                <strong>No salen en ningún lado:</strong> ni en el informe, ni en la planilla, ni en la
+                casuística. Quedan sólo en este navegador, junto al borrador.
+                Lo que quieras que salga en el informe va en <em>Otros antecedentes relevantes</em>.
+            </span>
+            <!-- Campo viejo, oculto: sólo recibe lo guardado antes del cambio para
+                 migrarlo a `ant_otros`. Ver migrarResumenHC(). -->
+            <textarea id="resumen_hc" style="display:none" aria-hidden="true"></textarea>
         </div>
     </section>
 
@@ -104,6 +111,7 @@
                     <option value="post_iam">Control Post-IAM</option>
                     <option value="estenosis_ao">Estenosis Aórtica (Bajo Flujo/Gradiente)</option>
                     <option value="eao_asintomatica">Estenosis Aórtica severa asintomática (evaluación con ejercicio)</option>
+                    <option value="eao_moderada">Control de EAo moderada</option>
                     <option value="mch">Miocardiopatía Hipertrófica (obstrucción latente)</option>
                     <option value="dolor_toracico">Unidad de Dolor Torácico</option>
                     <option value="diastolico">Función Diastólica con Estrés</option>
@@ -166,8 +174,81 @@
             </div>
             <div class="form-group" style="grid-column: 1 / -1">
                 <label for="ant_otros">Otros antecedentes relevantes</label>
-                <input autocomplete="off" type="text" id="ant_otros" placeholder="Ej: miocardiopatía chagásica, marcapasos bicameral 2021">
-                <span class="firma-nota">Se agrega a la línea de antecedentes del informe, tal como lo escribas.</span>
+                <textarea autocomplete="off" id="ant_otros" rows="3"
+                    placeholder="Ej: válvula aórtica bicúspide, miocardiopatía chagásica, marcapasos bicameral 2021"></textarea>
+                <span class="firma-nota">
+                    <strong>⚠ Sale en el informe y en la planilla.</strong> La planilla es anónima:
+                    no pongas nombre, DNI ni notas personales. Para eso está <em>Notas privadas</em>.
+                    Es texto libre: la app lo muestra y lo deja buscar, pero no calcula con él.
+                </span>
+            </div>
+
+            <!-- ── Valvulopatía de base ──────────────────────────────
+                 Estructurada y no en texto libre: con texto libre no hay forma de
+                 contar cuántas EAo bicúspides se hicieron en el año, porque cada vez
+                 se escribe distinto. -->
+            <div class="form-group">
+                <label for="valv_tipo">Valvulopatía de base</label>
+                <select autocomplete="off" id="valv_tipo">
+                    <option value="">Ninguna / no corresponde</option>
+                    <option value="eao">Estenosis aórtica</option>
+                    <option value="iao">Insuficiencia aórtica</option>
+                    <option value="em">Estenosis mitral</option>
+                    <option value="im">Insuficiencia mitral</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="valv_severidad">Severidad</label>
+                <select autocomplete="off" id="valv_severidad">
+                    <option value="">—</option>
+                    <option value="leve">Leve</option>
+                    <option value="moderada">Moderada</option>
+                    <option value="severa">Severa</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="valv_bicuspide">Válvula aórtica bicúspide</label>
+                <select autocomplete="off" id="valv_bicuspide">
+                    <option value="">No consignado</option>
+                    <option value="si">Sí</option>
+                    <option value="no">No</option>
+                </select>
+            </div>
+
+            <!-- ── Estudio previo ────────────────────────────────────
+                 Permite calcular la progresión anual sola. Con estos datos en texto
+                 libre ("gradiente previo 28") el número no sirve para calcular. -->
+            <div class="form-group" style="grid-column: 1 / -1">
+                <details class="carga-territorio">
+                    <summary class="tc-title" style="cursor:pointer; list-style:none">
+                        📈 Estudio previo (para calcular progresión)
+                    </summary>
+                    <div class="form-grid" style="margin-top:0.75rem">
+                        <div class="form-group">
+                            <label for="prev_fecha">Fecha del estudio previo</label>
+                            <input autocomplete="off" type="date" id="prev_fecha" onchange="calcProgresion()">
+                        </div>
+                        <div class="form-group">
+                            <label for="prev_vmax">Vmax aórtica (m/s)</label>
+                            <input autocomplete="off" type="number" id="prev_vmax" placeholder="m/s" step="0.1" min="0.5" max="7" onchange="calcProgresion()">
+                        </div>
+                        <div class="form-group">
+                            <label for="prev_grad">Gradiente medio (mmHg)</label>
+                            <input autocomplete="off" type="number" id="prev_grad" placeholder="mmHg" step="1" min="0" max="150" onchange="calcProgresion()">
+                        </div>
+                        <div class="form-group">
+                            <label for="prev_ava">Área valvular (cm²)</label>
+                            <input autocomplete="off" type="number" id="prev_ava" placeholder="cm²" step="0.01" min="0.1" max="5" onchange="calcProgresion()">
+                        </div>
+                        <div class="form-group">
+                            <label for="prev_aorta">Aorta ascendente (mm)</label>
+                            <input autocomplete="off" type="number" id="prev_aorta" placeholder="mm" step="1" min="15" max="90" onchange="calcProgresion()">
+                        </div>
+                        <div class="form-group" style="grid-column: 1 / -1">
+                            <div id="progresion-resultado" class="hint-sugerida" style="display:none"></div>
+                        </div>
+                    </div>
+                </details>
             </div>
         </div>
     </section>
@@ -1116,6 +1197,46 @@
                         <input autocomplete="off" type="number" id="eaoej_grad_post" placeholder="mmHg" min="0" max="150" oninput="calcEAoEjercicio()">
                     </div>
                     <div class="form-group">
+                        <label for="eaoej_vmax_reposo">Vmax aórtica en reposo (m/s)</label>
+                        <input autocomplete="off" type="number" id="eaoej_vmax_reposo" placeholder="m/s" step="0.1" min="0.5" max="7" oninput="calcEAoEjercicio()">
+                    </div>
+                    <div class="form-group">
+                        <label for="eaoej_vmax_post">Vmax post-esfuerzo inmediato (m/s)</label>
+                        <input autocomplete="off" type="number" id="eaoej_vmax_post" placeholder="m/s" step="0.1" min="0.5" max="7" oninput="calcEAoEjercicio()">
+                    </div>
+                    <div class="form-group">
+                        <label for="eaoej_ia">Insuficiencia aórtica asociada</label>
+                        <select autocomplete="off" id="eaoej_ia" onchange="calcEAoEjercicio()">
+                            <option value="">No consignada</option>
+                            <option value="ninguna">Ausente o trivial</option>
+                            <option value="leve">Leve</option>
+                            <option value="moderada">Moderada</option>
+                            <option value="severa">Severa</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="eaoej_aorta">Aorta ascendente en reposo (mm)</label>
+                        <input autocomplete="off" type="number" id="eaoej_aorta" placeholder="mm" step="1" min="15" max="90" oninput="calcEAoEjercicio()">
+                    </div>
+                    <div class="form-group">
+                        <label for="eaoej_vsi">Volumen sistólico indexado (mL/m²)</label>
+                        <input autocomplete="off" type="number" id="eaoej_vsi" placeholder="mL/m²" step="1" min="10" max="80" oninput="calcEAoEjercicio()">
+                        <span class="firma-nota">Por debajo de 35 mL/m² el gradiente subestima la severidad.</span>
+                    </div>
+                    <div class="form-group">
+                        <label for="eaoej_primero">Qué se adquirió primero post-esfuerzo</label>
+                        <select autocomplete="off" id="eaoej_primero" onchange="calcEAoEjercicio()">
+                            <option value="">No consignado</option>
+                            <option value="doppler">Doppler (gradiente y VRT)</option>
+                            <option value="motilidad">Motilidad (bull's eye)</option>
+                        </select>
+                        <span class="firma-nota">Los dos caen rápido: cuál se priorizó cambia cómo se lee el otro.</span>
+                    </div>
+                    <div class="form-group">
+                        <label for="eaoej_seg_motilidad">Segundos hasta la motilidad post-esfuerzo</label>
+                        <input autocomplete="off" type="number" id="eaoej_seg_motilidad" placeholder="seg" min="0" max="600" oninput="calcEAoEjercicio()">
+                    </div>
+                    <div class="form-group">
                         <label for="eaoej_seg_doppler">Segundos hasta el Doppler post-esfuerzo</label>
                         <input autocomplete="off" type="number" id="eaoej_seg_doppler" placeholder="seg" min="0" max="600" oninput="calcEAoEjercicio()">
                         <span class="firma-nota">Desde que dejó de pedalear hasta la toma del gradiente y la VRT.</span>
@@ -1487,6 +1608,12 @@
             <div class="historial-acciones">
                 <button class="btn btn-secondary btn-sm" onclick="exportarCasuistica()">⬇ Exportar casuística</button>
                 <button class="btn btn-danger btn-sm" onclick="borrarCasuistica()">🗑 Borrar casuística</button>
+            </div>
+            <div class="form-group" style="margin-bottom:0.5rem">
+                <input autocomplete="off" type="search" id="casuistica-buscar"
+                    placeholder="Buscar en los antecedentes: bicúspide, chagas, marcapasos…"
+                    oninput="buscarCasuistica()">
+                <span class="firma-nota">Busca en los antecedentes, la valvulopatía y el texto del informe.</span>
             </div>
             <div id="casuistica-resumen"></div>
         </details>

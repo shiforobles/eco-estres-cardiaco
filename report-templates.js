@@ -95,6 +95,10 @@ const NARRATIVA = {
     antecedentesCrmAmbiguo: 'revascularización previa, por cirugía o angioplastia{{anio}} '
                      + '(dato previo al cambio de registro, sin precisar cuál)',
     antecedentesBB:    'Bajo tratamiento betabloqueante.',
+    antecedentesValvulopatia: '{{tipo}}{{severidad}}{{bicuspide}}',
+    // La progresión DESCRIBE el cambio. Lo que ese cambio implica para el
+    // seguimiento va al panel: el informe no indica conducta.
+    antecedentesProgresion: 'Respecto del estudio previo, en {{anios}} años {{cambios}}.',
 
     // ── VEREDICTO DE SUFICIENCIA ──────────────────────────────────────
     // Antes era un preámbulo largo que repetía la etapa, la causa de detención, el
@@ -145,8 +149,24 @@ const NARRATIVA = {
 
     // ── EAo SEVERA ASINTOMÁTICA CON EJERCICIO ─────────────────────────
     // Párrafo propio: es la pregunta que se fue a responder, no un accesorio.
-    eaoEjBloque: 'Evaluación de estenosis aórtica severa asintomática con ejercicio.{{severidadBasal}} ' +
-                 '{{gradiente}}{{psap}} {{sintomas}} {{tension}}{{capacidad}}',
+    // El encabezado cambia con la indicación: una EAo moderada no es una severa
+    // asintomática, y los cortes de la app salen de series de severa.
+    eaoEjBloque: '{{encabezado}}{{severidadBasal}}{{vmax}} ' +
+                 '{{gradiente}}{{vsi}}{{ia}}{{aorta}}{{psap}} {{sintomas}} {{tension}}{{capacidad}}{{adquisicion}}',
+    eaoEjEncabezadoSevera:   'Evaluación de estenosis aórtica severa asintomática con ejercicio.',
+    eaoEjEncabezadoModerada: 'Control de estenosis aórtica moderada con ejercicio.',
+
+    eaoEjVmax:     ' La velocidad máxima aórtica pasó de {{vmaxRep}} m/s en reposo a {{vmaxPost}} m/s ' +
+                 'post-esfuerzo ({{delta}} m/s).',
+    eaoEjVmaxSolo: ' Velocidad máxima aórtica en reposo de {{vmaxRep}} m/s.',
+    eaoEjVsi:      ' Volumen sistólico indexado de {{vsi}} mL/m².',
+    // Por debajo de 35 el gradiente subestima: decirlo es describir, no indicar.
+    eaoEjVsiBajo:  ' Volumen sistólico indexado de {{vsi}} mL/m², por debajo de 35: en esa situación ' +
+                 'el gradiente subestima la severidad.',
+    eaoEjIA:       ' Insuficiencia aórtica asociada {{ia}}.',
+    eaoEjAorta:    ' Aorta ascendente de {{mm}} mm.',
+    eaoEjAdquisicion:    ' Post-esfuerzo se adquirió primero {{primero}}{{segundos}}.',
+    eaoEjAdquisicionSeg: ' (Doppler a los {{doppler}} segundos, motilidad a los {{motil}})',
 
     eaoEjSeveridad:  ' Área valvular en reposo de {{ava}} cm².',
     eaoEjGradiente:  'El gradiente medio pasó de {{gradRep}} mmHg en reposo a {{gradPost}} mmHg en el ' +

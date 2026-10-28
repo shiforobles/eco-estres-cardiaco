@@ -41,6 +41,14 @@ const EstresSheets = {
         'Fecha', 'HC', 'Edad', 'Sexo', 'Peso', 'Altura', 'SC',
         // Antecedentes y contexto
         'Indicación', 'Medicación', 'Betabloqueo',
+        // Valvulopatía estructurada: cada dato en su columna, para poder contarlos.
+        // En texto libre no hay forma de saber cuántas EAo bicúspides hubo en el año.
+        'Valvulopatía', 'Severidad valvular', 'Bicúspide',
+        // Estudio previo y progresión anual calculada.
+        'Fecha estudio previo', 'Vmax previa', 'Gradiente previo', 'AVA previa', 'Aorta previa',
+        'Δ Vmax/año', 'Δ Gradiente/año', 'Δ AVA/año', 'Δ Aorta/año',
+        // Texto libre del operador. Sale acá y en el informe; las notas privadas NO.
+        'Otros antecedentes',
         // Protocolo
         'Protocolo', 'Carga Kgm/min', 'Etapa', 'Duración', 'Causa detención',
         // Hemodinamia
@@ -139,6 +147,18 @@ const EstresSheets = {
             v('indicacion_libre') || textoSelect('indicacion'),
             medicacionEnTexto() || nada,
             H.betabloqueante ? 'Sí' : 'No',
+
+            H.valvTipoTxt || nada, H.valvSeveridadTxt || nada,
+            H.valvBicuspide === 'si' ? 'Sí' : (H.valvBicuspide === 'no' ? 'No' : nada),
+
+            v('prev_fecha') || nada, num_(v('prev_vmax')), num_(v('prev_grad')),
+            num_(v('prev_ava')), num_(v('prev_aorta')),
+            num_(H.progresion && H.progresion.vmax, true),
+            num_(H.progresion && H.progresion.grad, true),
+            num_(H.progresion && H.progresion.ava, true),
+            num_(H.progresion && H.progresion.aorta, true),
+
+            H.antOtros || nada,
 
             H.protocoloTxt || nada, t(H.cargaKgm), t(H.etapa), v('ej_duracion') || nada,
             H.causaDetencionTxt || nada,

@@ -625,6 +625,7 @@ function autocompletarInterpretacion() {
     renderAvisosClinicos();
     renderComparacionMotilidad();
     marcarInformeDesactualizado();
+    calcProgresion();
 
     // Depende de la TA basal y de esfuerzo, de los METs y de la VRT post-esfuerzo:
     // campos que viven fuera de su propio panel.
@@ -1121,6 +1122,35 @@ function evaluarAvisosClinicos() {
                 'Es el perfil en el que el estudio diastólico rinde: presiones de llenado limítrofes en ' +
                 'reposo que se desenmascaran con el ejercicio. Alcanza con E, e\' y VRT post-esfuerzo.');
     }
+
+    // 9b · Progresión respecto del estudio previo. Va al panel y no al informe: el
+    // informe describe el cambio, lo que ese cambio implica para el seguimiento es
+    // conducta.
+    const prog = H.progresion;
+    if (prog && prog.vmaxRapida)
+        alto(`La Vmax progresa ${nProsa(prog.vmax, 2)} m/s por año`,
+             `Por encima de ${nProsa(VMAX_PROGRESION_RAPIDA, 1)} m/s anuales la progresión se considera ` +
+             'rápida y acorta el intervalo de control.');
+    if (prog && prog.aortaCrece)
+        alto(`La aorta ascendente crece ${nProsa(prog.aorta, 1)} mm por año`,
+             'Un crecimiento de 3 mm anuales o más cambia el seguimiento de la aorta, con ' +
+             'independencia del diámetro actual.');
+
+    // 9c · EAo MODERADA: los cortes de la severa no valen igual.
+    if (H.eaoEjEnUso && H.eaoModerada) {
+        atencion('Estudio de EAo moderada: los cortes de la app son de EAo severa',
+            'El salto del gradiente con el esfuerzo y el veredicto de "deja de considerarse ' +
+            'asintomático" salen de series de EAo SEVERA asintomática. En una moderada son ' +
+            'orientativos, no criterio: la decisión se apoya en los síntomas, la capacidad ' +
+            'funcional y la progresión.');
+    }
+
+    // 9d · Volumen sistólico indexado bajo: el gradiente subestima la severidad.
+    const vsi = num('eaoej_vsi');
+    if (H.eaoEjEnUso && vsi > 0 && vsi < 35)
+        atencion(`Volumen sistólico indexado ${vsi} mL/m²`,
+            'Por debajo de 35 mL/m² el gradiente subestima la severidad: una EAo de bajo flujo ' +
+            'puede tener gradiente bajo con área severa.');
 
     // 9 · Extensión de la isquemia. Cuenta segmentos NUEVOS, no anormales totales.
     if (H.isquemicos.length >= 5)
@@ -2016,7 +2046,21 @@ function datosEAoEjercicio() {
         sintomas,
         momento: v('eaoej_sint_momento'),
         ta: respuestaTensionalEAo(),
-        mets: num('ej_mets') || null
+        mets: num('ej_mets') || null,
+        // Datos del control de EAo moderada y del seguimiento valvular.
+        vmaxRep: num('eaoej_vmax_reposo') || null,
+        vmaxPost: num('eaoej_vmax_post') || null,
+        deltaVmax: (num('eaoej_vmax_reposo') > 0 && num('eaoej_vmax_post') > 0)
+            ? num('eaoej_vmax_post') - num('eaoej_vmax_reposo') : null,
+        ia: v('eaoej_ia'),
+        iaTxt: v('eaoej_ia') ? textoSelect('eaoej_ia').toLowerCase() : '',
+        aorta: num('eaoej_aorta') || null,
+        vsi: num('eaoej_vsi') || null,
+        primero: v('eaoej_primero'),
+        // Etiqueta corta para la prosa: el texto del selector trae el paréntesis
+        // explicativo y salía "primero doppler (gradiente y vrt)".
+        primeroTxt: { doppler: 'el Doppler', motilidad: 'la motilidad' }[v('eaoej_primero')] || '',
+        segMotilidad: num('eaoej_seg_motilidad') || null
     };
 }
 
@@ -2110,8 +2154,105 @@ const VIAB_PROSA = {
 // campo de veredicto tenga valor, porque lo rellena la propia app apenas hay TA basal
 // y pico — o sea, en todos los estudios. Leerlo como evidencia era circular, y por eso
 // la conclusión de EAo se coló en informes sin un solo dato valvular.
+// ══════════════════════════════════════════════
+//  MIGRACIÓN DEL "RESUMEN DE HISTORIA CLÍNICA"
+//  Era un campo que se cargaba con esfuerzo y no salía en ninguna parte: ni en el
+//  informe ni en la planilla. Su contenido pasa a "Otros antecedentes relevantes",
+//  que sí sale. Lo guardado antes se mueve una sola vez, sin pisar lo que ya haya.
+// ══════════════════════════════════════════════
+function migrarResumenHC() {
+    const viejo = document.getElementById('resumen_hc');
+    const nuevo = document.getElementById('ant_otros');
+    if (!viejo || !nuevo) return;
+    const txt = (viejo.value || '').trim();
+    if (!txt) return;
+    const actual = (nuevo.value || '').trim();
+    nuevo.value = actual ? actual + '\n' + txt : txt;
+    viejo.value = '';
+    showNotice('El "Resumen de historia clínica" de este estudio pasó a "Otros antecedentes ' +
+               'relevantes": ahora sale en el informe. Revisalo antes de firmar.', 'warn');
+}
+
+// ══════════════════════════════════════════════
+//  PROGRESIÓN RESPECTO DEL ESTUDIO PREVIO
+//  Con los datos del previo en texto libre ("gradiente previo 28") el número no
+//  sirve para calcular. Cargados aparte, la progresión sale sola.
+// ══════════════════════════════════════════════
+
+// Criterios de progresión rápida. PROPIOS de la app en su umbral exacto: el de la
+// Vmax es el más citado en EAo, el de la aorta se usa como señal de alarma.
+const VMAX_PROGRESION_RAPIDA = 0.3;   // m/s por año
+const AORTA_CRECIMIENTO_RAPIDO = 3;   // mm por año
+
+function datosProgresion() {
+    const fecha = v('prev_fecha');
+    if (!fecha) return null;
+    const fEst = v('fecha_estudio');
+    const d0 = new Date(fecha + 'T12:00:00');
+    const d1 = fEst ? new Date(fEst + 'T12:00:00') : new Date();
+    const anios = (d1 - d0) / (365.25 * 24 * 3600 * 1000);
+    // Menos de tres meses no permite anualizar nada sin inventar una pendiente.
+    if (!(anios > 0.25)) return { anios, muyCorto: true };
+
+    const porAnio = (ahora, antes) =>
+        (ahora > 0 && antes > 0) ? (ahora - antes) / anios : null;
+
+    const vmaxAhora = num('eaoej_vmax_reposo');
+    const gradAhora = num('eaoej_grad_reposo');
+    const avaAhora  = num('eaoej_ava');
+    const aortaAhora = num('eaoej_aorta');
+
+    const r = {
+        anios,
+        vmax:  porAnio(vmaxAhora, num('prev_vmax')),
+        grad:  porAnio(gradAhora, num('prev_grad')),
+        ava:   porAnio(avaAhora, num('prev_ava')),
+        aorta: porAnio(aortaAhora, num('prev_aorta')),
+    };
+    r.vmaxRapida = r.vmax !== null && r.vmax >= VMAX_PROGRESION_RAPIDA;
+    r.aortaCrece = r.aorta !== null && r.aorta >= AORTA_CRECIMIENTO_RAPIDO;
+    r.hayAlgo = ['vmax', 'grad', 'ava', 'aorta'].some(k => r[k] !== null);
+    return r;
+}
+
+function calcProgresion() {
+    const box = document.getElementById('progresion-resultado');
+    if (!box) return;
+    const r = datosProgresion();
+    if (!r) { box.style.display = 'none'; box.innerHTML = ''; return; }
+    box.style.display = 'block';
+    if (r.muyCorto) {
+        box.innerHTML = '<strong>Intervalo demasiado corto</strong>' +
+            '<div class="cat-motivos">Menos de tres meses entre los dos estudios: anualizar ' +
+            'la diferencia daría una pendiente que los datos no sostienen.</div>';
+        return;
+    }
+    if (!r.hayAlgo) {
+        box.innerHTML = '<strong>Faltan los valores actuales</strong>' +
+            '<div class="cat-motivos">Cargá en el módulo de EAo la Vmax, el gradiente, el área ' +
+            'o la aorta de hoy para comparar con el estudio previo.</div>';
+        return;
+    }
+    const linea = [];
+    const porAnio = (txt, val, dec, uni) => { if (val !== null)
+        linea.push(`${txt} ${val >= 0 ? '+' : ''}${nProsa(val, dec)} ${uni}/año`); };
+    porAnio('Vmax', r.vmax, 2, 'm/s');
+    porAnio('gradiente medio', r.grad, 1, 'mmHg');
+    porAnio('área', r.ava, 2, 'cm²');
+    porAnio('aorta', r.aorta, 1, 'mm');
+    const alarmas = [];
+    if (r.vmaxRapida) alarmas.push(`Progresión rápida de la Vmax (≥ ${nProsa(VMAX_PROGRESION_RAPIDA, 1)} m/s por año).`);
+    if (r.aortaCrece) alarmas.push(`La aorta ascendente crece ${nProsa(r.aorta, 1)} mm por año.`);
+    box.className = 'hint-sugerida cat-panel' + (alarmas.length ? ' hint-alto' : '');
+    box.innerHTML = `<strong>En ${nProsa(r.anios, 1)} años:</strong>` +
+        `<div class="cat-motivos">${linea.join(' · ')}</div>` +
+        (alarmas.length ? `<div class="cat-motivos"><strong>${alarmas.join(' ')}</strong></div>` : '');
+}
+
 function moduloEAoEnUso() {
-    if (document.getElementById('indicacion').value === 'eao_asintomatica') return true;
+    const ind = document.getElementById('indicacion').value;
+    if (ind === 'eao_asintomatica' || ind === 'eao_moderada') return true;
+    if (num('eaoej_vmax_reposo') > 0 || num('eaoej_vmax_post') > 0) return true;
     if (num('eaoej_ava') > 0 || num('eaoej_grad_reposo') > 0 || num('eaoej_grad_post') > 0) return true;
     if (EAOEJ_SINTOMAS.some(x => { const el = document.getElementById(x.id); return el && el.checked; })) return true;
     return fueCorregido('eaoej_veredicto');
@@ -2676,7 +2817,8 @@ function recolectarHallazgos() {
     H.antOtros = normalizarTexto(v('ant_otros'));
     H.antCrm = document.getElementById('ant_crm').checked;
     H.crmAmbiguo = H.antCrm && CRM_AMBIGUO;
-    H.indicacionTxt = document.getElementById('indicacion').value ? textoSelect('indicacion') : '';
+    H.indicacion = document.getElementById('indicacion').value;
+    H.indicacionTxt = H.indicacion ? textoSelect('indicacion') : '';
     H.indicacionLibre = normalizarTexto(v('indicacion_libre'));
     H.contraste = document.getElementById('contraste_usado').value;
     H.conclusionLibre = normalizarTexto(v('conclusion_libre'));
@@ -2728,9 +2870,29 @@ function recolectarHallazgos() {
     H.diastGrado = document.getElementById('diast_grado').value;
     H.geometriaVI = document.getElementById('geometria_vi').value;
     // EAo severa asintomática: sólo se arma el bloque si el módulo está en uso
+    // ── Valvulopatía de base, estructurada ──
+    // Estructurada y no en texto libre: con texto libre no hay forma de contar
+    // cuántas EAo bicúspides se hicieron en el año.
+    H.valvTipo = v('valv_tipo');
+    H.valvTipoTxt = H.valvTipo ? textoSelect('valv_tipo') : '';
+    H.valvSeveridad = v('valv_severidad');
+    H.valvSeveridadTxt = H.valvSeveridad ? textoSelect('valv_severidad').toLowerCase() : '';
+    H.valvBicuspide = v('valv_bicuspide');
+
     H.eaoEj = datosEAoEjercicio();
     H.eaoEjVeredicto = document.getElementById('eaoej_veredicto').value;
     H.eaoEjEnUso = moduloEAoEnUso();
+    // La EAo moderada es otro escenario: los cortes validados —el salto del
+    // gradiente, sobre todo— salen de series de EAo SEVERA asintomática. Se señala
+    // para no aplicarlos como si valieran igual.
+    H.eaoModerada = H.indicacion === 'eao_moderada' || H.valvSeveridad === 'moderada';
+
+    // ── Progresión respecto del estudio previo ──
+    H.progresion = datosProgresion();
+
+    // ── Notas privadas: NO van al informe ni a la planilla ──
+    // Se leen sólo para dejar constancia de que existen; su contenido no se usa.
+    H.hayNotasPrivadas = !!normalizarTexto(v('notas_privadas'));
     // Viabilidad
     H.viabEnUso = moduloViabilidadEnUso();
     H.viabRespuesta = document.getElementById('viab_respuesta').value;
@@ -3599,6 +3761,29 @@ function bloqueEAoEjercicio(H) {
         gradiente = rellenar(T.eaoEjGradienteSolo, { gradRep: nProsa(E.gradRep, 0) });
     }
 
+    // Vmax: el otro eje de la severidad, y el que mejor sigue la progresión.
+    let vmax = '';
+    if (E.vmaxRep && E.vmaxPost) {
+        vmax = rellenar(T.eaoEjVmax, {
+            vmaxRep: nProsa(E.vmaxRep, 1), vmaxPost: nProsa(E.vmaxPost, 1),
+            delta: (E.deltaVmax >= 0 ? '+' : '') + nProsa(E.deltaVmax, 1) });
+    } else if (E.vmaxRep) {
+        vmax = rellenar(T.eaoEjVmaxSolo, { vmaxRep: nProsa(E.vmaxRep, 1) });
+    }
+
+    const vsi = E.vsi ? rellenar(E.vsi < 35 ? T.eaoEjVsiBajo : T.eaoEjVsi, { vsi: E.vsi }) : '';
+    const ia = (E.ia && E.ia !== 'ninguna') ? rellenar(T.eaoEjIA, { ia: E.iaTxt }) : '';
+    const aorta = E.aorta ? rellenar(T.eaoEjAorta, { mm: E.aorta }) : '';
+    // Los dos caen rápido después de pedalear: cuál se priorizó cambia cómo se lee el
+    // otro, y sin eso el informe no deja constancia de la secuencia.
+    const adquisicion = E.primero
+        ? rellenar(T.eaoEjAdquisicion, {
+            primero: E.primeroTxt,
+            segundos: E.segMotilidad
+                ? rellenar(T.eaoEjAdquisicionSeg, { doppler: E.segDoppler || '—', motil: E.segMotilidad })
+                : '' })
+        : '';
+
     let psap = '';
     if (E.psapReposo && E.psapPost) psap = rellenar(T.eaoEjPsap, { psapRep: E.psapReposo, psapPost: E.psapPost });
     else if (E.psapPost) psap = rellenar(T.eaoEjPsapPost, { psapPost: E.psapPost });
@@ -3620,7 +3805,10 @@ function bloqueEAoEjercicio(H) {
     // Sin gradiente ni síntomas cargados el bloque no aporta nada
     if (!gradiente && !E.sintomas.length && !tension) return '';
 
-    return rellenar(T.eaoEjBloque, { severidadBasal: severidad, gradiente, psap, sintomas, tension, capacidad })
+    return rellenar(T.eaoEjBloque, {
+        encabezado: H.eaoModerada ? T.eaoEjEncabezadoModerada : T.eaoEjEncabezadoSevera,
+        severidadBasal: severidad, vmax, gradiente, vsi, ia, aorta, psap,
+        sintomas, tension, capacidad, adquisicion })
         .replace(/\s{2,}/g, ' ').trim();
 }
 
@@ -3684,11 +3872,50 @@ function antecedentesEnProsa(H) {
     else if (H.crmAnio || H.antCrm) partes.push(rellenar(T.antecedentesCRM, {
         anio: H.crmAnio ? ` (${H.crmAnio})` : ''
     }));
-    if (H.antOtros) partes.push(H.antOtros);
-
+    // Valvulopatía de base, estructurada: entra antes del texto libre porque es el
+    // dato duro.
+    if (H.valvTipo) {
+        partes.push(rellenar(T.antecedentesValvulopatia, {
+            tipo: H.valvTipoTxt.toLowerCase(),
+            severidad: H.valvSeveridadTxt ? ' ' + H.valvSeveridadTxt : '',
+            bicuspide: H.valvBicuspide === 'si' ? ', sobre válvula bicúspide' : ''
+        }));
+    } else if (H.valvBicuspide === 'si') {
+        partes.push('válvula aórtica bicúspide');
+    }
+    // El texto libre va al final y como ORACIÓN APARTE, no enganchado con "y": es el
+    // relato del operador y suele traer su propia puntuación. Antes salía
+    // "sobre válvula bicúspide y Seguimiento anual por bicúspide. Hermano operado..",
+    // con el "y" fuera de lugar y el punto doblado.
     let txt = partes.length ? mayuscula(listarEnProsa(partes)) + '.' : T.sinAntecedentes + '.';
+    if (H.antOtros) {
+        const libre = H.antOtros.trim().replace(/\s*\.+\s*$/, '');
+        if (libre) txt += ' ' + mayuscula(libre) + '.';
+    }
     if (H.betabloqueante) txt += ' ' + T.antecedentesBB;
+    const prog = progresionEnProsa(H);
+    if (prog) txt += ' ' + prog;
     return txt;
+}
+
+// La progresión respecto del estudio previo, en una línea. Describe el cambio; lo
+// que ese cambio implica para el seguimiento va al panel, no al informe.
+function progresionEnProsa(H) {
+    const r = H.progresion;
+    if (!r || r.muyCorto || !r.hayAlgo) return '';
+    const T = NARRATIVA;
+    const partes = [];
+    const dec = (txt, val, d, uni) => { if (val !== null)
+        partes.push(`${txt} ${val >= 0 ? '+' : ''}${nProsa(val, d)} ${uni} por año`); };
+    dec('la Vmax', r.vmax, 2, 'm/s');
+    dec('el gradiente medio', r.grad, 1, 'mmHg');
+    dec('el área valvular', r.ava, 2, 'cm²');
+    dec('la aorta ascendente', r.aorta, 1, 'mm');
+    if (!partes.length) return '';
+    return rellenar(T.antecedentesProgresion, {
+        anios: nProsa(r.anios, 1),
+        cambios: listarEnProsa(partes)
+    });
 }
 
 // El método, en prosa. Encabeza el bloque de reposo porque ese bloque se recorta solo
@@ -4812,6 +5039,13 @@ function anonimizarEstudio(h) {
         causaDetencion: f.ej_causa_detencion || '',
         conduccion: f.ecg_conduccion || '',
         wm: h.estudio && h.estudio.wm ? h.estudio.wm : null,
+        // Texto libre y valvulopatía estructurada: es lo que permite encontrar
+        // después "las bicúspides" o "los que tenían tal antecedente". Las notas
+        // privadas NO viajan: se quedan en el navegador.
+        antOtros: f.ant_otros || '',
+        valvTipo: f.valv_tipo || '',
+        valvSeveridad: f.valv_severidad || '',
+        valvBicuspide: f.valv_bicuspide || '',
         informe
     };
 }
@@ -4832,23 +5066,42 @@ function archivarEnCasuistica(estudios) {
     }
 }
 
+// Búsqueda sobre la casuística: el texto libre de antecedentes se puede encontrar
+// ("bicúspide"), y la valvulopatía estructurada se puede CONTAR sin ambigüedad.
+function buscarCasuistica() { renderCasuistica(); }
+
+function filtrarCasos(casos, q) {
+    const t = (q || '').trim().toLowerCase();
+    if (!t) return casos;
+    return casos.filter(c => [c.antOtros, c.valvTipo, c.valvSeveridad,
+        c.valvBicuspide === 'si' ? 'bicúspide bicuspide' : '',
+        c.resultado, c.informe, c.categorizacion]
+        .filter(Boolean).join(' ').toLowerCase().includes(t));
+}
+
 function renderCasuistica() {
     const cont = document.getElementById('casuistica-resumen');
     if (!cont) return;
-    const casos = leerCasuistica();
+    const q = (document.getElementById('casuistica-buscar') || {}).value || '';
+    const todos = leerCasuistica();
+    const casos = filtrarCasos(todos, q);
     const badge = document.getElementById('casuistica-badge');
-    if (badge) badge.textContent = casos.length;
+    if (badge) badge.textContent = todos.length;
     if (!casos.length) {
-        cont.innerHTML = '<p class="module-description">Todavía no hay estudios archivados. ' +
-            'Los estudios pasan acá, sin datos del paciente, cuando se descartan del historial.</p>';
+        cont.innerHTML = q
+            ? `<p class="module-description">Ningún estudio de los ${todos.length} archivados ` +
+              `coincide con «${q}».</p>`
+            : '<p class="module-description">Todavía no hay estudios archivados. ' +
+              'Los estudios pasan acá, sin datos del paciente, cuando se descartan del historial.</p>';
         return;
     }
+    const cab = q ? `<p class="module-description">${casos.length} de ${todos.length} coinciden con «${q}».</p>` : '';
     const porResultado = {};
     casos.forEach(c => { porResultado[c.resultado] = (porResultado[c.resultado] || 0) + 1; });
     const filas = Object.entries(porResultado).sort((a, b) => b[1] - a[1])
         .map(([r, n]) => `<div class="calc-row"><span>${r}</span><span class="calc-value">${n}</span></div>`).join('');
     const desde = new Date(Math.min(...casos.map(c => c.ts))).toLocaleDateString('es-AR');
-    cont.innerHTML = `<div class="calc-box"><div class="calc-row"><span><strong>Total archivado</strong> (desde ${desde})</span>` +
+    cont.innerHTML = cab + `<div class="calc-box"><div class="calc-row"><span><strong>Total archivado</strong> (desde ${desde})</span>` +
         `<span class="calc-value"><strong>${casos.length}</strong></span></div>${filas}</div>`;
 }
 
@@ -5523,6 +5776,9 @@ function aplicarEstudio(d) {
     CRM_AMBIGUO = !d.crmSoloCirugia;
 
     restoreFields(d.fields);
+    // El "Resumen de HC" de los estudios viejos pasa a "Otros antecedentes
+    // relevantes", que sí sale en el informe.
+    migrarResumenHC();
 
     // Pestañas activas
     if (d.protocol) setProtocol(d.protocol);

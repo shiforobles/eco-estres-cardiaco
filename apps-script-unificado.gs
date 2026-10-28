@@ -111,33 +111,77 @@ const HEADERS_DOPPLER = [
   "Observaciones"
 ];
 
-// ESQUEMA v2 — 61 columnas. Generado del contrato de la app (EstresSheets.HEADERS):
-// no transcribir a mano. Si la app agrega una columna, este bloque y ESQUEMA_ESTRES_V
-// se actualizan JUNTOS, y las filas viejas se migran con migrarEstresV1aV2().
-const ESQUEMA_ESTRES_V = 2;
+// ESQUEMA ESTRÉS v3 — 74 columnas. Generado del contrato de la app
+// (EstresSheets.HEADERS): no transcribir a mano. Si la app agrega una columna,
+// este bloque, ESQUEMA_ESTRES_V y ESQUEMAS_PREVIOS se actualizan JUNTOS.
+const ESQUEMA_ESTRES_V = 3;
 const HEADERS_ESTRES = [
   "Fecha", "HC", "Edad", "Sexo",
   "Peso", "Altura", "SC", "Indicación",
-  "Medicación", "Betabloqueo", "Protocolo", "Carga Kgm/min",
-  "Etapa", "Duración", "Causa detención", "FC reposo",
-  "TA basal", "FC pico", "TA pico", "FC rec 1min",
-  "DP máximo", "% FCMT", "Índice cronotrópico", "Reserva FC",
-  "HRR1", "METs", "% METs predicho", "Ventana",
-  "Seg hasta imagen", "FC al adquirir", "% FC pico al adquirir", "FEy reposo",
-  "FEy post", "Delta FEy", "Función VD", "WMSI reposo",
-  "WMSI post", "Delta WMSI", "Escala WMSI", "Motor texto",
-  "Seg isquémicos", "Seg secuela", "Territorio", "Patrón",
-  "Ritmo", "Conducción", "ST basal", "ST tipo",
-  "ST mm", "ST morfología", "ST derivaciones", "Arritmias",
-  "E/e' reposo", "E/e' esfuerzo", "VRT reposo", "VRT esfuerzo",
-  "Diastólico esfuerzo", "Resultado", "Categorización", "Avisos",
-  "Informe"
+  "Medicación", "Betabloqueo", "Valvulopatía", "Severidad valvular",
+  "Bicúspide", "Fecha estudio previo", "Vmax previa", "Gradiente previo",
+  "AVA previa", "Aorta previa", "Δ Vmax/año", "Δ Gradiente/año",
+  "Δ AVA/año", "Δ Aorta/año", "Otros antecedentes", "Protocolo",
+  "Carga Kgm/min", "Etapa", "Duración", "Causa detención",
+  "FC reposo", "TA basal", "FC pico", "TA pico",
+  "FC rec 1min", "DP máximo", "% FCMT", "Índice cronotrópico",
+  "Reserva FC", "HRR1", "METs", "% METs predicho",
+  "Ventana", "Seg hasta imagen", "FC al adquirir", "% FC pico al adquirir",
+  "FEy reposo", "FEy post", "Delta FEy", "Función VD",
+  "WMSI reposo", "WMSI post", "Delta WMSI", "Escala WMSI",
+  "Motor texto", "Seg isquémicos", "Seg secuela", "Territorio",
+  "Patrón", "Ritmo", "Conducción", "ST basal",
+  "ST tipo", "ST mm", "ST morfología", "ST derivaciones",
+  "Arritmias", "E/e' reposo", "E/e' esfuerzo", "VRT reposo",
+  "VRT esfuerzo", "Diastólico esfuerzo", "Resultado", "Categorización",
+  "Avisos", "Informe"
 ];
+
+// Encabezados de los esquemas anteriores, para migrar las filas ya guardadas.
+// La migración es POR NOMBRE de columna, no por posición: así sirve para
+// cualquier inserción futura en el medio.
+const ESQUEMAS_PREVIOS = {
+  59: [
+    "Fecha", "HC", "Edad", "Sexo",
+    "Peso", "Altura", "SC", "Indicación",
+    "Medicación", "Betabloqueo", "Protocolo", "Carga Kgm/min",
+    "Etapa", "Duración", "Causa detención", "FC reposo",
+    "TA basal", "FC pico", "TA pico", "FC rec 1min",
+    "DP máximo", "% FCMT", "Índice cronotrópico", "Reserva FC",
+    "HRR1", "METs", "% METs predicho", "Ventana",
+    "Seg hasta imagen", "FC al adquirir", "% FC pico al adquirir", "FEy reposo",
+    "FEy post", "Delta FEy", "Función VD", "WMSI reposo",
+    "WMSI post", "Delta WMSI", "Seg isquémicos", "Seg secuela",
+    "Territorio", "Patrón", "Ritmo", "Conducción",
+    "ST basal", "ST tipo", "ST mm", "ST morfología",
+    "ST derivaciones", "Arritmias", "E/e' reposo", "E/e' esfuerzo",
+    "VRT reposo", "VRT esfuerzo", "Diastólico esfuerzo", "Resultado",
+    "Categorización", "Avisos", "Informe"
+  ],
+  61: [
+    "Fecha", "HC", "Edad", "Sexo",
+    "Peso", "Altura", "SC", "Indicación",
+    "Medicación", "Betabloqueo", "Protocolo", "Carga Kgm/min",
+    "Etapa", "Duración", "Causa detención", "FC reposo",
+    "TA basal", "FC pico", "TA pico", "FC rec 1min",
+    "DP máximo", "% FCMT", "Índice cronotrópico", "Reserva FC",
+    "HRR1", "METs", "% METs predicho", "Ventana",
+    "Seg hasta imagen", "FC al adquirir", "% FC pico al adquirir", "FEy reposo",
+    "FEy post", "Delta FEy", "Función VD", "WMSI reposo",
+    "WMSI post", "Delta WMSI", "Escala WMSI", "Motor texto",
+    "Seg isquémicos", "Seg secuela", "Territorio", "Patrón",
+    "Ritmo", "Conducción", "ST basal", "ST tipo",
+    "ST mm", "ST morfología", "ST derivaciones", "Arritmias",
+    "E/e' reposo", "E/e' esfuerzo", "VRT reposo", "VRT esfuerzo",
+    "Diastólico esfuerzo", "Resultado", "Categorización", "Avisos",
+    "Informe"
+  ]
+};
 
 // Columnas numéricas: se les fuerza formato para que Sheets no las lea
 // como fechas, que es lo que invirtió los dígitos de IMC y E/e'.
 const NUM_DOPPLER = [7,8,21,22,24,28,29,30,32,33,34,35,37,38,39,40,44,45,47,48,50,52,53,54,55,57,58,59,65,66,67,68,70,72,74,75,76,77,78,79,80,81,82];
-const NUM_ESTRES  = [23, 24, 36, 37, 38, 53, 54, 55, 56, 49, 26, 7];
+const NUM_ESTRES  = [36, 37, 49, 50, 51, 66, 67, 68, 69, 62, 39, 7];
 
 function doPost(e) {
   try {
@@ -244,10 +288,11 @@ function doGet(e) {
 //  adivina a qué esquema pertenece.
 // ══════════════════════════════════════════════════════════════════
 
-var COLS_NUEVAS_V2 = [39, 40];   // 1-based, en el orden en que se insertan
-
 function migrarEstresV1aV2_simular() { return migrarEstres_(true); }
 function migrarEstresV1aV2()         { return migrarEstres_(false); }
+// Nombres nuevos, más claros: la migración ya no es sólo de v1 a v2.
+function migrarEstres_simular() { return migrarEstres_(true); }
+function migrarEstres()         { return migrarEstres_(false); }
 
 function migrarEstres_(simular) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -260,7 +305,7 @@ function migrarEstres_(simular) {
   var ancho = Math.max(sheet.getLastColumn(), HEADERS_ESTRES.length);
   var datos = sheet.getRange(1, 1, ultimaFila, ancho).getValues();
 
-  // Largo real de cada fila: la última celda con contenido.
+  // Largo real de una fila: la última celda con contenido.
   function largo(f) {
     for (var i = f.length - 1; i >= 0; i--) {
       if (f[i] !== '' && f[i] !== null) return i + 1;
@@ -268,27 +313,40 @@ function migrarEstres_(simular) {
     return 0;
   }
 
-  var viejas = 0, nuevas = 0, raras = [];
-  var salida = [];
+  // Reubica una fila de un esquema viejo al actual, buscando cada columna POR
+  // NOMBRE. Lo que el esquema viejo no tenía queda vacío; nada se pierde ni se
+  // corre, por más que las columnas nuevas se hayan insertado en el medio.
+  function reubicar(fila, viejos) {
+    var indice = {};
+    for (var i = 0; i < viejos.length; i++) indice[viejos[i]] = i;
+    var salida = [];
+    for (var j = 0; j < HEADERS_ESTRES.length; j++) {
+      var pos = indice[HEADERS_ESTRES[j]];
+      salida.push(pos === undefined ? '' : (fila[pos] === undefined ? '' : fila[pos]));
+    }
+    return salida;
+  }
 
-  for (var r = 1; r < datos.length; r++) {     // r=0 es el encabezado
+  var cuenta = {}, raras = [], salida = [];
+
+  for (var r = 1; r < datos.length; r++) {
     var fila = datos[r].slice();
     var n = largo(fila);
+    if (n === 0) continue;
 
-    if (n <= 59 && n > 0) {
-      // Esquema v1: se abren dos huecos en 39 y 40 y se corre el resto.
-      var migrada = fila.slice(0, 38);
-      migrada.push('', '');
-      migrada = migrada.concat(fila.slice(38, 59));
-      while (migrada.length < HEADERS_ESTRES.length) migrada.push('');
-      salida.push(migrada.slice(0, HEADERS_ESTRES.length));
-      viejas++;
-    } else if (n === 60 || n === 61) {
-      // Esquema v2: ya está bien, sólo se completa el ancho.
+    var esquema = null;
+    if (n <= HEADERS_ESTRES.length && ESQUEMAS_PREVIOS[n]) esquema = n;
+    else if (n <= 59) esquema = 59;        // filas v1 con celdas finales vacías
+    else if (n <= 61) esquema = 61;
+
+    if (n === HEADERS_ESTRES.length) {
       var igual = fila.slice(0, HEADERS_ESTRES.length);
       while (igual.length < HEADERS_ESTRES.length) igual.push('');
       salida.push(igual);
-      nuevas++;
+      cuenta['v' + ESQUEMA_ESTRES_V] = (cuenta['v' + ESQUEMA_ESTRES_V] || 0) + 1;
+    } else if (esquema && ESQUEMAS_PREVIOS[esquema]) {
+      salida.push(reubicar(fila, ESQUEMAS_PREVIOS[esquema]));
+      cuenta[esquema] = (cuenta[esquema] || 0) + 1;
     } else {
       var tal = fila.slice(0, HEADERS_ESTRES.length);
       while (tal.length < HEADERS_ESTRES.length) tal.push('');
@@ -297,15 +355,15 @@ function migrarEstres_(simular) {
     }
   }
 
-  Logger.log('Hoja: ' + HOJA_ESTRES);
+  Logger.log('Hoja: ' + HOJA_ESTRES + ' — esquema actual v' + ESQUEMA_ESTRES_V +
+             ' (' + HEADERS_ESTRES.length + ' columnas)');
   Logger.log('Filas de datos: ' + salida.length);
-  Logger.log('  esquema v1 (59), se migran: ' + viejas);
-  Logger.log('  esquema v2 (61), ya están bien: ' + nuevas);
+  for (var k in cuenta) Logger.log('  esquema de ' + k + ' columnas: ' + cuenta[k]);
   Logger.log('  sin reconocer, se dejan como están: ' + raras.length);
   raras.forEach(function (x) { Logger.log('    fila ' + x.fila + ': ' + x.columnas + ' columnas'); });
 
   if (simular) {
-    Logger.log('SIMULACIÓN: no se escribió nada. Hacé una copia de la hoja y corré migrarEstresV1aV2().');
+    Logger.log('SIMULACIÓN: no se escribió nada. Hacé una copia de la hoja y corré migrarEstres().');
     return;
   }
 
