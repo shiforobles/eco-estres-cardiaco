@@ -419,7 +419,10 @@
          ECG BASAL
          ══════════════════════════════════════ -->
     <section class="card">
-        <h2 class="section-title">ECG basal</h2>
+        <details class="plegable-tecnica">
+            <summary class="section-title" style="cursor:pointer; list-style:none">ECG basal <span class="firma-nota">— lo carga la técnica; se despliega con un clic</span></summary>
+
+        
         <div class="grid">
             <div class="form-group">
                 <label for="ecg_ritmo">Ritmo de base</label>
@@ -460,6 +463,7 @@
                 <input autocomplete="off" type="text" id="ecg_otros_basal" placeholder="Ej: imagen de secuela inferolateral">
             </div>
         </div>
+        </details>
     </section>
 
 
@@ -535,12 +539,14 @@
                     </select>
                 </div>
                 <div class="form-group">
-                    <label for="ej_carga">Carga alcanzada (Kgm/min)</label>
-                    <input autocomplete="off" type="number" id="ej_carga" placeholder="Ej: 600" min="0" max="2000" step="25" oninput="calcEjercicio()">
+                    <label for="ej_etapa">Etapa alcanzada</label>
+                    <input autocomplete="off" type="number" id="ej_etapa" placeholder="Nº" min="1" max="12" step="1" oninput="calcCargaYMets()">
+                    <span class="firma-nota" id="etapa-carga-nota">En Astrand: etapa 1 = 150 Kgm/min, y cada etapa suma 150.</span>
                 </div>
                 <div class="form-group">
-                    <label for="ej_etapa">Etapa alcanzada</label>
-                    <input autocomplete="off" type="number" id="ej_etapa" placeholder="Nº" min="1" max="12" step="1">
+                    <label for="ej_carga">Carga alcanzada (Kgm/min)</label>
+                    <input autocomplete="off" type="number" id="ej_carga" placeholder="se calcula de la etapa" min="0" max="2000" step="25" oninput="calcCargaYMets(true)">
+                    <span class="firma-nota">Se calcula de la etapa. Si la cargás a mano, manda lo que escribas.</span>
                 </div>
                 <div class="form-group">
                     <label for="ej_duracion">Duración total (min:seg)</label>
@@ -548,14 +554,15 @@
                 </div>
                 <div class="form-group">
                     <label for="ej_mets">METs alcanzados</label>
-                    <input autocomplete="off" type="number" id="ej_mets" placeholder="METs" min="1" max="25" step="0.1" oninput="calcEjercicio()">
+                    <input autocomplete="off" type="number" id="ej_mets" placeholder="se calculan solos" min="1" max="25" step="0.1" oninput="marcarManual('ej_mets', 'Puestos a mano: la app ya no los recalcula.'); calcEjercicio()">
+                    <span class="firma-nota" id="mets_origen">Fórmula del ACSM para cicloergómetro, con la carga y el peso.</span>
                 </div>
                 <div class="form-group">
                     <label for="ej_causa_detencion">Causa de detención</label>
                     <select autocomplete="off" id="ej_causa_detencion">
                         <option value="">Seleccionar…</option>
+                        <option value="fatiga" selected>Fatiga</option>
                         <option value="fc_objetivo">FC objetivo alcanzada</option>
-                        <option value="fatiga">Fatiga</option>
                         <option value="angina">Angina</option>
                         <option value="st_t">Cambios del ST-T</option>
                         <option value="hipertensiva">Respuesta hipertensiva</option>
@@ -580,13 +587,12 @@
                     <option value="limitada">Limitada</option>
                 </select>
             </div>
-            <div class="form-group">
-                <label for="contraste_usado">Contraste Ecocardiográfico</label>
-                <select autocomplete="off" id="contraste_usado">
-                    <option value="no">No utilizado</option>
-                    <option value="si">Sí (SonoVue / Definity)</option>
-                </select>
-            </div>
+            <!-- Contraste: retirado de la pantalla. Oculto para que los estudios
+                 guardados con él sigan abriendo y saliendo igual en su informe. -->
+            <select id="contraste_usado" style="display:none" aria-hidden="true">
+                <option value="no">No utilizado</option>
+                <option value="si">Sí (SonoVue / Definity)</option>
+            </select>
             </div>
 
             <div class="calc-box">
@@ -606,10 +612,13 @@
             <div id="aviso-adquisicion" class="aviso-adquisicion" style="display:none"></div>
 
             <div class="pearl-container" data-pearl="ejercicio"></div>
-            <div class="info-banner info-banner-warning" style="margin-top:0.75rem">
+            <details class="plegable-tecnica" style="margin-top:0.75rem">
+            <summary class="firma-nota" style="cursor:pointer">⚠ Contraindicaciones y criterios de suspensión</summary>
+            <div class="info-banner info-banner-warning" style="margin-top:0.5rem">
                 <strong>Contraindicaciones absolutas del esfuerzo:</strong> IAM &lt;2 días, angina inestable, arritmia no controlada con compromiso hemodinámico, EAo severa sintomática, IC descompensada, TEP/trombosis aguda, miocarditis/pericarditis aguda, disección aórtica. &nbsp;|&nbsp;
                 <strong>Criterios absolutos de suspensión:</strong> caída de TAS &gt;10 mmHg bajo el basal con signos de isquemia, angina progresiva, ataxia/mareo/presíncope, signos de mala perfusión, TV sostenida, supradesnivel ST &gt;1 mm en derivaciones sin Q, dificultad para monitorizar, pedido del paciente.
             </div>
+            </details>
         </div>
 
         <!-- DOBUTAMINA -->
@@ -784,7 +793,10 @@
          ECG POST-ESFUERZO Y ARRITMIAS
          ══════════════════════════════════════ -->
     <section class="card">
-        <h2 class="section-title">ECG post-esfuerzo</h2>
+        <details class="plegable-tecnica">
+            <summary class="section-title" style="cursor:pointer; list-style:none">ECG post-esfuerzo <span class="firma-nota">— incluye arritmias; se despliega con un clic</span></summary>
+
+        
         <div class="grid">
             <div class="form-group">
                 <label for="ecg_st_tipo">Cambios del ST-T</label>
@@ -862,6 +874,7 @@
             </div>
         </div>
         <div id="aviso-arritmias" class="aviso-adquisicion" style="display:none"></div>
+        </details>
     </section>
 
     <!-- ══════════════════════════════════════

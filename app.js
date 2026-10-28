@@ -73,6 +73,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Recalcular lo derivado al cambiar datos que lo alimentan
     document.getElementById('altura').addEventListener('input', calcGeometria);
+    ['ej_protocolo', 'peso'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('change', () => calcCargaYMets());
+    });
     document.getElementById('sexo').addEventListener('change', calcGeometria);
 
     ['sexo', 'ant_betabloq', 'fevi_reposo', 'fevi_pico'].forEach(id => {
@@ -766,6 +770,66 @@ function categoriaMETs(mets) {
 }
 
 // ── CALCULADORA EJERCICIO (post-esfuerzo) ─────
+// ══════════════════════════════════════════════
+//  CARGA Y METs DEL CICLOERGÓMETRO
+//
+//  La carga salía a mano aunque el protocolo la determina, y los METs también,
+//  cuando se calculan con la carga y el peso.
+//
+//  Astrand en este laboratorio: etapa 1 = 150 Kgm/min y cada etapa suma 150.
+//
+//  METs por la fórmula del ACSM para cicloergómetro:
+//    VO2 (mL/kg/min) = 7 + (10,8 × W) / peso        — W en vatios
+//    1 Kgm/min = 0,1635 W        1 MET = 3,5 mL/kg/min
+//  El 7 son el metabolismo basal más el pedaleo sin carga.
+// ══════════════════════════════════════════════
+const ASTRAND_KGM_POR_ETAPA = 150;
+const KGM_A_WATT = 0.1635;
+
+function cargaDeEtapa(etapa, protocolo) {
+    if (!(etapa > 0)) return null;
+    // Sólo Astrand tiene escalones fijos en este laboratorio: con otro protocolo la
+    // carga la escribe el operador y la app no la inventa.
+    if (protocolo !== 'astrand') return null;
+    return etapa * ASTRAND_KGM_POR_ETAPA;
+}
+
+function metsDeCarga(kgm, peso) {
+    if (!(kgm > 0) || !(peso > 0)) return null;
+    const vatios = kgm * KGM_A_WATT;
+    const vo2 = 7 + (10.8 * vatios) / peso;
+    return Math.round((vo2 / 3.5) * 10) / 10;
+}
+
+/**
+ * @param {boolean} cargaManual true cuando el operador escribió la carga: ahí la
+ *                              etapa deja de mandar, pero los METs se siguen
+ *                              calculando con lo que haya escrito.
+ */
+function calcCargaYMets(cargaManual) {
+    if (cargaManual) marcarManual('ej_carga', 'Puesta a mano: la etapa ya no la recalcula.');
+
+    const protocolo = v('ej_protocolo');
+    const nota = document.getElementById('etapa-carga-nota');
+    if (nota) nota.textContent = protocolo === 'astrand'
+        ? `En Astrand: etapa 1 = ${ASTRAND_KGM_POR_ETAPA} Kgm/min, y cada etapa suma ${ASTRAND_KGM_POR_ETAPA}.`
+        : 'Con este protocolo la carga se escribe a mano: la app no la deduce.';
+
+    const deEtapa = cargaDeEtapa(num('ej_etapa'), protocolo);
+    if (deEtapa !== null) sugerir('ej_carga', deEtapa,
+        `Etapa ${num('ej_etapa')} del protocolo de Astrand. Podés corregirla.`);
+
+    const mets = metsDeCarga(num('ej_carga'), num('peso'));
+    if (mets !== null) {
+        sugerir('ej_mets', mets,
+            `Fórmula del ACSM para cicloergómetro, con ${num('ej_carga')} Kgm/min y ${num('peso')} kg. Podés corregirlos.`);
+    } else if (!fueCorregido('ej_mets')) {
+        const falta = !(num('ej_carga') > 0) ? 'la carga' : 'el peso';
+        notaOrigen('ej_mets', `Falta ${falta} para calcular los METs con la fórmula del ACSM.`);
+    }
+    calcEjercicio();
+}
+
 function calcEjercicio() {
     const edad = parseInt(v('edad')) || 0;
     const sexo = document.getElementById('sexo').value;

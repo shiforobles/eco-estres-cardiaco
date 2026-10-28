@@ -1219,3 +1219,9 @@ details[open] summary::after { content: ' ▲'; }
     background: rgba(202, 138, 4, 0.08);
 }
 .informe-viejo { opacity: 0.6; }
+
+/* Lo que carga la técnica va plegado: ocupa la mitad de la pantalla y se mira poco. */
+.plegable-tecnica > summary { list-style: none; }
+.plegable-tecnica > summary::-webkit-details-marker { display: none; }
+.plegable-tecnica > summary::before { content: '▸ '; opacity: 0.6; }
+.plegable-tecnica[open] > summary::before { content: '▾ '; }
