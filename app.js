@@ -49,7 +49,10 @@ let currentSpecialTab = 'viabilidad';
 // ── INIT ──────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
     // Inicializar scores en 0 (no evaluado)
-    SEGMENTS.forEach(s => { WM.reposo[s.id] = 0; WM.estres[s.id] = 0; });
+    // Arrancan en NORMAL: lo habitual es que la motilidad sea normal y marcar lo
+    // anormal es menos trabajo que confirmar 34 segmentos. El 0 "no evaluado" sigue
+    // disponible en el pincel para los segmentos que no se vieron.
+    SEGMENTS.forEach(s => { WM.reposo[s.id] = 1; WM.estres[s.id] = 1; });
 
     initTheme();
     document.getElementById('btn-theme-toggle').addEventListener('click', toggleTheme);
@@ -660,6 +663,79 @@ function refrescarDeducidos() {
     if (deducirTimer) clearTimeout(deducirTimer);
     deducirTimer = setTimeout(autocompletarInterpretacion, 250);
 }
+
+// ══════════════════════════════════════════════
+//  TEST DIASTÓLICO DE ESFUERZO — CRITERIO ASE 2016
+//
+//  CRITERIO DE ASE 2016, PENDIENTE DE ACTUALIZAR A ASE 2025. El panel lo dice.
+//
+//  Positivo: las TRES
+//    · con esfuerzo, E/e' promedio >14 (o septal >15 si sólo hay septal)
+//    · con esfuerzo, VRT >2,8 m/s
+//    · en reposo, e' septal <7 cm/s
+//  Normal: E/e' promedio <10 en reposo Y con esfuerzo, y VRT <2,8 m/s
+//  Indeterminado: cualquier otra combinación
+//  Datos insuficientes: falta el E/e' post o la VRT. NUNCA sale como negativo:
+//    antes, con E/e' 8 y VRT sin cargar, la app autocompletaba "negativo" y el
+//    informe afirmaba que no había aumento de presiones sin haberlo medido.
+// ══════════════════════════════════════════════
+const DIAST_EE_PROMEDIO = 14;   // E/e' promedio con esfuerzo
+const DIAST_EE_SEPTAL   = 15;   // si sólo se cargó el septal
+const DIAST_VRT         = 2.8;  // m/s
+const DIAST_EPRIMA_SEP  = 7;    // e' septal en reposo, cm/s
+const DIAST_EE_NORMAL   = 10;   // E/e' promedio para llamarlo normal
+
+function evaluarDiastolicoEsfuerzo() {
+    const ee = (fase) => {
+        const E = num('e_onda_' + fase);
+        const sep = num('e_prima_' + fase), lat = num('e_prima_lat_' + fase);
+        const promedio = sep > 0 && lat > 0;
+        const eprima = promedio ? (sep + lat) / 2 : (sep > 0 ? sep : lat);
+        if (!(E > 0) || !(eprima > 0)) return null;
+        return { valor: E / eprima, promedio };
+    };
+    const rep = ee('rep'), est = ee('est');
+    const vrt = num('vrt_est');
+    const eprimaSep = num('e_prima_rep');
+
+    // Sin E/e' post o sin VRT no se puede concluir nada.
+    const falta = [];
+    if (!est) falta.push("el E/e' post-esfuerzo");
+    if (!(vrt > 0)) falta.push('la VRT post-esfuerzo');
+    if (falta.length) return { clave: 'insuficiente', falta, detalle: [] };
+
+    // El corte depende de qué se cargó: promedio >14, septal aislado >15.
+    const corteEE = est.promedio ? DIAST_EE_PROMEDIO : DIAST_EE_SEPTAL;
+    const cEE  = est.valor > corteEE;
+    const cVRT = vrt > DIAST_VRT;
+    // El e' septal de reposo es el tercer criterio; si no está, no se puede afirmar.
+    const cEprima = eprimaSep > 0 && eprimaSep < DIAST_EPRIMA_SEP;
+
+    const detalle = [
+        { ok: cEE,  txt: `E/e' ${est.promedio ? 'promedio' : 'septal'} post-esfuerzo ` +
+                         `${nProsa(est.valor, 1)} (corte > ${corteEE})` },
+        { ok: cVRT, txt: `VRT post-esfuerzo ${nProsa(vrt, 1)} m/s (corte > ${nProsa(DIAST_VRT, 1)})` },
+        { ok: cEprima, txt: eprimaSep > 0
+            ? `e' septal en reposo ${nProsa(eprimaSep, 1)} cm/s (corte < ${DIAST_EPRIMA_SEP})`
+            : "e' septal en reposo no consignado" },
+    ];
+
+    if (cEE && cVRT && cEprima) return { clave: 'positivo', detalle };
+
+    // Normal exige E/e' bajo en LAS DOS fases, no sólo post.
+    const normal = rep && rep.valor < DIAST_EE_NORMAL &&
+                   est.valor < DIAST_EE_NORMAL && vrt < DIAST_VRT;
+    if (normal) return { clave: 'negativo', detalle };
+
+    return { clave: 'indeterminado', detalle };
+}
+
+const DIAST_ETIQUETA = {
+    positivo:      'Positivo',
+    negativo:      'Normal',
+    indeterminado: 'Indeterminado',
+    insuficiente:  'Datos insuficientes',
+};
 
 function autocompletarDiastolico(veredicto) {
     sugerir('diast_resultado', veredicto, veredicto === 'no_evaluado'
@@ -1502,6 +1578,7 @@ function renderBullsEye(svgId, stateKey) {
             // gesto. Sin pincel se conserva el ciclado de siempre.
             // El clic va SIEMPRE al bull's eye que se tocó: el selector de fase gobierna
             // los botones de grupo y nada más. Lo contrario sería una trampa.
+            marcarMotilidadTocada();
             const actual = WM[stateKey][seg.id];
             WM[stateKey][seg.id] = (GRADO_PINCEL === null)
                 ? (actual + 1) % 6
@@ -1906,6 +1983,7 @@ function buildSegmentsTable() {
 }
 
 function setScore(segId, stateKey, score) {
+    marcarMotilidadTocada();
     WM[stateKey][segId] = score;
     updateSegTableRow(segId);
     updateWMSI();
@@ -1962,19 +2040,42 @@ function calcDiastolico() {
     // Criterio ASE: E/e' promedio >14 con esfuerzo Y VRT >2,8 m/s
     const vrtEst = num('vrt_est');
     if (est) {
-        const eeAlto = est.valor > 14;
-        const vrtAlto = vrtEst > 2.8;
-        let txt;
-        if (eeAlto && vrtAlto) txt = '⚠ POSITIVO — E/e\' >14 y VRT >2,8 m/s con el esfuerzo';
-        else if (eeAlto && !vrtEst) txt = 'E/e\' >14 con el esfuerzo; falta la VRT para completar el criterio';
-        else if (eeAlto) txt = 'Indeterminado — E/e\' >14 pero VRT ≤2,8 m/s';
-        else if (vrtAlto) txt = 'Indeterminado — VRT >2,8 m/s pero E/e\' ≤14';
-        else txt = '✓ Negativo — sin aumento de las presiones de llenado con el esfuerzo';
-        set('diast_respuesta', txt);
-        autocompletarDiastolico(eeAlto && vrtAlto ? 'positivo' : (eeAlto || vrtAlto) ? 'no_evaluado' : 'negativo');
+        pintarDiastolicoEsfuerzo();
     } else {
-        set('diast_respuesta', '—');
+        pintarDiastolicoEsfuerzo();
+    }
+}
+
+// Muestra el veredicto con sus tres criterios a la vista, y lo lleva al campo que
+// va al informe. El selector manual se fue: el resultado es automático.
+function pintarDiastolicoEsfuerzo() {
+    const r = evaluarDiastolicoEsfuerzo();
+    const box = document.getElementById('diast-criterios');
+    const set = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };
+
+    if (r.clave === 'insuficiente') {
+        set('diast_respuesta', 'Datos insuficientes — falta ' + listarEnProsa(r.falta));
         autocompletarDiastolico('no_evaluado');
+        if (box) {
+            box.style.display = 'block';
+            box.innerHTML = '<div class="criterio-ase criterio-alto">▲ No se puede concluir: falta ' +
+                listarEnProsa(r.falta) + '. <strong>No sale como negativo</strong>: ' +
+                'afirmar que no hubo aumento de las presiones sin haberlo medido sería falso.</div>';
+        }
+        return;
+    }
+
+    const icono = { positivo: '⚠ ', negativo: '✓ ', indeterminado: '' }[r.clave] || '';
+    set('diast_respuesta', icono + DIAST_ETIQUETA[r.clave]);
+    autocompletarDiastolico(r.clave === 'indeterminado' ? 'no_evaluado' : r.clave);
+
+    if (box) {
+        box.style.display = 'block';
+        box.innerHTML = r.detalle.map(d =>
+            `<div class="criterio-ase ${d.ok ? 'criterio-alto' : 'criterio-normal'}">` +
+            `${d.ok ? '▲' : '✓'} ${d.txt}</div>`).join('') +
+            '<div class="criterio-ase criterio-corte">Criterio de <strong>ASE 2016</strong>: ' +
+            'las tres condiciones para positivo. <strong>Pendiente de actualizar a ASE 2025.</strong></div>';
     }
 }
 
@@ -2585,6 +2686,7 @@ function setGradoPincel(grado) {
  * apaga: el mismo botón sirve para poner y para sacar.
  */
 function aplicarGrupoMotilidad(clave) {
+    marcarMotilidadTocada();
     const ids = segmentosDeGrupo(clave);
     if (!ids || !ids.length) return;
     const grado = GRADO_PINCEL === null ? GRADO_SIN_PINCEL : GRADO_PINCEL;
@@ -2626,6 +2728,7 @@ function sincronizarBarraMotilidad() {
 }
 
 function setTerritoryScore(stateKey, territory, score) {
+    marcarMotilidadTocada();
     SEGMENTS.forEach(seg => {
         if (seg.territory === territory) WM[stateKey][seg.id] = score;
     });
@@ -2636,6 +2739,7 @@ function setTerritoryScore(stateKey, territory, score) {
 }
 
 function setAllNormal(stateKey) {
+    marcarMotilidadTocada();
     SEGMENTS.forEach(seg => { WM[stateKey][seg.id] = 1; });
     renderBullsEye('svg-' + stateKey, stateKey);
     buildSegmentsTable();
@@ -3091,7 +3195,10 @@ function recolectarHallazgos() {
     H.vrtReposo = v('vrt_rep');
     H.vrtEstres = v('vrt_est');
     // Resultado CALCULADO del estudio diastólico, a partir de los números.
-    H.diastolicoCalculado = (H.eeEstresNum || 0) > 14 && num('vrt_est') > 2.8;
+    const dEsf = evaluarDiastolicoEsfuerzo();
+    H.diastEsfuerzo = dEsf;
+    H.diastolicoCalculado = dEsf.clave === 'positivo';
+    H.diastInsuficiente = dEsf.clave === 'insuficiente';
 
     // ECG
     H.stTipo = document.getElementById('ecg_st_tipo').value;
@@ -3258,7 +3365,9 @@ function recolectarHallazgos() {
     const ev = evaluabilidadPorTerritorio();
     H.territoriosEvaluables = ev.evaluables;
     H.territoriosNoEvaluables = ev.noEvaluables;
-    H.motilidadNoValorable = ev.ningunoEvaluable;
+    // Nadie tocó el bull's eye: los puntajes son el valor inicial, no una lectura.
+    H.motilidadSinConfirmar = !MOTILIDAD_TOCADA;
+    H.motilidadNoValorable = ev.ningunoEvaluable || H.motilidadSinConfirmar;
     H.evaluabilidad = ev.estado;
     // Con trastorno de conducción el septum no es valorable, esté normal o alterado:
     // queda fuera del índice y así se aclara en el informe.
@@ -3319,6 +3428,13 @@ const SIN_PAR_MAX_POR_TERRITORIO = 2;
 
 // El ápex no cuenta para ningún territorio: no tiene vaso asignado y ya está
 // fuera del WMSI y de territoriosDe().
+// Con los segmentos arrancando en verde, "todo normal" ya no distingue un estudio
+// mirado de uno que nadie tocó. Este flag sí: se enciende con el primer gesto sobre
+// el bull's eye. Mientras esté apagado, el informe no afirma un eco negativo, igual
+// que cuando los segmentos arrancaban en cero.
+let MOTILIDAD_TOCADA = false;
+function marcarMotilidadTocada() { MOTILIDAD_TOCADA = true; }
+
 function evaluabilidadPorTerritorio() {
     const terr = { DA: [], CD: [], Cx: [] };
     SEGMENTS.forEach(s => {
@@ -4648,7 +4764,9 @@ function incoherenciasInforme(texto, H) {
 
 function motivoNoConcluyente(H) {
     const m = [];
-    if (H.motilidadNoValorable)
+    if (H.motilidadSinConfirmar)
+        m.push('no haberse registrado la motilidad segmentaria');
+    else if (H.motilidadNoValorable)
         m.push(H.segEvaluados === 0
             ? 'no haberse registrado la motilidad segmentaria'
             : `motilidad no valorable en ninguno de los territorios coronarios ` +
@@ -5965,6 +6083,8 @@ function aplicarEstudio(d) {
     // Las correcciones manuales se restauran ANTES que nada: los recálculos de más
     // abajo consultan esta marca, y si llega después ya pisaron el valor corregido.
     camposCorregidos = (d.corregidos && typeof d.corregidos === 'object') ? { ...d.corregidos } : {};
+    // Un estudio guardado ya trae la motilidad leída: no hay que volver a tocarla.
+    if (d.wm) marcarMotilidadTocada();
 
     // Estudio guardado antes de que `ant_crm` pasara a significar sólo cirugía: el
     // dato no distingue CRM de ATC y el informe no puede elegir uno por él.

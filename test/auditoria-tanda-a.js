@@ -48,7 +48,9 @@ exigir(w.elegirRama(H) === 'noConcluyente',
 
 // ── #5 · corrección manual del diastólico ────────────────────────
 casoBase(w); todoNormal(w);
+// El criterio ASE 2016 pide las TRES: E/e' post, VRT y e' septal de reposo <7.
 set('e_onda_est', 150); set('e_prima_est', 8); set('e_prima_lat_est', 8); set('vrt_est', 3.4);
+set('e_prima_rep', 6);
 H = w.recolectarHallazgos();
 exigir(H.diastolicoCalculado && H.diastolicoPositivo, 'sin corrección manda el cálculo');
 set('diast_resultado', 'negativo'); w.marcarManual('diast_resultado', '');

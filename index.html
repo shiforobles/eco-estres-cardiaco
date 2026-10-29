@@ -930,21 +930,17 @@
             <div class="calc-row"><span>Respuesta de e' al esfuerzo:</span><span id="diast_eprima_resp" class="calc-value">—</span></div>
             <div class="calc-row"><span>Test diastólico de esfuerzo:</span><span id="diast_respuesta" class="calc-value">—</span></div>
         </div>
-        <div class="grid" style="margin-top:0.75rem">
-            <div class="form-group">
-                <label for="diast_resultado">Estudio diastólico de esfuerzo — resultado que va al informe</label>
-                <select autocomplete="off" id="diast_resultado">
-                    <option value="no_evaluado">No evaluado</option>
-                    <option value="negativo">Negativo</option>
-                    <option value="positivo">Positivo</option>
-                </select>
-                <span class="firma-nota" id="diast_resultado_origen">Se completa solo desde E/e' y VRT; podés corregirlo.</span>
-            </div>
-        </div>
-        <p class="table-note">
-            Criterio de test diastólico positivo (ASE): E/e' promedio &gt;14 con el esfuerzo <em>y</em> VRT &gt;2,8 m/s, con e' septal &lt;7 cm/s en reposo.
-            Si sólo se cargó e' septal, el E/e' se calcula con ese valor.
-        </p>
+        <!-- Los tres criterios a la vista. El selector manual se fue: el resultado
+             es automático y se ve de dónde sale. -->
+        <div id="diast-criterios" class="criterios-box" style="display:none; margin-top:0.5rem"></div>
+        <!-- Campo del resultado: oculto, lo completa el cálculo. Sigue existiendo
+             porque los estudios guardados lo traen y la planilla lo lee. -->
+        <select id="diast_resultado" style="display:none" aria-hidden="true">
+            <option value="no_evaluado">No evaluado</option>
+            <option value="negativo">Negativo</option>
+            <option value="positivo">Positivo</option>
+        </select>
+        <span id="diast_resultado_origen" style="display:none"></span>
     </section>
 
 
@@ -1090,16 +1086,14 @@
         </div>
         </details>
 
-        <div class="grid" style="margin-top:1.25rem">
-            <div class="form-group">
-                <label for="patron_motilidad">Patrón de la alteración</label>
-                <select autocomplete="off" id="patron_motilidad">
-                    <option value="segmentaria">Segmentaria (distribución coronaria)</option>
-                    <option value="global">Global (no coronaria)</option>
-                </select>
-                <span class="firma-nota" id="patron_motilidad_origen">Se propone solo según extensión, territorios y FEy.</span>
-            </div>
-        </div>
+        <!-- Patrón de la alteración: lo deduce el bull's eye (≥12 segmentos, tres
+             territorios y FEy ≤40 %). Oculto, no borrado: sigue siendo corregible
+             desde el resumen plegado de Interpretación. -->
+        <select id="patron_motilidad" style="display:none" aria-hidden="true">
+            <option value="segmentaria">Segmentaria (distribución coronaria)</option>
+            <option value="global">Global (no coronaria)</option>
+        </select>
+        <span id="patron_motilidad_origen" style="display:none"></span>
 
         <h3 class="subsection-title" style="margin-top:1.25rem">Motilidad en Recuperación</h3>
         <div class="grid">
@@ -1453,6 +1447,23 @@
     <section class="card card-result">
         <h2 class="section-title">Interpretación y Resultado</h2>
         <div class="pearl-container" data-pearl="errores"></div>
+
+        <!-- Lo que el operador OBSERVA y la app no puede deducir: queda a la vista. -->
+        <div class="grid grid-2col">
+            <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="hal_angina"><label for="hal_angina">Angina durante el estudio</label></div>
+            <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="hal_disnea"><label for="hal_disnea">Disnea de esfuerzo</label></div>
+        </div>
+        <div id="resultado-banner" class="resultado-banner" style="display:none"></div>
+        <div class="form-group" style="margin-top:0.75rem">
+            <label for="conclusion_libre">Conclusión clínica (texto libre)</label>
+            <textarea autocomplete="off" id="conclusion_libre" rows="3" placeholder="Lo que quieras agregar al cierre del informe..."></textarea>
+        </div>
+
+        <!-- Todo lo de abajo lo completa la app sola desde el bull's eye, el ECG y la
+             hemodinamia. Se pliega: está para corregir, no para cargar. -->
+        <details class="plegable-tecnica" style="margin-top:0.75rem">
+        <summary class="subsection-title" style="cursor:pointer; list-style:none">Resultado deducido
+            <span class="firma-nota">— lo completa la app; se abre para corregir</span></summary>
         <div class="grid">
             <div class="form-group">
                 <label for="resultado_estudio">Resultado del Estudio</label>
@@ -1504,10 +1515,7 @@
                 <span class="firma-nota" id="extension_isquemia_origen"></span>
             </div>
         </div>
-        <div id="resultado-banner" class="resultado-banner" style="display:none"></div>
         <div class="grid grid-3col" style="margin-top:1rem">
-            <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="hal_angina"><label for="hal_angina">Angina durante el estudio</label></div>
-            <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="hal_disnea"><label for="hal_disnea">Disnea de esfuerzo</label></div>
             <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="hal_st_dep"><label for="hal_st_dep">Descenso ST en ECG</label></div>
             <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="hal_st_ele"><label for="hal_st_ele">Elevación ST en ECG</label></div>
             <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="hal_arritmia"><label for="hal_arritmia">Arritmia significativa</label></div>
@@ -1515,11 +1523,8 @@
             <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="hal_hipertensiva"><label for="hal_hipertensiva">Respuesta hipertensiva (≥210/110)</label></div>
             <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="hal_extrasistoles"><label for="hal_extrasistoles">Extrasístoles ventriculares frecuentes</label></div>
         </div>
-        <span class="firma-nota">Todos se marcan solos desde el ECG, la hemodinamia y las arritmias ya cargadas, salvo <strong>angina</strong> y <strong>disnea</strong>, que son síntomas que observás vos. Si destildás alguno, la app deja de tocarlo.</span>
-        <div class="form-group" style="margin-top:1rem">
-            <label for="conclusion_libre">Conclusión clínica (texto libre)</label>
-            <textarea autocomplete="off" id="conclusion_libre" rows="3" placeholder="Descripción interpretativa del estudio para el informe final..."></textarea>
-        </div>
+        <span class="firma-nota">Se marcan solos desde el ECG, la hemodinamia y las arritmias ya cargadas. Si destildás alguno, la app deja de tocarlo.</span>
+        </details>
     </section>
 
     <!-- ══════════════════════════════════════
