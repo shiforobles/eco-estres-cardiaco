@@ -32,24 +32,14 @@
         <span class="bloque-hint">paciente, contexto e indicación</span>
     </div>
 
-    <!-- ══════════════════════════════════════
-         RESUMEN DE HISTORIA CLÍNICA
-         ══════════════════════════════════════ -->
-    <section class="card card-blue">
-        <h2 class="section-title">Notas privadas</h2>
-        <div class="form-group">
-            <textarea autocomplete="off" id="notas_privadas" rows="3"
-                placeholder="Apuntes tuyos sobre este estudio. No salen del navegador."></textarea>
-            <span class="firma-nota">
-                <strong>No salen en ningún lado:</strong> ni en el informe, ni en la planilla, ni en la
-                casuística. Quedan sólo en este navegador, junto al borrador.
-                Lo que quieras que salga en el informe va en <em>Otros antecedentes relevantes</em>.
-            </span>
-            <!-- Campo viejo, oculto: sólo recibe lo guardado antes del cambio para
-                 migrarlo a `ant_otros`. Ver migrarResumenHC(). -->
-            <textarea id="resumen_hc" style="display:none" aria-hidden="true"></textarea>
-        </div>
-    </section>
+    <!-- Retirados de la pantalla, no borrados. `notas_privadas` nunca salió del
+         navegador y no se usaba; `resumen_hc` sólo recibe lo guardado antes del
+         cambio, para migrarlo a `ant_otros`. Ver migrarResumenHC(). Un estudio que
+         los trae los sigue mostrando en el bloque de datos heredados. -->
+    <div style="display:none" aria-hidden="true">
+        <textarea id="notas_privadas"></textarea>
+        <textarea id="resumen_hc"></textarea>
+    </div>
 
     <!-- ══════════════════════════════════════
          SECCIÓN 1: DATOS DEL PACIENTE
@@ -1567,6 +1557,46 @@
              contenteditable="true" spellcheck="true"
              oninput="marcarInformeEditado()"
              aria-label="Informe generado, editable"></div>
+
+        <!-- ── Los tres cuadros del formulario de OSECAC ──────────────
+             Texto plano, sin estilos: se pega en el formulario o en un Google Doc
+             sin tener que limpiar nada. Se arman con "Generar informe", del mismo
+             estudio y en el mismo acto que el informe de arriba. -->
+        <div id="osecac-salida" class="osecac-salida" style="display:none">
+            <h3 class="subsection-title">Informe para OSECAC</h3>
+            <p class="firma-nota" style="margin-bottom:0.6rem">
+                Los tres cuadros del formulario, en texto plano. El ECG y las arritmias
+                no van en ninguno: si el ECG cambia lo que el estudio puede afirmar, se
+                dice una vez en la conclusión.
+            </p>
+            <div class="report-controls" style="margin-bottom:0.75rem">
+                <button type="button" class="btn btn-primary" onclick="copiarOsecacTodo()">📋 Copiar todo</button>
+            </div>
+
+            <div class="osecac-bloque">
+                <div class="osecac-cabecera">
+                    <span class="osecac-titulo">REPOSO</span>
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="copiarBloqueOsecac('reposo')">Copiar</button>
+                </div>
+                <pre id="osecac-reposo" class="osecac-texto"></pre>
+            </div>
+
+            <div class="osecac-bloque">
+                <div class="osecac-cabecera">
+                    <span class="osecac-titulo">ESFUERZO</span>
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="copiarBloqueOsecac('esfuerzo')">Copiar</button>
+                </div>
+                <pre id="osecac-esfuerzo" class="osecac-texto"></pre>
+            </div>
+
+            <div class="osecac-bloque">
+                <div class="osecac-cabecera">
+                    <span class="osecac-titulo">CONCLUSIÓN</span>
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="copiarBloqueOsecac('conclusion')">Copiar</button>
+                </div>
+                <pre id="osecac-conclusion" class="osecac-texto"></pre>
+            </div>
+        </div>
     </section>
 
     <div class="bloque-sep">

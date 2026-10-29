@@ -116,7 +116,8 @@ const oculto = id => {
     exigir(oculto(id), `${id} salió de la pantalla sin borrarse`));
 exigir(!oculto('ant_hta'),
     'la HTA se queda a la vista: cambia cómo se lee una respuesta hipertensiva');
-['fevi_recup','mot_recup','mot_recup_tiempo','ecg_st_aparicion','ecg_st_resolucion']
+['fevi_recup','mot_recup','mot_recup_tiempo','ecg_st_aparicion','ecg_st_resolucion',
+ 'notas_privadas','resumen_hc']
     .forEach(id => exigir(oculto(id), `${id} salió de la pantalla sin borrarse`));
 exigir(!oculto('delta_fevi'),
     'el ΔFEy reposo→pico se queda: avisa de la caída de FEy, que sí cambia el informe');

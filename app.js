@@ -3201,6 +3201,14 @@ function recolectarHallazgos() {
     const G = medidasVI();
     H.imvi = G.imvi;
     H.rwt = G.rwt;
+    // Dimensiones, espesores y presión pulmonar: el cuadro de Reposo del formulario
+    // de OSECAC los pide con su número, no sólo clasificados en "geometría normal".
+    H.ddvi = G.ddvi || null;
+    H.sivD = G.siv || null;
+    H.ppD = G.pp || null;
+    H.volAI = num('volvi_reposo') || null;
+    H.lavi = v('lavi_reposo');
+    H.psapReposo = num('pp_reposo') || null;
     // Los E/e' se calculan de sus componentes, NO se leen del campo de pantalla. Ese
     // ida y vuelta por el DOM era una trampa esperando: al formatear el campo con coma
     // decimal, parseFloat("14,5") devuelve 14 y el criterio de >14 se da vuelta solo.
@@ -4480,6 +4488,10 @@ function construirNarrativa(H) {
     const rama = elegirRama(H);
     const nada = '—';
     const parrafos = [];
+    // Las piezas sueltas del informe, antes de rotularlas y pegarlas. La salida para
+    // el formulario de OSECAC las vuelve a ordenar en tres cuadros. Una sola redacción
+    // para las dos salidas: si se escribieran dos veces, se separarían.
+    const piezas = {};
 
     // El cuerpo es un esqueleto fijo de líneas rotuladas. Ver la nota en
     // report-templates.js: antes cambiaba de forma según qué campos había cargados.
@@ -4556,10 +4568,16 @@ function construirNarrativa(H) {
     // sola masa de texto y la diastólica se perdía al final de la frase de motilidad.
     // El texto libre reemplaza la descripción del reposo, no el método ni la
     // diastólica, que tienen sus propios datos.
+    // Las tres piezas se guardan por separado: la salida para OSECAC las reparte en
+    // cuadros distintos —el método es hemodinamia y va a Esfuerzo— y no puede
+    // redactarlas por su cuenta sin que los dos informes se separen con el tiempo.
+    piezas.metodo = metodoEnProsa(H);
+    piezas.reposoEco = H.reposoLibre || bloqueReposo(H, datosReposo, datosConduccion, hayAsincronia);
+    piezas.reposoDiastolica = bloqueDiastolicaReposo(H);
     linea(T.lineaReposo, [
-        metodoEnProsa(H),
-        H.reposoLibre || bloqueReposo(H, datosReposo, datosConduccion, hayAsincronia),
-        rellenar(T.reposoDiastolica, { contenido: bloqueDiastolicaReposo(H) })
+        piezas.metodo,
+        piezas.reposoEco,
+        rellenar(T.reposoDiastolica, { contenido: piezas.reposoDiastolica })
     ].filter(Boolean).join('\n\n'));
 
     // ── ESFUERZO ──
@@ -4623,24 +4641,28 @@ function construirNarrativa(H) {
     if (H.feyEstres > 0 && !/FEy/.test(textoEsfuerzo))
         textoEsfuerzo += ` FEy post-esfuerzo ${H.feyEstres} %` +
             (H.deltaFey !== null ? ` (Δ ${H.deltaFey >= 0 ? '+' : ''}${H.deltaFey} puntos)` : '') + '.';
+    piezas.esfuerzo = textoEsfuerzo;
     linea(T.lineaEsfuerzo, textoEsfuerzo);
 
     // ── MOTILIDAD: la línea cuantitativa, siempre ──
-    linea(T.lineaMotilidad, lineaMotilidadEnProsa(H));
+    piezas.motilidad = lineaMotilidadEnProsa(H);
+    linea(T.lineaMotilidad, piezas.motilidad);
 
     // ── ECG ──
     parrafos.push(rellenar(T.ecgReposo, { contenido: ecgReposoEnProsa(H) }));
     parrafos.push(rellenar(T.ecgPostEsfuerzo, { contenido: ecgEsfuerzoEnProsa(H) }));
 
     // ── ESTUDIO DIASTÓLICO ──
-    parrafos.push({
+    piezas.diastolicoEsfuerzo = {
         negativo: T.diastolicoNegativo,
         positivo: T.diastolicoPositivo
-    }[H.diastResultado] || T.diastolicoNoEvaluado);
+    }[H.diastResultado] || T.diastolicoNoEvaluado;
+    parrafos.push(piezas.diastolicoEsfuerzo);
 
     // ── MÓDULOS OPCIONALES ──
-    if (H.viabEnUso) { const b = bloqueViabilidad(H); if (b) linea(T.lineaViabilidad, b); }
-    if (H.eaoEjEnUso) { const b = bloqueEAoEjercicio(H); if (b) linea(T.lineaValvular, b); }
+    piezas.modulos = [];
+    if (H.viabEnUso) { const b = bloqueViabilidad(H); if (b) { piezas.modulos.push(rellenar(T.lineaViabilidad, { contenido: b })); linea(T.lineaViabilidad, b); } }
+    if (H.eaoEjEnUso) { const b = bloqueEAoEjercicio(H); if (b) { piezas.modulos.push(rellenar(T.lineaValvular, { contenido: b })); linea(T.lineaValvular, b); } }
 
     // ── CONCLUSIÓN ──
     // Con FC subóptima la conclusión negativa arranca corta: la limitación es el foco
@@ -4754,11 +4776,152 @@ function construirNarrativa(H) {
     // La conclusión que escribe el operador cierra el informe: antes se cargaba y no
     // aparecía en ninguna parte.
     if (H.conclusionLibre) conclusion += rellenar(T.conclusionLibre, { texto: H.conclusionLibre });
+    piezas.conclusion = conclusion;
     parrafos.push(conclusion);
 
     const texto = parrafos.join('\n\n');
     INCOHERENCIAS_INFORME = incoherenciasInforme(texto, H);
-    return { rama, texto };
+    return { rama, texto, piezas };
+}
+
+// ══════════════════════════════════════════════
+//  SALIDA PARA EL FORMULARIO DE OSECAC
+//
+//  El formulario tiene tres cuadros —Reposo, Esfuerzo y Conclusión— y el informe
+//  entra ahí a mano. Esta salida lo entrega ya repartido, en texto plano: sin
+//  negritas, viñetas ni estilos, para pegar en el formulario o en un Google Doc sin
+//  tener que limpiar nada.
+//
+//  No redacta: reparte. Las frases son las mismas piezas que arma
+//  construirNarrativa(), porque dos redacciones del mismo hallazgo se separan con el
+//  tiempo y terminan diciendo cosas distintas del mismo estudio.
+//
+//  Qué va en cada cuadro:
+//    REPOSO      sólo el eco basal: medidas, FEy, motilidad, diastólica,
+//                valvulopatía y presión pulmonar.
+//    ESFUERZO    primero la hemodinamia, después el eco post-esfuerzo.
+//    CONCLUSIÓN  toda la interpretación, y nada de interpretación fuera de acá.
+//
+//  El ECG y las arritmias no van en ningún cuadro. Única excepción: cuando el ECG
+//  cambia lo que el estudio puede afirmar —el ST ilegible por bloqueo de rama o
+//  marcapasos—, y entonces se dice una sola vez, en la conclusión.
+// ══════════════════════════════════════════════
+
+const OSECAC_BLOQUES = [
+    { id: 'reposo',     titulo: 'REPOSO' },
+    { id: 'esfuerzo',   titulo: 'ESFUERZO' },
+    { id: 'conclusion', titulo: 'CONCLUSIÓN' }
+];
+
+// La única fórmula de cierre permitida. El informe describe el hallazgo y su
+// significado; el que prescribe es el clínico que deriva.
+const CIERRE_INFORME = 'Se sugiere correlación clínica.';
+
+// Dimensiones, espesores, volumen auricular y presión pulmonar. El cuerpo del
+// informe los resume en "geometría ventricular normal"; el cuadro de Reposo los
+// pide con su número.
+function medidasReposoEnProsa(H) {
+    const partes = [];
+    if (H.ddvi) partes.push(`diámetro diastólico del ventrículo izquierdo ${nProsa(H.ddvi)} mm`);
+    if (H.sivD) partes.push(`septum interventricular ${nProsa(H.sivD)} mm`);
+    if (H.ppD) partes.push(`pared posterior ${nProsa(H.ppD)} mm`);
+    if (H.volAI) partes.push(`volumen auricular izquierdo ${nProsa(H.volAI)} mL` +
+        (H.lavi ? ` (${H.lavi})` : ''));
+    return partes.length ? unirOraciones([listarEnProsa(partes)]) : '';
+}
+
+// La presión pulmonar se informa siempre: si no se estimó, se dice que no se estimó.
+// Un cuadro de reposo sin la línea no distingue "normal" de "no medida".
+function psapEnProsa(H) {
+    return H.psapReposo
+        ? `Presión sistólica pulmonar estimada ${nProsa(H.psapReposo)} mmHg.`
+        : `Presión sistólica pulmonar ${NARRATIVA.sinDatoF}.`;
+}
+
+// Valvulopatía de base. Sale de los campos estructurados, los mismos que alimentan
+// la línea de antecedentes y la casuística.
+function valvulopatiaReposoEnProsa(H) {
+    const partes = [];
+    if (H.valvTipo) partes.push(H.valvTipoTxt.toLowerCase() +
+        (H.valvSeveridadTxt ? ' ' + H.valvSeveridadTxt : ''));
+    if (H.valvBicuspide === 'si') partes.push('válvula aórtica bicúspide');
+    return partes.length ? unirOraciones([listarEnProsa(partes)]) : 'Sin valvulopatías significativas.';
+}
+
+// El ECG fuera de los cuadros, salvo cuando cambia lo que el estudio puede afirmar.
+// Se agrega sólo si la conclusión no lo dijo ya por su cuenta: una mención, no dos.
+function ecgEnConclusionOsecac(H, conclusion) {
+    const frases = [];
+    const yaLoDice = txt => conclusion.toLowerCase().includes(txt);
+    if (!H.stInterpretable && !yaLoDice('segmento st')) {
+        const causa = H.conduccionLimita
+            ? (H.conduccionProsa && H.conduccionProsa.alTrastorno ? H.conduccionProsa.alTrastorno : 'el trastorno de conducción')
+            : 'las alteraciones del ST basal';
+        frases.push(`El análisis del segmento ST no resultó interpretable por ${causa}.`);
+    }
+    // Cambios isquémicos del ST sin correlato en la motilidad: en el informe largo
+    // esto vive en la línea de ECG, que acá no existe. Si se callara, el cuadro de
+    // conclusión afirmaría un estudio negativo sin decir que el ECG fue positivo.
+    if (H.stIsquemico && !H.isquemicos.length && !yaLoDice('discordancia')) {
+        frases.push(`Presentó cambios isquémicos del segmento ST (${descripcionSTEnProsa(H)}) sin ` +
+            `correlato en la motilidad parietal, discordancia en la que la respuesta contráctil ` +
+            `tiene mayor especificidad para isquemia miocárdica.`);
+    }
+    return frases.join(' ');
+}
+
+/**
+ * Los tres cuadros del formulario, en texto plano.
+ * @returns {{reposo: string, esfuerzo: string, conclusion: string, texto: string}}
+ */
+function informeOsecac(H) {
+    const { piezas } = construirNarrativa(H);
+
+    // ── REPOSO: sólo el eco basal ──
+    const reposo = [
+        medidasReposoEnProsa(H),
+        piezas.reposoEco,
+        mayuscula(piezas.reposoDiastolica.replace(/\.*$/, '')) + '.',
+        valvulopatiaReposoEnProsa(H),
+        psapEnProsa(H)
+    ].filter(Boolean).join(' ');
+
+    // ── ESFUERZO: la hemodinamia primero, después el eco post-esfuerzo ──
+    // Los síntomas van en el renglón de hemodinamia, salvo que la descripción del
+    // post-esfuerzo ya los haya nombrado: una vez alcanza.
+    let hemodinamia = piezas.metodo;
+    const sint = (H.sintomasEsfuerzo || '').trim();
+    if (sint && !piezas.esfuerzo.toLowerCase().includes(sint.toLowerCase()))
+        hemodinamia += ` Refirió ${sint.toLowerCase()} durante el esfuerzo.`;
+    // ── CONCLUSIÓN: toda la interpretación, y sólo acá ──
+    let conclusion = mayuscula(piezas.conclusion.replace(/^Conclusión:\s*/, ''));
+
+    // El diastólico de esfuerzo se informa como dato en el cuadro de Esfuerzo y como
+    // interpretación en el de Conclusión. Cuando la conclusión ya lo explica, acá
+    // queda sólo el resultado: si no, la misma oración sale dos veces casi igual.
+    const diastolico = /diastólico de esfuerzo/i.test(conclusion)
+        ? piezas.diastolicoEsfuerzo.replace(/^(Estudio diastólico de esfuerzo: \w+)[^]*$/, '$1.')
+        : piezas.diastolicoEsfuerzo;
+
+    const esfuerzo = [
+        hemodinamia,
+        [piezas.esfuerzo, piezas.motilidad].filter(Boolean).join(' '),
+        diastolico,
+        ...piezas.modulos
+    ].filter(Boolean).join('\n');
+    const ecg = ecgEnConclusionOsecac(H, conclusion);
+    // La fórmula de cierre se saca y se vuelve a poner al final: en el informe largo
+    // queda en medio de la conclusión, con el pronóstico y la categorización después.
+    // En el cuadro tiene que cerrar, una sola vez y como última oración.
+    conclusion = conclusion.replace(/\s*Se sugiere correlación clínica\.?/g, '').trim();
+    if (ecg) conclusion += ' ' + ecg;
+    conclusion = conclusion.replace(/\s+$/, '') + ' ' + CIERRE_INFORME;
+
+    const bloques = { reposo, esfuerzo, conclusion };
+    const texto = OSECAC_BLOQUES
+        .map(b => b.titulo + '\n' + bloques[b.id])
+        .join('\n\n');
+    return { ...bloques, texto };
 }
 
 // ── Guarda de coherencia ──────────────────────
@@ -4941,6 +5104,9 @@ function generarInforme() {
     const out = document.getElementById('reporte-output');
     out.style.display = 'block';
     out.textContent = informe;
+    // La salida para el formulario de OSECAC se arma en el mismo acto: dos botones
+    // distintos terminarían mostrando dos versiones del mismo estudio.
+    pintarInformeOsecac(H);
     HUELLA_INFORME = huellaDelEstudio();
     TEXTO_GENERADO = informe;
     marcarInformeEditado();
@@ -5769,9 +5935,15 @@ function imprimirReporte() {
     setTimeout(() => window.print(), 150);
 }
 
-function copiarReporte() {
-    const txt = document.getElementById('reporte-output').textContent;
-    if (!txt) { alert('Primero generá el informe.'); return; }
+/**
+ * Copia texto plano al portapapeles.
+ * @param {string} txt   lo que se copia, tal cual se ve en pantalla
+ * @param {string} que   cómo nombrarlo en el aviso ("El informe", "El cuadro REPOSO")
+ * @param {Element} [elemento] de dónde salió: si no se puede copiar solo, se deja
+ *                             seleccionado para copiar con Cmd+C
+ */
+function copiarTexto(txt, que, elemento) {
+    if (!txt || !txt.trim()) { alert('Primero generá el informe.'); return; }
 
     // navigator.clipboard NO existe si la página se abrió con doble clic (file://):
     // no es un contexto seguro. Sin este respaldo el botón no hacía nada ni avisaba.
@@ -5785,30 +5957,72 @@ function copiarReporte() {
         let ok = false;
         try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
         ta.remove();
-        if (ok) showNotice('Informe copiado al portapapeles.', 'ok');
+        if (ok) showNotice(`${que} se copió al portapapeles.`, 'ok');
         else {
             // Última salida: dejarlo seleccionado para que copie con Ctrl/Cmd+C
-            seleccionarInforme();
-            showNotice('No se pudo copiar solo. El informe quedó seleccionado: copiá con Cmd+C.', 'warn');
+            seleccionarTexto(elemento || document.getElementById('reporte-output'));
+            showNotice(`No se pudo copiar solo. ${que} quedó seleccionado: copiá con Cmd+C.`, 'warn');
         }
     };
 
     if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(txt)
-            .then(() => showNotice('Informe copiado al portapapeles.', 'ok'))
+            .then(() => showNotice(`${que} se copió al portapapeles.`, 'ok'))
             .catch(respaldo);
     } else {
         respaldo();
     }
 }
 
-function seleccionarInforme() {
-    const out = document.getElementById('reporte-output');
+function copiarReporte() {
+    copiarTexto(document.getElementById('reporte-output').textContent, 'El informe');
+}
+
+// ── Los tres cuadros de OSECAC ────────────────
+// Lo que se copia sale del elemento, no de una regeneración: el botón tiene que
+// entregar exactamente lo que el operador está viendo.
+function copiarBloqueOsecac(id) {
+    const b = OSECAC_BLOQUES.find(x => x.id === id);
+    const el = document.getElementById('osecac-' + id);
+    if (!b || !el) return;
+    copiarTexto(el.textContent, `El cuadro ${b.titulo}`, el);
+}
+
+function copiarOsecacTodo() {
+    const txt = OSECAC_BLOQUES
+        .map(b => {
+            const el = document.getElementById('osecac-' + b.id);
+            return b.titulo + '\n' + ((el && el.textContent) || '');
+        })
+        .join('\n\n');
+    copiarTexto(txt, 'El informe para OSECAC', document.getElementById('osecac-salida'));
+}
+
+// Pinta los tres cuadros. Se llama desde generarInforme(): una sola acción produce
+// el informe largo y la salida para el formulario, así no pueden quedar en
+// versiones distintas del mismo estudio.
+function pintarInformeOsecac(H) {
+    const caja = document.getElementById('osecac-salida');
+    if (!caja) return;
+    const bloques = informeOsecac(H);
+    OSECAC_BLOQUES.forEach(b => {
+        const el = document.getElementById('osecac-' + b.id);
+        if (el) el.textContent = bloques[b.id];
+    });
+    caja.style.display = 'block';
+}
+
+function seleccionarTexto(el) {
+    if (!el) return;
     const rango = document.createRange();
-    rango.selectNodeContents(out);
+    rango.selectNodeContents(el);
     const sel = window.getSelection();
     sel.removeAllRanges();
     sel.addRange(rango);
+}
+
+function seleccionarInforme() {
+    seleccionarTexto(document.getElementById('reporte-output'));
 }
 
 function limpiarFormulario() {

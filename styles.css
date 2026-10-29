@@ -833,6 +833,42 @@ details[open] summary::after { content: ' ▲'; }
 .reporte-output { white-space: pre-wrap; line-height: 1.55; }
 
 /* ========================================
+   SALIDA PARA EL FORMULARIO DE OSECAC
+   Tres cuadros de texto plano, cada uno con su botón de copiar. El estilo es de
+   la pantalla: lo que se copia es el texto, sin una sola marca de formato.
+   ======================================== */
+.osecac-salida { margin-top: 1.5rem; }
+.osecac-bloque { margin-bottom: 1rem; }
+.osecac-cabecera {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.35rem;
+}
+.osecac-titulo {
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    font-size: var(--font-size-sm);
+    color: var(--color-text-primary);
+}
+.osecac-texto {
+    margin: 0;
+    background: var(--color-bg-main);
+    border: 1.5px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: 1rem 1.1rem;
+    font-family: var(--font-family-mono);
+    font-size: 0.8rem;
+    line-height: 1.7;
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: var(--color-text-primary);
+    max-height: 340px;
+    overflow-y: auto;
+}
+
+/* ========================================
    PANEL DE VALIDACIÓN
    ======================================== */
 .validacion-panel {
