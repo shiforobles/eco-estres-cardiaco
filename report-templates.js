@@ -247,6 +247,12 @@ const NARRATIVA = {
 
     esfuerzoNoConcluyente: 'En los segmentos evaluables no se observaron nuevas alteraciones de la motilidad parietal.',
 
+    // Nadie registró la motilidad. Con todos los segmentos en el valor inicial, la
+    // frase de arriba afirmaba que no hubo alteraciones nuevas: "no evaluado" leído
+    // como "normal", y encima contradiciendo a la conclusión del mismo informe.
+    esfuerzoSinMotilidad: 'No se consignó la motilidad segmentaria, de modo que este estudio no permite ' +
+                       'afirmar ni descartar nuevas alteraciones de la motilidad parietal.',
+
     esfuerzoDiastolico: 'Sin nuevas alteraciones de la motilidad parietal. La relación E/e\' promedio ascendió a ' +
                        '{{eeEstres}}, con VRT de {{vrtEstres}} m/s, sin el incremento esperado de e\', hallazgos compatibles con aumento de las ' +
                        'presiones de llenado del ventrículo izquierdo inducido por el ejercicio.',

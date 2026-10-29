@@ -104,5 +104,116 @@ H2 = w2.recolectarHallazgos();
 exigir(!H2.motilidadSinConfirmar && w2.elegirRama(H2) === 'negativa',
     'con un solo gesto sobre el bull\'s eye el estudio ya es valorable');
 
+// ── 7 · Lo que salió de la pantalla sigue cargado y sigue saliendo ─
+// Un campo oculto tiene que seguir existiendo en el documento, seguir guardándose y
+// seguir apareciendo en la salida del estudio que lo trae.
+const oculto = id => {
+    const e = w.document.getElementById(id);
+    return !!e && e.closest('[aria-hidden="true"]') !== null;
+};
+['ant_dm','ant_tabaquismo','ant_dislipemia','ant_isquemia','ant_fa','ant_epoc',
+ 'ant_mcd','ant_valv'].forEach(id =>
+    exigir(oculto(id), `${id} salió de la pantalla sin borrarse`));
+exigir(!oculto('ant_hta'),
+    'la HTA se queda a la vista: cambia cómo se lee una respuesta hipertensiva');
+['fevi_recup','mot_recup','mot_recup_tiempo','ecg_st_aparicion','ecg_st_resolucion']
+    .forEach(id => exigir(oculto(id), `${id} salió de la pantalla sin borrarse`));
+exigir(!oculto('delta_fevi'),
+    'el ΔFEy reposo→pico se queda: avisa de la caída de FEy, que sí cambia el informe');
+
+// Las pestañas de los módulos que no alimentan nada quedan ocultas, con sus campos
+// intactos: un estudio guardado con esa pestaña activa la vuelve a abrir.
+['cfr','strain','mch'].forEach(t => {
+    const btn = Array.from(w.document.querySelectorAll('.special-tab'))
+        .find(b => (b.getAttribute('onclick') || '').includes(`'${t}'`));
+    exigir(btn && btn.style.display === 'none', `la pestaña de ${t} está oculta`);
+    exigir(w.document.getElementById('panel-' + t), `pero el panel de ${t} sigue en el documento`);
+});
+['cfr_vel_basal','strain_gls_rep','mch_grad_reposo'].forEach(id =>
+    exigir(w.document.getElementById(id), `${id} no se borró`));
+
+// Un estudio viejo con factores de riesgo los sigue mostrando y los sigue sacando.
+const w3 = cargarApp();
+casoBase(w3);
+w3.document.getElementById('ant_dm').checked = true;
+w3.document.getElementById('ant_tabaquismo').checked = true;
+w3.renderAntecedentesHeredados();
+const heredados = w3.document.getElementById('antecedentes-heredados');
+exigir(heredados.style.display === 'block' && /Diabetes/i.test(heredados.innerHTML),
+    'un estudio que trae factores de riesgo los muestra en el bloque de heredados');
+exigir(/diabetes/i.test(w3.recolectarHallazgos().antecedentes.join(', ')),
+    'y los sigue sacando en la línea de antecedentes del informe');
+
+// Lo oculto se sigue guardando: captureFields recorre el documento, no la pantalla.
+const guardados = w3.captureFields();
+exigir(guardados.ant_dm === true && 'mot_recup' in guardados && 'fevi_recup' in guardados,
+    'los campos ocultos se siguen guardando con el estudio');
+
+// Ningún id repetido: dos campos con el mismo id hacen que captureFields() guarde el
+// último, y el último era la copia vacía del bloque oculto. Lo escrito se perdía.
+const ids = {};
+w.document.querySelectorAll('[id]').forEach(e => { ids[e.id] = (ids[e.id] || 0) + 1; });
+const repetidos = Object.keys(ids).filter(k => ids[k] > 1);
+exigir(repetidos.length === 0, `ids repetidos en el documento: ${repetidos.join(', ')}`);
+
+// Lo escrito en notas privadas sobrevive a un guardado.
+const w8 = cargarApp();
+w8.document.getElementById('notas_privadas').value = 'paciente con mala ventana';
+exigir(w8.captureFields().notas_privadas === 'paciente con mala ventana',
+    'las notas privadas se guardan con lo que se escribió');
+
+// ── 8 · METs de la ergometría ────────────────────────────────────
+const w4 = cargarApp();
+const set4 = (id, val) => { const e = w4.document.getElementById(id); e.value = val;
+    e.dispatchEvent(new w4.Event('input', { bubbles: true }));
+    e.dispatchEvent(new w4.Event('change', { bubbles: true })); };
+set4('peso', 80); set4('ej_protocolo', 'astrand'); set4('ej_etapa', 4);
+w4.calcCargaYMets();
+exigir(Math.abs(parseFloat(w4.document.getElementById('ej_mets').value) - 5.8) < 0.2,
+    'sin el dato de la ergometría manda la fórmula del ACSM');
+set4('ej_mets_ergo', 9.2);
+exigir(w4.document.getElementById('ej_mets').value === '9.2',
+    'cargada la ergometría, el informe usa ese valor');
+exigir(w4.recolectarHallazgos().mets === 9.2,
+    'y el motor del informe lee los METs de la ergometría');
+// Y manda incluso sobre unos METs escritos a mano antes.
+const w5 = cargarApp();
+const set5 = (id, val) => { const e = w5.document.getElementById(id); e.value = val;
+    e.dispatchEvent(new w5.Event('input', { bubbles: true }));
+    e.dispatchEvent(new w5.Event('change', { bubbles: true })); };
+set5('peso', 80); set5('ej_protocolo', 'astrand'); set5('ej_etapa', 4);
+set5('ej_mets', 11);
+set5('ej_mets_ergo', 7.4);
+exigir(w5.document.getElementById('ej_mets').value === '7.4',
+    'el dato de la ergometría manda sobre unos METs escritos a mano');
+// Borrarlo devuelve el cálculo a la fórmula.
+set5('ej_mets_ergo', '');
+exigir(Math.abs(parseFloat(w5.document.getElementById('ej_mets').value) - 5.8) < 0.2,
+    'y al borrarlo vuelve la fórmula del ACSM');
+
+// ── 9 · "Todo normal" también confirma la motilidad ──────────────
+const w6 = cargarApp();
+casoBase(w6);
+exigir(w6.recolectarHallazgos().motilidadSinConfirmar,
+    'recién cargado, el estudio todavía no tiene la motilidad confirmada');
+// Y mientras no está confirmada, el bloque de Esfuerzo no puede afirmar que no hubo
+// alteraciones nuevas: los 17 segmentos están en el valor inicial, no en uno visto.
+const esfSin = informe(w6).texto.split('\n\n').find(p => p.startsWith('Esfuerzo:')) || '';
+exigir(!/no se observaron nuevas alteraciones/i.test(esfSin),
+    'sin motilidad registrada, el informe no afirma que no hubo alteraciones nuevas');
+exigir(/no se consignó la motilidad/i.test(esfSin),
+    'y dice que no se consignó');
+w6.setAllNormal('reposo');
+exigir(!w6.recolectarHallazgos().motilidadSinConfirmar,
+    '"Todo normal" cuenta como gesto sobre el bull\'s eye');
+
+// Un preset trae la motilidad ya cargada: cuenta como leída, como el historial.
+const w7 = cargarApp();
+w7.applyPreset('isquemia_da');
+exigir(!w7.recolectarHallazgos().motilidadSinConfirmar,
+    'un preset que carga la motilidad entera la deja confirmada');
+exigir(w7.elegirRama(w7.recolectarHallazgos()) === 'positivaUnico',
+    'y el preset de isquemia de DA vuelve a salir positivo');
+
 console.log(fallas ? `${fallas} FALLAS` : 'Sin fallas');
 process.exit(fallas ? 1 : 0);

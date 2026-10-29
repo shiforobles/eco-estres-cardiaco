@@ -180,23 +180,12 @@
                     <span class="firma-nota">El objetivo sigue siendo el 85 %. Si no se alcanza, la conclusión lo aclara.</span>
                 </label>
             </div>
-        </div>
-
-        <h3 class="subsection-title" style="margin-top:1.25rem">Factores de riesgo y otros</h3>
-        <p class="firma-nota" style="margin-bottom:0.6rem">
-            Salen en la línea de antecedentes del informe. La HTA además cambia cómo se
-            lee una respuesta tensional exagerada.
-        </p>
-        <div class="grid grid-3col">
-            <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="ant_hta"><label for="ant_hta">HTA</label></div>
-            <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="ant_dm"><label for="ant_dm">Diabetes</label></div>
-            <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="ant_tabaquismo"><label for="ant_tabaquismo">Tabaquismo</label></div>
-            <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="ant_dislipemia"><label for="ant_dislipemia">Dislipemia</label></div>
-            <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="ant_isquemia"><label for="ant_isquemia">C. isquémica</label></div>
-            <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="ant_fa"><label for="ant_fa">FA</label></div>
-            <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="ant_epoc"><label for="ant_epoc">EPOC / asma</label></div>
-            <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="ant_mcd"><label for="ant_mcd">MCD conocida</label></div>
-            <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="ant_valv"><label for="ant_valv">Valvulopatía conocida</label></div>
+            <div class="checkbox-group">
+                <input autocomplete="off" type="checkbox" id="ant_hta">
+                <label for="ant_hta">Hipertensión arterial
+                    <span class="firma-nota">Cambia cómo se lee una respuesta tensional exagerada con basal normal.</span>
+                </label>
+            </div>
         </div>
 
         <!-- Valvulopatía estructurada y estudio previo: alimentan el módulo de EAo y
@@ -265,9 +254,20 @@
         <!-- Campos retirados de la pantalla. No se borran: un estudio viejo los
              restaura acá y siguen alimentando su informe y su fila de planilla. -->
         <div style="display:none" aria-hidden="true">
-            <textarea id="resumen_hc"></textarea>
+            <!-- Factores de riesgo: sólo se listaban en la línea de antecedentes, sin
+                 cambiar ninguna lectura. La HTA quedó arriba porque sí la cambia. -->
+            <input type="checkbox" id="ant_dm">
+            <input type="checkbox" id="ant_tabaquismo">
+            <input type="checkbox" id="ant_dislipemia">
+            <input type="checkbox" id="ant_isquemia">
+            <input type="checkbox" id="ant_fa">
+            <input type="checkbox" id="ant_epoc">
+            <input type="checkbox" id="ant_mcd">
+            <input type="checkbox" id="ant_valv">
+            <!-- `resumen_hc` y `notas_privadas` NO van acá: ya existen más arriba y un
+                 id repetido los vaciaba al guardar. captureFields() recorre todo el
+                 documento y la segunda copia, vacía, pisaba a la primera. -->
             <textarea id="ant_otros"></textarea>
-            <textarea id="notas_privadas"></textarea>
             <input type="checkbox" id="ant_iam">
             <input type="checkbox" id="atc_da">
             <input type="checkbox" id="atc_cd">
@@ -553,9 +553,14 @@
                     <input autocomplete="off" type="text" id="ej_duracion" placeholder="Ej: 9:20">
                 </div>
                 <div class="form-group">
+                    <label for="ej_mets_ergo">METs de la ergometría <span class="firma-nota">(opcional)</span></label>
+                    <input autocomplete="off" type="number" id="ej_mets_ergo" placeholder="los del informe de la técnica" min="1" max="25" step="0.1" oninput="calcCargaYMets()">
+                    <span class="firma-nota">Si lo cargás, el informe usa este valor y no el calculado.</span>
+                </div>
+                <div class="form-group">
                     <label for="ej_mets">METs alcanzados</label>
                     <input autocomplete="off" type="number" id="ej_mets" placeholder="se calculan solos" min="1" max="25" step="0.1" oninput="marcarManual('ej_mets', 'Puestos a mano: la app ya no los recalcula.'); calcEjercicio()">
-                    <span class="firma-nota" id="mets_origen">Fórmula del ACSM para cicloergómetro, con la carga y el peso.</span>
+                    <span class="firma-nota" id="ej_mets_origen">Fórmula del ACSM para cicloergómetro, con la carga y el peso.</span>
                 </div>
                 <div class="form-group">
                     <label for="ej_causa_detencion">Causa de detención</label>
@@ -825,14 +830,14 @@
                 <label for="ecg_st_deriv">Derivaciones comprometidas</label>
                 <input autocomplete="off" type="text" id="ecg_st_deriv" placeholder="Ej: V4-V6, DII, aVF">
             </div>
-            <div class="form-group">
-                <label for="ecg_st_aparicion">Aparición (etapa / carga / FC)</label>
-                <input autocomplete="off" type="text" id="ecg_st_aparicion" placeholder="Ej: etapa 3 — 450 Kgm/min">
-            </div>
-            <div class="form-group">
-                <label for="ecg_st_resolucion">Resolución en recuperación</label>
-                <input autocomplete="off" type="text" id="ecg_st_resolucion" placeholder="Ej: 3 min">
-            </div>
+        </div>
+
+        <!-- Aparición y resolución del ST: retiradas de la pantalla. Se cargaban y no
+             salían en el informe ni en la planilla. Un estudio que las trae las sigue
+             mostrando en su resumen técnico. -->
+        <div style="display:none" aria-hidden="true">
+            <input type="text" id="ecg_st_aparicion">
+            <input type="text" id="ecg_st_resolucion">
         </div>
 
         <div class="info-banner">
@@ -888,13 +893,16 @@
                 <input autocomplete="off" type="number" id="fevi_pico" placeholder="%" min="10" max="80" oninput="calcFEVI()">
             </div>
             <div class="form-group">
-                <label for="fevi_recup">FEy Recuperación (%)</label>
-                <input autocomplete="off" type="number" id="fevi_recup" placeholder="%" min="10" max="80">
-            </div>
-            <div class="form-group">
                 <label>ΔFEy (Reposo → Pico)</label>
                 <input autocomplete="off" type="text" id="delta_fevi" class="calculated-value" disabled>
             </div>
+        </div>
+
+        <!-- Retirado de la pantalla: la FEy de recuperación no sale en el informe ni en
+             la planilla. Un estudio guardado la restaura acá y la sigue mostrando en su
+             resumen técnico. -->
+        <div style="display:none" aria-hidden="true">
+            <input type="number" id="fevi_recup">
         </div>
 
         <h3 class="subsection-title" style="margin-top:1.25rem">Estrés diastólico</h3>
@@ -1095,22 +1103,18 @@
         </select>
         <span id="patron_motilidad_origen" style="display:none"></span>
 
-        <h3 class="subsection-title" style="margin-top:1.25rem">Motilidad en Recuperación</h3>
-        <div class="grid">
-            <div class="form-group">
-                <label for="mot_recup">Comportamiento en recuperación</label>
-                <select autocomplete="off" id="mot_recup">
-                    <option value="">No evaluada</option>
-                    <option value="normalizacion">Normalización completa de la alteración</option>
-                    <option value="persiste">Persiste la alteración en recuperación</option>
-                    <option value="nueva">Aparece nueva alteración en recuperación (isquemia tardía)</option>
-                    <option value="sin_alteraciones">Sin alteraciones en ningún momento</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label for="mot_recup_tiempo">Tiempo hasta la normalización (min)</label>
-                <input autocomplete="off" type="text" id="mot_recup_tiempo" placeholder="Ej: 4 min">
-            </div>
+        <!-- Motilidad en recuperación: retirada de la pantalla. No alimentaba el
+             informe ni la planilla, sólo el resumen técnico. Los estudios que la traen
+             la siguen mostrando ahí. -->
+        <div style="display:none" aria-hidden="true">
+            <select id="mot_recup">
+                <option value="">No evaluada</option>
+                <option value="normalizacion">Normalización completa de la alteración</option>
+                <option value="persiste">Persiste la alteración en recuperación</option>
+                <option value="nueva">Aparece nueva alteración en recuperación (isquemia tardía)</option>
+                <option value="sin_alteraciones">Sin alteraciones en ningún momento</option>
+            </select>
+            <input type="text" id="mot_recup_tiempo">
         </div>
     </section>
 
@@ -1118,7 +1122,7 @@
     <div class="bloque-sep">
         <span class="bloque-num">4</span>
         <span class="bloque-nombre">Situaciones especiales</span>
-        <span class="bloque-hint">viabilidad, estenosis aórtica, CFR, strain, MCH</span>
+        <span class="bloque-hint">viabilidad y estenosis aórtica</span>
     </div>
 
     <!-- ══════════════════════════════════════
@@ -1134,9 +1138,12 @@
                 <button class="special-tab active" onclick="setSpecialTab('viabilidad')">Viabilidad</button>
                 <button class="special-tab" onclick="setSpecialTab('estenosis_ao')">EAo bajo flujo</button>
                 <button class="special-tab" onclick="setSpecialTab('eao_ejercicio')">EAo asintomática</button>
-                <button class="special-tab" onclick="setSpecialTab('cfr')">Reserva Coronaria</button>
-                <button class="special-tab" onclick="setSpecialTab('strain')">Strain / GLS</button>
-                <button class="special-tab" onclick="setSpecialTab('mch')">MCH / Chagas</button>
+                <!-- CFR, strain y MCH quedan ocultos: calculan en pantalla y no llegan
+                     al informe ni a la planilla. Los paneles siguen en el documento, así
+                     que un estudio guardado con esa pestaña activa la vuelve a abrir. -->
+                <button class="special-tab" style="display:none" aria-hidden="true" onclick="setSpecialTab('cfr')">Reserva Coronaria</button>
+                <button class="special-tab" style="display:none" aria-hidden="true" onclick="setSpecialTab('strain')">Strain / GLS</button>
+                <button class="special-tab" style="display:none" aria-hidden="true" onclick="setSpecialTab('mch')">MCH / Chagas</button>
             </div>
 
             <!-- VIABILIDAD -->

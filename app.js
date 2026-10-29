@@ -173,6 +173,10 @@ function marcarManual(id, nota) {
     scheduleSave();
 }
 
+// Devuelve el campo al control de la app. Se usa cuando aparece un dato que manda
+// sobre lo escrito a mano: los METs de la ergometría sobre los METs calculados.
+function olvidarCorreccion(id) { delete camposCorregidos[id]; }
+
 const NOTA_MANUAL = 'Corregido a mano: la app ya no lo modifica.';
 
 // Al restaurar un estudio, las notas tienen que volver a distinguir lo que puso la
@@ -895,13 +899,21 @@ function calcCargaYMets(cargaManual) {
     if (deEtapa !== null) sugerir('ej_carga', deEtapa,
         `Etapa ${num('ej_etapa')} del protocolo de Astrand. Podés corregirla.`);
 
-    const mets = metsDeCarga(num('ej_carga'), num('peso'));
+    // Los METs del informe de la técnica mandan sobre la fórmula: si los dos informes
+    // van a la misma historia clínica, no pueden decir dos capacidades distintas.
+    const metsErgo = num('ej_mets_ergo');
+    // Cargar el valor de la ergometría es un acto más explícito que haber escrito unos
+    // METs a mano antes: ése es el que el operador quiere ver en el informe.
+    if (metsErgo > 0) olvidarCorreccion('ej_mets');
+    const mets = metsErgo > 0 ? metsErgo : metsDeCarga(num('ej_carga'), num('peso'));
     if (mets !== null) {
-        sugerir('ej_mets', mets,
-            `Fórmula del ACSM para cicloergómetro, con ${num('ej_carga')} Kgm/min y ${num('peso')} kg. Podés corregirlos.`);
+        sugerir('ej_mets', mets, metsErgo > 0
+            ? 'Tomados del informe de la ergometría. La fórmula del ACSM queda de lado.'
+            : `Fórmula del ACSM para cicloergómetro, con ${num('ej_carga')} Kgm/min y ${num('peso')} kg. Podés corregirlos.`);
     } else if (!fueCorregido('ej_mets')) {
         const falta = !(num('ej_carga') > 0) ? 'la carga' : 'el peso';
-        notaOrigen('ej_mets', `Falta ${falta} para calcular los METs con la fórmula del ACSM.`);
+        notaOrigen('ej_mets', `Falta ${falta} para calcular los METs con la fórmula del ACSM, ` +
+            'o cargá los de la ergometría.');
     }
     calcEjercicio();
 }
@@ -2399,6 +2411,16 @@ const CASILLAS_HEREDADAS = [
     { id: 'atc_da',  txt: 'Angioplastia a la DA' },
     { id: 'atc_cd',  txt: 'Angioplastia a la CD' },
     { id: 'atc_cx',  txt: 'Angioplastia a la Cx' },
+    // Factores de riesgo: salieron de la pantalla porque sólo se listaban. Un estudio
+    // que los trae los sigue mostrando acá y los sigue sacando en su informe.
+    { id: 'ant_dm',         txt: 'Diabetes' },
+    { id: 'ant_tabaquismo', txt: 'Tabaquismo' },
+    { id: 'ant_dislipemia', txt: 'Dislipemia' },
+    { id: 'ant_isquemia',   txt: 'Cardiopatía isquémica' },
+    { id: 'ant_fa',         txt: 'Fibrilación auricular' },
+    { id: 'ant_epoc',       txt: 'EPOC o asma' },
+    { id: 'ant_mcd',        txt: 'Miocardiopatía dilatada' },
+    { id: 'ant_valv',       txt: 'Valvulopatía conocida' },
 ];
 
 function renderAntecedentesHeredados() {
@@ -4574,7 +4596,9 @@ function construirNarrativa(H) {
     const plantillaEsfuerzo = {
         discordancia:  T.esfuerzoDiscordancia,
         dilatada:      T.esfuerzoDilatada,
-        noConcluyente: T.esfuerzoNoConcluyente,
+        // Sin motilidad registrada no se puede decir que no hubo alteraciones nuevas:
+        // los 17 segmentos están en el valor inicial, no en uno observado.
+        noConcluyente: H.motilidadSinConfirmar ? T.esfuerzoSinMotilidad : T.esfuerzoNoConcluyente,
         hipotensiva:   T.esfuerzoHipotensiva,
         positivaMulti: T.esfuerzoPositivoMulti,
         positivaUnico: T.esfuerzoPositivoUnico,
@@ -5838,6 +5862,9 @@ function setVal(id, val) {
 
 function setWM(scores) {
     // scores = { reposo: {segId: score, ...}, estres: {segId: score, ...} }
+    // Cargar la motilidad entera cuenta como haberla leído, igual que un estudio
+    // recuperado del historial: si no, el preset sale no concluyente por sí mismo.
+    marcarMotilidadTocada();
     if (scores.reposo) Object.entries(scores.reposo).forEach(([id, sc]) => { WM.reposo[parseInt(id)] = sc; });
     if (scores.estres) Object.entries(scores.estres).forEach(([id, sc]) => { WM.estres[parseInt(id)] = sc; });
     renderBullsEye('svg-reposo', 'reposo');
@@ -5926,7 +5953,8 @@ function applyPreset(name) {
     if (P.mch_grad_estres) setVal('mch_grad_estres', P.mch_grad_estres);
     if (P.mch_sam) setVal('mch_sam', P.mch_sam);
     if (P.mch_patologia) setVal('mch_patologia', P.mch_patologia);
-    if (P.mch_grad_reposo) calcMCH();
+    // El panel de MCH está oculto: si el preset lo carga, se abre para que se vea.
+    if (P.mch_grad_reposo) { calcMCH(); setSpecialTab('mch'); }
 
     // EAo fields
     if (P.eao_grad_reposo) setVal('eao_grad_reposo', P.eao_grad_reposo);
