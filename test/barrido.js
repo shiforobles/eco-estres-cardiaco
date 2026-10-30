@@ -93,6 +93,37 @@ for (let i = 0; i < N; i++) {
             (sinConducta.match(new RegExp('.{0,80}' + re.source + '.{0,80}', re.flags)) || [m[0]])[0]);
     });
 
+    // Y cierra con ella, una sola vez y como última oración del informe. Varias ramas
+    // terminaban en "Categorización: riesgo bajo" y no la decían en ninguna parte.
+    const veces = (texto.match(/Se sugiere correlación clínica/g) || []).length;
+    if (veces !== 1)
+        reportar(`la fórmula de cierre aparece ${veces} veces, y tiene que aparecer una`,
+            texto.slice(-160));
+    const lConcl = linea(texto, 'Conclusión');
+    if (!/Se sugiere correlación clínica\.\s*$/.test(lConcl.trim()))
+        reportar('la conclusión no termina en la fórmula de cierre', lConcl.slice(-160));
+
+    // ── La salida para el formulario de OSECAC, sobre el mismo caso ──
+    // Repartir el informe en tres cuadros es recortar texto: estas dos reglas son
+    // las que un recorte mal hecho rompe primero.
+    let O;
+    try { O = w.informeOsecac(H); }
+    catch (e) { reportar('excepción en la salida de OSECAC: ' + e.message, ''); O = null; }
+    if (O) {
+        const wmsi = (O.esfuerzo.match(/WMSI/g) || []).length;
+        if (wmsi > 1) reportar(`el cuadro de esfuerzo dice el WMSI ${wmsi} veces`, O.esfuerzo.slice(-200));
+        const cierres = (O.conclusion.match(/Se sugiere correlación clínica/g) || []).length;
+        if (cierres !== 1) reportar(`el cuadro de conclusión cierra ${cierres} veces`, O.conclusion.slice(-160));
+        if (!/Se sugiere correlación clínica\.$/.test(O.conclusion.trim()))
+            reportar('el cuadro de conclusión no termina en la fórmula de cierre', O.conclusion.slice(-160));
+        // Si queda FEy post-esfuerzo cargada, el cuadro tiene que nombrarla: el
+        // recorte del WMSI se llevaba la caída de la FEy pegada a esa oración.
+        if (H.feyEstres > 0 && !/FEy/.test(O.esfuerzo))
+            reportar('el cuadro de esfuerzo perdió la FEy post-esfuerzo', O.esfuerzo.slice(-200));
+        const marca = O.texto.match(/<[a-z/!][^>]*>|\*\*|&nbsp;/i);
+        if (marca) reportar('formato en la salida de OSECAC: ' + marca[0], '');
+    }
+
     // El bloque de reposo abre siempre con el método, en prosa.
     const lRep = linea(texto, 'Reposo');
     if (!/^Reposo: Se realizó ecocardiograma con ejercicio en cicloergómetro/.test(lRep))

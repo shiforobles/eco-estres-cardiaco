@@ -282,6 +282,155 @@ CASOS.forEach(({ nombre, w }) => {
         'sin volver a generar, el botón sigue entregando lo que está en pantalla');
 }
 
+// ── Presión pulmonar: cómo se dice cuando no está ────────────────
+{
+    const w = cargarApp(); casoBase(w); todoNormal(w);
+    const O = w.informeOsecac(w.recolectarHallazgos());
+    exigir(/Presión pulmonar no estimada\./.test(O.reposo),
+        'sin el dato, el cuadro dice "Presión pulmonar no estimada"');
+}
+
+// ── 4 · Volúmenes ventriculares, opcionales ──────────────────────
+{
+    // Sin cargar, no se nombran en ninguna parte.
+    const w = cargarApp(); casoBase(w); todoNormal(w);
+    const O = w.informeOsecac(w.recolectarHallazgos());
+    exigir(!/VTD|VTS/.test(O.texto), 'sin cargar, los volúmenes no aparecen');
+
+    // Cargados, cada uno en su cuadro.
+    const w2 = cargarApp(); casoBase(w2); todoNormal(w2);
+    set(w2, 'vtd_reposo', 110); set(w2, 'vts_reposo', 42);
+    set(w2, 'vtd_pico', 104);   set(w2, 'vts_pico', 36);
+    const O2 = w2.informeOsecac(w2.recolectarHallazgos());
+    exigir(/VTD 110 mL/.test(O2.reposo) && /VTS 42 mL/.test(O2.reposo),
+        'los volúmenes de reposo salen en el cuadro de reposo');
+    exigir(/VTS post-esfuerzo 36 mL/.test(O2.esfuerzo),
+        'el VTS post-esfuerzo sale como dato en la línea del esfuerzo');
+    exigir(/VTD post-esfuerzo 104 mL/.test(O2.esfuerzo),
+        'y el VTD post-esfuerzo también');
+    exigir(!/VTD 110|VTS 42/.test(O2.esfuerzo), 'sin mezclarse con los de reposo');
+
+    // Y no mueven ningún criterio: misma rama y mismo WMSI que sin ellos.
+    const H1 = w.recolectarHallazgos(), H2 = w2.recolectarHallazgos();
+    exigir(w.elegirRama(H1) === w2.elegirRama(H2),
+        'cargar volúmenes no cambia la rama del informe');
+    exigir(H1.wmsiEstres === H2.wmsiEstres,
+        'ni el WMSI');
+    // También salen en el informe largo: un dato que se carga tiene que salir.
+    exigir(/VTD 110 mL/.test(w2.construirNarrativa(H2).texto),
+        'y el informe largo también los trae');
+}
+
+// ── 5 · El WMSI, una sola vez dentro de ESFUERZO ─────────────────
+{
+    const w = CASOS.find(c => c.nombre === 'positivo de DA').w;
+    const O = w.informeOsecac(w.recolectarHallazgos());
+    const veces = (O.esfuerzo.match(/WMSI/g) || []).length;
+    exigir(veces === 1, `el WMSI sale una vez en el cuadro de esfuerzo (salió ${veces})`);
+    exigir(/WMSI 1,00 → /.test(O.esfuerzo),
+        'y la que queda es la línea cuantitativa, con el delta y los segmentos');
+    exigir(!/El WMSI ascendió/.test(O.esfuerzo),
+        'la oración del WMSI de la descripción sale del cuadro');
+    // El informe largo conserva las dos: son párrafos distintos.
+    const texto = w.construirNarrativa(w.recolectarHallazgos()).texto;
+    exigir(/El WMSI ascendió/.test(texto) && /^Motilidad: WMSI/m.test(texto),
+        'el informe largo sigue teniendo la frase y la línea');
+}
+
+// Un territorio y FEy que cae: la plantilla de isquemia de un solo territorio NO
+// engancha la caída de la FEy a la oración del WMSI, y reconstruirla como si lo
+// hiciera dejaba la oración puesta y el índice dicho dos veces.
+{
+    const w = cargarApp(); casoBase(w); todoNormal(w);
+    puntajes(w, {}, { 1: 3, 7: 3, 13: 3 });
+    set(w, 'fevi_reposo', 58); set(w, 'fevi_pico', 52);
+    const O = w.informeOsecac(w.recolectarHallazgos());
+    const veces = (O.esfuerzo.match(/WMSI/g) || []).length;
+    exigir(veces === 1,
+        `con un territorio y caída de FEy, el WMSI sale una vez (salió ${veces})`);
+    exigir(/FEy post-esfuerzo 52 %/.test(O.esfuerzo), 'y la FEy post-esfuerzo sigue');
+}
+
+// Con caída de la FEy, sacar la oración del WMSI no puede llevarse la FEy con ella.
+{
+    const w = cargarApp(); casoBase(w); todoNormal(w);
+    // Isquemia extensa en dos territorios y FEy que cae: rama positivaMulti, que es
+    // donde la caída de la FEy viaja pegada a la oración del WMSI.
+    puntajes(w, {}, { 1: 3, 7: 3, 13: 3, 4: 3, 10: 3, 15: 3 });
+    set(w, 'fevi_reposo', 58); set(w, 'fevi_pico', 50);
+    const O = w.informeOsecac(w.recolectarHallazgos());
+    exigir(/FEy/.test(O.esfuerzo), 'la FEy post-esfuerzo sigue en el cuadro');
+    exigir(/50/.test(O.esfuerzo), 'con su número');
+    exigir((O.esfuerzo.match(/WMSI/g) || []).length === 1,
+        'y el WMSI sigue saliendo una sola vez');
+}
+
+// ── 1 · El informe largo cierra con la fórmula, una sola vez ─────
+CASOS.forEach(({ nombre, w }) => {
+    const texto = w.construirNarrativa(w.recolectarHallazgos()).texto;
+    const veces = (texto.match(/Se sugiere correlación clínica/g) || []).length;
+    exigir(veces === 1, `[${nombre}] el informe largo dice la fórmula de cierre una vez (dijo ${veces})`);
+    exigir(/Se sugiere correlación clínica\.$/.test(texto.trim()),
+        `[${nombre}] y la deja al final`);
+});
+
+// ── 3 · Los cuadros se editan, y la edición no se pisa sola ──────
+{
+    const w = positivoDA();
+    casoBase(w);
+    w.generarInforme();
+
+    const caja = id => w.document.getElementById('osecac-' + id);
+    ['reposo', 'esfuerzo', 'conclusion'].forEach(id =>
+        exigir(caja(id).getAttribute('contenteditable') === 'true',
+            `el cuadro ${id} se puede editar`));
+
+    const aviso = w.document.getElementById('osecac-editado');
+    exigir(aviso && aviso.style.display === 'none', 'recién generado, no hay aviso de edición');
+    exigir(!w.osecacFueEditado(), 'ni edición registrada');
+
+    // Se edita a mano
+    caja('conclusion').textContent = 'Mi texto corregido a mano. Se sugiere correlación clínica.';
+    w.marcarOsecacEditado();
+    exigir(w.osecacFueEditado(), 'editar un cuadro queda registrado');
+    exigir(aviso.style.display === 'block', 'y el aviso aparece');
+
+    // Copiar entrega la edición, no el texto generado
+    let copiado = null;
+    w.navigator.clipboard = { writeText: t => { copiado = t; return Promise.resolve(); } };
+    w.copiarBloqueOsecac('conclusion');
+    exigir(copiado === 'Mi texto corregido a mano. Se sugiere correlación clínica.',
+        'copiar entrega lo editado a mano');
+
+    // Regenerar pregunta antes de pisar. Si se dice que no, el texto queda.
+    w.confirm = () => false;
+    w.generarInforme();
+    exigir(caja('conclusion').textContent === 'Mi texto corregido a mano. Se sugiere correlación clínica.',
+        'al decir que no, la edición sobrevive a regenerar el informe');
+    exigir(w.osecacFueEditado(), 'y se sigue considerando editada');
+
+    // Si se dice que sí, se rehace desde los datos.
+    w.confirm = () => true;
+    w.generarInforme();
+    exigir(/Prueba de eco estrés con ejercicio positiva/.test(caja('conclusion').textContent),
+        'al decir que sí, el cuadro se rehace desde los datos');
+    exigir(!w.osecacFueEditado(), 'y deja de estar editado');
+
+    // Lo editado se guarda con el borrador: cerrar el navegador no puede costarlo.
+    caja('reposo').textContent = 'Reposo a mano.';
+    w.marcarOsecacEditado();
+    w.saveDraft();
+    const d = JSON.parse(w.localStorage.getItem('eco-estres-draft'));
+    exigir(d.osecac && d.osecac.reposo === 'Reposo a mano.',
+        'el borrador guarda los cuadros con la edición');
+    exigir(d.osecacGenerado && d.osecacGenerado.reposo !== 'Reposo a mano.',
+        'y también lo que había dejado el generador, para seguir distinguiendo una cosa de la otra');
+
+    w.restaurarCuadrosOsecac(d.osecac, d.osecacGenerado);
+    exigir(caja('reposo').textContent === 'Reposo a mano.', 'y al restaurar vuelve la edición');
+    exigir(w.osecacFueEditado(), 'reconocida como edición');
+}
+
 // ── El informe largo no se tocó ──────────────────────────────────
 // La salida para OSECAC reparte las mismas piezas: no puede haber cambiado la
 // redacción del informe que se firma.

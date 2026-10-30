@@ -3209,6 +3209,12 @@ function recolectarHallazgos() {
     H.volAI = num('volvi_reposo') || null;
     H.lavi = v('lavi_reposo');
     H.psapReposo = num('pp_reposo') || null;
+    // Volúmenes ventriculares: opcionales. Si se cargan salen en el bloque que les
+    // toca; si no, no se nombran. Ningún criterio de positividad los mira.
+    H.vtdReposo = num('vtd_reposo') || null;
+    H.vtsReposo = num('vts_reposo') || null;
+    H.vtdEstres = num('vtd_pico') || null;
+    H.vtsEstres = num('vts_pico') || null;
     // Los E/e' se calculan de sus componentes, NO se leen del campo de pantalla. Ese
     // ida y vuelta por el DOM era una trampa esperando: al formatear el campo con coma
     // decimal, parseFloat("14,5") devuelve 14 y el criterio de >14 se da vuelta solo.
@@ -4483,6 +4489,37 @@ function oracionRevascularizacion(H) {
     return partes.join('');
 }
 
+// La única fórmula de cierre permitida. El informe describe el hallazgo y su
+// significado; el que prescribe es el clínico que deriva.
+const CIERRE_INFORME = 'Se sugiere correlación clínica.';
+
+// La deja una sola vez y como última oración. Las plantillas la traen en el medio
+// —el párrafo pronóstico y la categorización se agregan después— y en varias ramas
+// no la traían en absoluto.
+function cerrarConFormula(texto) {
+    return texto
+        .replace(/\s*Se sugiere correlación clínica\.?/g, '')
+        .replace(/\s+$/, '') + ' ' + CIERRE_INFORME;
+}
+
+// La FEy post-esfuerzo con su delta. Sale en el bloque de esfuerzo de las dos
+// salidas; se escribe en un solo lugar para que digan el mismo número igual.
+function feyEstresEnProsa(H) {
+    if (!(H.feyEstres > 0)) return '';
+    return `FEy post-esfuerzo ${H.feyEstres} %` +
+        (H.deltaFey !== null ? ` (Δ ${H.deltaFey >= 0 ? '+' : ''}${H.deltaFey} puntos)` : '') + '.';
+}
+
+// Volúmenes ventriculares, cuando están cargados. Son opcionales: si no se miden,
+// no se nombran. No intervienen en ningún criterio de positividad.
+function volumenesEnProsa(vtd, vts, sufijo) {
+    const s = sufijo ? ' ' + sufijo : '';
+    const partes = [];
+    if (vtd > 0) partes.push(`VTD${s} ${nProsa(vtd)} mL`);
+    if (vts > 0) partes.push(`VTS${s} ${nProsa(vts)} mL`);
+    return partes.length ? mayuscula(listarEnProsa(partes)) + '.' : '';
+}
+
 function construirNarrativa(H) {
     const T = NARRATIVA;
     const rama = elegirRama(H);
@@ -4573,6 +4610,9 @@ function construirNarrativa(H) {
     // redactarlas por su cuenta sin que los dos informes se separen con el tiempo.
     piezas.metodo = metodoEnProsa(H);
     piezas.reposoEco = H.reposoLibre || bloqueReposo(H, datosReposo, datosConduccion, hayAsincronia);
+    // Volúmenes de reposo: opcionales, y si se cargaron tienen que salir.
+    piezas.volumenesReposo = volumenesEnProsa(H.vtdReposo, H.vtsReposo, '');
+    if (piezas.volumenesReposo) piezas.reposoEco += ' ' + piezas.volumenesReposo;
     piezas.reposoDiastolica = bloqueDiastolicaReposo(H);
     linea(T.lineaReposo, [
         piezas.metodo,
@@ -4639,8 +4679,18 @@ function construirNarrativa(H) {
         textoEsfuerzo += ' ' + rellenar(T.parrafoSinParReposo, datosReposo);
     // La FEy de esfuerzo se informa siempre, no sólo en las ramas que la nombraban
     if (H.feyEstres > 0 && !/FEy/.test(textoEsfuerzo))
-        textoEsfuerzo += ` FEy post-esfuerzo ${H.feyEstres} %` +
-            (H.deltaFey !== null ? ` (Δ ${H.deltaFey >= 0 ? '+' : ''}${H.deltaFey} puntos)` : '') + '.';
+        textoEsfuerzo += ' ' + feyEstresEnProsa(H);
+    // Volúmenes post-esfuerzo: opcionales, como los de reposo.
+    piezas.volumenEstres = volumenesEnProsa(H.vtdEstres, H.vtsEstres, 'post-esfuerzo');
+    if (piezas.volumenEstres) textoEsfuerzo += ' ' + piezas.volumenEstres;
+    // La oración del WMSI, tal como quedó armada: el cuadro de OSECAC la saca para no
+    // decir el índice dos veces, y necesita el texto exacto para sacarlo entero. Son
+    // dos formas porque sólo la plantilla de isquemia multiterritorial le engancha la
+    // caída de la FEy; reconstruir una sola dejaba la oración puesta en la otra rama.
+    piezas.oracionesWmsi = [
+        `El WMSI ${datosEsfuerzo.frasewmsi}${datosEsfuerzo.caidaFey}.`,
+        `El WMSI ${datosEsfuerzo.frasewmsi}.`
+    ];
     piezas.esfuerzo = textoEsfuerzo;
     linea(T.lineaEsfuerzo, textoEsfuerzo);
 
@@ -4776,6 +4826,10 @@ function construirNarrativa(H) {
     // La conclusión que escribe el operador cierra el informe: antes se cargaba y no
     // aparecía en ninguna parte.
     if (H.conclusionLibre) conclusion += rellenar(T.conclusionLibre, { texto: H.conclusionLibre });
+    // La fórmula de cierre va última, siempre y una sola vez. Varias ramas no la
+    // traían —un estudio negativo terminaba en "Categorización: riesgo bajo"— y en
+    // las que sí, el párrafo pronóstico y la categorización quedaban después de ella.
+    conclusion = cerrarConFormula(conclusion);
     piezas.conclusion = conclusion;
     parrafos.push(conclusion);
 
@@ -4813,10 +4867,6 @@ const OSECAC_BLOQUES = [
     { id: 'conclusion', titulo: 'CONCLUSIÓN' }
 ];
 
-// La única fórmula de cierre permitida. El informe describe el hallazgo y su
-// significado; el que prescribe es el clínico que deriva.
-const CIERRE_INFORME = 'Se sugiere correlación clínica.';
-
 // Dimensiones, espesores, volumen auricular y presión pulmonar. El cuerpo del
 // informe los resume en "geometría ventricular normal"; el cuadro de Reposo los
 // pide con su número.
@@ -4835,7 +4885,7 @@ function medidasReposoEnProsa(H) {
 function psapEnProsa(H) {
     return H.psapReposo
         ? `Presión sistólica pulmonar estimada ${nProsa(H.psapReposo)} mmHg.`
-        : `Presión sistólica pulmonar ${NARRATIVA.sinDatoF}.`;
+        : 'Presión pulmonar no estimada.';
 }
 
 // Valvulopatía de base. Sale de los campos estructurados, los mismos que alimentan
@@ -4903,19 +4953,32 @@ function informeOsecac(H) {
         ? piezas.diastolicoEsfuerzo.replace(/^(Estudio diastólico de esfuerzo: \w+)[^]*$/, '$1.')
         : piezas.diastolicoEsfuerzo;
 
+    // El WMSI se dice una sola vez, en la línea cuantitativa: ahí además viene con el
+    // delta, los segmentos comprometidos y qué quedó excluido del índice. Sale la
+    // oración entera, y la caída de la FEy que viajaba pegada a ella vuelve sola.
+    let textoEsfuerzo = piezas.esfuerzo;
+    const oracionWmsi = (piezas.oracionesWmsi || []).find(o => textoEsfuerzo.includes(o));
+    if (oracionWmsi) {
+        textoEsfuerzo = textoEsfuerzo
+            .replace(' ' + oracionWmsi, '')
+            .replace(oracionWmsi, '')
+            .trim();
+        if (!/FEy/.test(textoEsfuerzo)) {
+            const fey = feyEstresEnProsa(H);
+            if (fey) textoEsfuerzo += ' ' + fey;
+        }
+    }
+
     const esfuerzo = [
         hemodinamia,
-        [piezas.esfuerzo, piezas.motilidad].filter(Boolean).join(' '),
+        [textoEsfuerzo, piezas.motilidad].filter(Boolean).join(' '),
         diastolico,
         ...piezas.modulos
     ].filter(Boolean).join('\n');
     const ecg = ecgEnConclusionOsecac(H, conclusion);
-    // La fórmula de cierre se saca y se vuelve a poner al final: en el informe largo
-    // queda en medio de la conclusión, con el pronóstico y la categorización después.
-    // En el cuadro tiene que cerrar, una sola vez y como última oración.
-    conclusion = conclusion.replace(/\s*Se sugiere correlación clínica\.?/g, '').trim();
-    if (ecg) conclusion += ' ' + ecg;
-    conclusion = conclusion.replace(/\s+$/, '') + ' ' + CIERRE_INFORME;
+    // El agregado del ECG entra antes del cierre: la fórmula tiene que seguir siendo
+    // la última oración.
+    if (ecg) conclusion = cerrarConFormula(conclusion).replace(CIERRE_INFORME, ecg + ' ' + CIERRE_INFORME);
 
     const bloques = { reposo, esfuerzo, conclusion };
     const texto = OSECAC_BLOQUES
@@ -5998,18 +6061,74 @@ function copiarOsecacTodo() {
     copiarTexto(txt, 'El informe para OSECAC', document.getElementById('osecac-salida'));
 }
 
+// ── Edición a mano de los cuadros ─────────────
+// Misma protección que el informe largo: lo que dejó el generador se recuerda, y si
+// lo que está en pantalla difiere, la diferencia la escribió el operador y no se
+// pisa sin preguntar.
+let TEXTO_OSECAC = {};
+
+function osecacFueEditado() {
+    return OSECAC_BLOQUES.some(b => {
+        const el = document.getElementById('osecac-' + b.id);
+        if (!el || TEXTO_OSECAC[b.id] === undefined) return false;
+        return el.textContent.trim() !== TEXTO_OSECAC[b.id].trim();
+    });
+}
+
+function marcarOsecacEditado() {
+    const aviso = document.getElementById('osecac-editado');
+    if (aviso) aviso.style.display = osecacFueEditado() ? 'block' : 'none';
+    scheduleSave();
+}
+
 // Pinta los tres cuadros. Se llama desde generarInforme(): una sola acción produce
 // el informe largo y la salida para el formulario, así no pueden quedar en
 // versiones distintas del mismo estudio.
 function pintarInformeOsecac(H) {
     const caja = document.getElementById('osecac-salida');
     if (!caja) return;
+    caja.style.display = 'block';
+
+    // Una edición a mano no se pisa en silencio: la decisión es del operador.
+    if (osecacFueEditado() && !confirm(
+            'Editaste a mano los cuadros para OSECAC.\n\n' +
+            'Aceptar: rehacerlos desde los datos actuales. Se PIERDE tu edición.\n' +
+            'Cancelar: dejarlos como los escribiste.')) {
+        marcarOsecacEditado();
+        return;
+    }
+
     const bloques = informeOsecac(H);
     OSECAC_BLOQUES.forEach(b => {
         const el = document.getElementById('osecac-' + b.id);
         if (el) el.textContent = bloques[b.id];
+        TEXTO_OSECAC[b.id] = bloques[b.id];
     });
-    caja.style.display = 'block';
+    marcarOsecacEditado();
+}
+
+// Lo que hay en los cuadros ahora mismo, con la edición incluida. Se guarda con el
+// borrador: cerrar el navegador no puede costar una corrección escrita a mano.
+function cuadrosOsecacEnPantalla() {
+    const o = {};
+    OSECAC_BLOQUES.forEach(b => {
+        const el = document.getElementById('osecac-' + b.id);
+        if (el && el.textContent.trim()) o[b.id] = el.textContent;
+    });
+    return o;
+}
+
+function restaurarCuadrosOsecac(guardados, generados) {
+    const caja = document.getElementById('osecac-salida');
+    if (!caja) return;
+    TEXTO_OSECAC = (generados && typeof generados === 'object') ? { ...generados } : {};
+    const hay = guardados && Object.keys(guardados).length;
+    OSECAC_BLOQUES.forEach(b => {
+        const el = document.getElementById('osecac-' + b.id);
+        if (el) el.textContent = (guardados && guardados[b.id]) || '';
+    });
+    caja.style.display = hay ? 'block' : 'none';
+    marcarOsecacEditado();
 }
 
 function seleccionarTexto(el) {
@@ -6046,6 +6165,7 @@ function resetFormulario() {
     updateWMSI();
 
     document.getElementById('reporte-output').style.display = 'none';
+    restaurarCuadrosOsecac(null, null);   // paciente nuevo: los cuadros arrancan vacíos
     document.getElementById('resultado-banner').style.display = 'none';
     document.getElementById('validacion-panel').style.display = 'none';
     setFechaHoy();
@@ -6239,7 +6359,12 @@ function saveDraft() {
         corregidos: { ...camposCorregidos },
             // El informe ya redactado también se guarda: si se cierra el navegador
             // después de generarlo, vuelve tal cual y no hay que rehacerlo.
-            reporte: document.getElementById('reporte-output').textContent || ''
+            reporte: document.getElementById('reporte-output').textContent || '',
+            // Los cuadros de OSECAC, con la edición a mano si la hubo, y lo que el
+            // generador había dejado: sin lo segundo, al volver no se puede saber
+            // qué parte del texto la escribió el operador.
+            osecac: cuadrosOsecacEnPantalla(),
+            osecacGenerado: { ...TEXTO_OSECAC }
         };
         localStorage.setItem(draftKeyActual, JSON.stringify(draft));
     } catch (e) {
@@ -6375,6 +6500,7 @@ function aplicarEstudio(d) {
         out.textContent = '';
         out.style.display = 'none';
     }
+    restaurarCuadrosOsecac(d.osecac, d.osecacGenerado);
 }
 
 

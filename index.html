@@ -296,6 +296,16 @@
                 <label for="volvi_reposo">Volumen AI (mL) — Reposo</label>
                 <input autocomplete="off" type="number" id="volvi_reposo" placeholder="mL" min="10" max="200">
             </div>
+            <!-- Volúmenes ventriculares: opcionales. Si se cargan salen en el informe;
+                 si no, no se nombran. No intervienen en ningún criterio. -->
+            <div class="form-group">
+                <label for="vtd_reposo">VTD reposo (mL) <span class="firma-nota">(opcional)</span></label>
+                <input autocomplete="off" type="number" id="vtd_reposo" placeholder="mL" min="20" max="500">
+            </div>
+            <div class="form-group">
+                <label for="vts_reposo">VTS reposo (mL) <span class="firma-nota">(opcional)</span></label>
+                <input autocomplete="off" type="number" id="vts_reposo" placeholder="mL" min="5" max="400">
+            </div>
             <div class="form-group">
                 <label for="ddvi">DDVI (mm)</label>
                 <input autocomplete="off" type="number" id="ddvi" placeholder="mm" min="25" max="80" step="0.5" onchange="calcGeometria()">
@@ -885,6 +895,16 @@
             <div class="form-group">
                 <label>ΔFEy (Reposo → Pico)</label>
                 <input autocomplete="off" type="text" id="delta_fevi" class="calculated-value" disabled>
+            </div>
+            <!-- Opcionales, como los de reposo. El VTS post-esfuerzo sale como dato en
+                 la línea del esfuerzo; no mueve ningún criterio de positividad. -->
+            <div class="form-group">
+                <label for="vtd_pico">VTD post-esfuerzo (mL) <span class="firma-nota">(opcional)</span></label>
+                <input autocomplete="off" type="number" id="vtd_pico" placeholder="mL" min="20" max="500">
+            </div>
+            <div class="form-group">
+                <label for="vts_pico">VTS post-esfuerzo (mL) <span class="firma-nota">(opcional)</span></label>
+                <input autocomplete="off" type="number" id="vts_pico" placeholder="mL" min="5" max="400">
             </div>
         </div>
 
@@ -1573,12 +1593,19 @@
                 <button type="button" class="btn btn-primary" onclick="copiarOsecacTodo()">📋 Copiar todo</button>
             </div>
 
+            <div id="osecac-editado" class="aviso-desactualizado" style="display:none">
+                ✎ <strong>Editaste estos cuadros a mano.</strong> Al volver a generar el informe
+                se te pregunta si querés conservar tu texto o rehacerlos desde los datos.
+                "Copiar" entrega siempre lo que estás viendo, con tu edición.
+            </div>
+
             <div class="osecac-bloque">
                 <div class="osecac-cabecera">
                     <span class="osecac-titulo">REPOSO</span>
                     <button type="button" class="btn btn-secondary btn-sm" onclick="copiarBloqueOsecac('reposo')">Copiar</button>
                 </div>
-                <pre id="osecac-reposo" class="osecac-texto"></pre>
+                <pre id="osecac-reposo" class="osecac-texto" contenteditable="true" spellcheck="true"
+                     oninput="marcarOsecacEditado()" aria-label="Cuadro REPOSO, editable"></pre>
             </div>
 
             <div class="osecac-bloque">
@@ -1586,7 +1613,8 @@
                     <span class="osecac-titulo">ESFUERZO</span>
                     <button type="button" class="btn btn-secondary btn-sm" onclick="copiarBloqueOsecac('esfuerzo')">Copiar</button>
                 </div>
-                <pre id="osecac-esfuerzo" class="osecac-texto"></pre>
+                <pre id="osecac-esfuerzo" class="osecac-texto" contenteditable="true" spellcheck="true"
+                     oninput="marcarOsecacEditado()" aria-label="Cuadro ESFUERZO, editable"></pre>
             </div>
 
             <div class="osecac-bloque">
@@ -1594,7 +1622,8 @@
                     <span class="osecac-titulo">CONCLUSIÓN</span>
                     <button type="button" class="btn btn-secondary btn-sm" onclick="copiarBloqueOsecac('conclusion')">Copiar</button>
                 </div>
-                <pre id="osecac-conclusion" class="osecac-texto"></pre>
+                <pre id="osecac-conclusion" class="osecac-texto" contenteditable="true" spellcheck="true"
+                     oninput="marcarOsecacEditado()" aria-label="Cuadro CONCLUSIÓN, editable"></pre>
             </div>
         </div>
     </section>
