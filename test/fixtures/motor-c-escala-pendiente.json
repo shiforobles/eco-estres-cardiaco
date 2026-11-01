@@ -1,0 +1,47 @@
+{
+  "estado": "PROPUESTA_NO_ACTIVADA",
+  "alcance": "Regresiones propuestas para la entrada al Motor C, sin cambiar A5, WM ni el motor diagnóstico de estrés",
+  "casos": [
+    {
+      "nombre": "Aquinesia apical no debe confundirse con disquinesia",
+      "reposoEstres": { "13": 4, "4": 2 },
+      "entradaCPropuesta": { "13": 3, "4": 2 },
+      "patronChagasTrasConversion": false,
+      "nota": "Hoy puede emitir patrón chagásico; no se corrige en esta tanda"
+    },
+    {
+      "nombre": "Disquinesia apical llega al grado disquinético del C",
+      "reposoEstres": { "13": 5, "4": 2 },
+      "entradaCPropuesta": { "13": 4, "4": 2 },
+      "patronChagasTrasConversion": true,
+      "nota": "Coincidencia de la regla actual del C, no diagnóstico clínico validado; su presencia en el informe requiere aprobación"
+    },
+    {
+      "nombre": "Las dos hipoquinesias se conservan en A5 y se reúnen sólo en C",
+      "reposoEstres": { "1": 2, "7": 3 },
+      "entradaCPropuesta": { "1": 2, "7": 2 },
+      "entradaA5SinCambio": { "1": 2, "7": 3 },
+      "patronChagasTrasConversion": false
+    },
+    {
+      "nombre": "Disquinesia sin compromiso inferobasal no cumple regla chagásica",
+      "reposoEstres": { "13": 5 },
+      "entradaCPropuesta": { "13": 4 },
+      "patronChagasTrasConversion": false
+    },
+    {
+      "nombre": "El ápex sigue fuera del C",
+      "reposoEstres": { "17": 5 },
+      "entradaCPropuesta": { "17": 1 },
+      "entradaA5SinCambio": { "17": 5 },
+      "patronChagasTrasConversion": false
+    }
+  ],
+  "invariantes": [
+    "No modificar WM ni puntajes guardados",
+    "No cambiar WMSI, exclusiones ni evaluabilidad",
+    "No cambiar ramas, territorios isquémicos ni conclusión diagnóstica",
+    "No editar vendor/doppler/",
+    "Decidir explícitamente qué inferencias se permiten antes de activar la conversión"
+  ]
+}

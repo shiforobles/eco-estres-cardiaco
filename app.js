@@ -3608,11 +3608,19 @@ function conc(segs, singular, plural) {
     return (segs || []).length === 1 ? singular : plural;
 }
 
-// Grado predominante (el peor) de un conjunto de segmentos
-function gradoEnProsa(segs, campo) {
+// Cada grupo conserva su puntaje: el peor grado no describe a los demás.
+// Es sólo redacción; no cambia las listas de respuesta, territorios ni WMSI.
+function motilidadPorGrados(segs, campo) {
     if (!segs.length) return 'alteración de la motilidad';
-    const peor = Math.max(...segs.map(s => s[campo] || 0));
-    return GRADO_PROSA[peor] || 'alteración de la motilidad';
+    const nombres = {
+        2: 'hipoquinesia leve', 3: 'hipoquinesia moderada',
+        4: 'aquinesia', 5: 'disquinesia'
+    };
+    const grupos = [5, 4, 3, 2].map(grado => {
+        const miembros = segs.filter(s => s[campo] === grado);
+        return miembros.length ? `${nombres[grado]} ${deSegmentos(miembros)}` : '';
+    }).filter(Boolean);
+    return listarEnProsa(grupos).replace(/ y hipoquinesia/g, ' e hipoquinesia');
 }
 
 // Frase de acompañamiento: cambios del ST y/o síntomas.
@@ -4346,8 +4354,7 @@ function renderComparacionMotilidad() {
 // construirNarrativa(). Antes vivían sueltos ahí adentro.
 function datosReposoDe(H) {
     return {
-        gradoReposo: gradoEnProsa(H.anormalesReposo, 'scoreReposo'),
-        deSegmentosReposo: deSegmentos(H.anormalesReposo),
+        motilidadReposo: motilidadPorGrados(H.anormalesReposo, 'scoreReposo'),
         territorioReposoFrase: fraseTerritorioReposo(H),
     };
 }
@@ -4573,7 +4580,6 @@ function construirNarrativa(H) {
         fey: H.feyReposo || nada,
         ee: nProsa(H.eeReposo) || nada,
         vrt: nProsa(H.vrtReposo) || nada,
-        gradoSecuela: gradoEnProsa(H.secuelas, 'scoreReposo'),
         segmentosSecuela: segmentosEnProsa(H.secuelas),
         deSegmentosSecuela: deSegmentos(H.secuelas),
         segmentosSecuelaArt: conc(H.secuelas, 'El segmento', 'Los segmentos'),
@@ -4582,7 +4588,7 @@ function construirNarrativa(H) {
         territorioSecuelaFrase: fraseTerritorioSecuela(H),
         // Motilidad basal: describe TODO lo anormal en reposo, cualquiera haya sido
         // su respuesta al esfuerzo.
-        gradoReposo: gradoEnProsa(H.anormalesReposo, 'scoreReposo'),
+        motilidadReposo: motilidadPorGrados(H.anormalesReposo, 'scoreReposo'),
         segmentosReposo: segmentosEnProsa(H.anormalesReposo),
         deSegmentosReposo: deSegmentos(H.anormalesReposo),
         territorioReposoFrase: fraseTerritorioReposo(H),
@@ -4625,7 +4631,7 @@ function construirNarrativa(H) {
     // ST-T en las del ECG: antes la redacción de esta línea cambiaba según la TA.
     const acompanamiento = acompanamientoEnProsa(H);
     const datosEsfuerzo = {
-        grado: gradoEnProsa(H.isquemicos, 'scoreEstres'),
+        motilidadEsfuerzo: motilidadPorGrados(H.isquemicos, 'scoreEstres'),
         segmentos: segmentosEnProsa(H.isquemicos),
         deSegmentos: deSegmentos(H.isquemicos),
         territorio: territoriosEnProsa(H.territoriosIsquemia),
@@ -4640,7 +4646,7 @@ function construirNarrativa(H) {
         acompanamiento: acompanamiento,
         caidaFey: H.caidaFey ? `, con caída de la FEy de ${H.feyReposo} % a ${H.feyEstres} % post-esfuerzo` : '',
         hallazgos: H.isquemicos.length
-            ? `nuevas alteraciones de la motilidad en los segmentos ${segmentosEnProsa(H.isquemicos)}`
+            ? `nuevas alteraciones de la motilidad: ${motilidadPorGrados(H.isquemicos, 'scoreEstres')}`
             : 'los hallazgos descritos',
         feyReposo: H.feyReposo || nada,
         feyEstres: H.feyEstres || nada,

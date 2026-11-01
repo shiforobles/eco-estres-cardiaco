@@ -76,8 +76,8 @@ const NARRATIVA = {
     // clasificación de respuesta al esfuerzo: la variante de secuela se usa sólo
     // cuando todos los segmentos basales anormales quedaron sin cambio con el esfuerzo.
     reposoMotilidadNormal:   'motilidad parietal normal',
-    reposoMotilidadAlterada: '{{gradoReposo}} {{deSegmentosReposo}} ({{territorioReposoFrase}})',
-    reposoMotilidadSecuela:  '{{gradoReposo}} {{deSegmentosReposo}} ({{territorioReposoFrase}}), en relación con evento previo',
+    reposoMotilidadAlterada: '{{motilidadReposo}} ({{territorioReposoFrase}})',
+    reposoMotilidadSecuela:  '{{motilidadReposo}} ({{territorioReposoFrase}}), en relación con evento previo',
     reposoMotilidadGlobal:   'hipoquinesia global, sin distribución en territorio coronario',
 
     // Lo que le pasó con el esfuerzo a un segmento basal anormal. Antes, si mejoraba
@@ -222,11 +222,11 @@ const NARRATIVA = {
     esfuerzoNegativo:  'Adecuada respuesta hiperdinámica global, sin nuevas alteraciones de la motilidad parietal ' +
                        'en ninguno de los territorios evaluados.',
 
-    esfuerzoPositivoUnico: 'Nueva {{grado}} {{deSegmentos}}, con caída del engrosamiento sistólico ' +
+    esfuerzoPositivoUnico: 'Nueva {{motilidadEsfuerzo}}, con caída del engrosamiento sistólico ' +
                        'respecto del reposo, en {{territorioFrase}}. El WMSI {{frasewmsi}}.' +
                        '{{acompanamiento}} El resto de los segmentos mostró adecuada respuesta hiperdinámica.',
 
-    esfuerzoPositivoMulti: 'Nuevas alteraciones de la motilidad en los segmentos {{segmentos}}, con compromiso ' +
+    esfuerzoPositivoMulti: 'Nuevas alteraciones de la motilidad: {{motilidadEsfuerzo}}, con compromiso ' +
                        'de más de un territorio coronario ({{territorios}}). El WMSI {{frasewmsi}}{{caidaFey}}.' +
                        '{{acompanamiento}} El hallazgo de isquemia extensa y multiterritorial constituye un marcador de alto riesgo.',
 
