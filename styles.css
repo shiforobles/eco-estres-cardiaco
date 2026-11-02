@@ -213,6 +213,23 @@ textarea { resize: vertical; min-height: 2.5rem; }
 .checkbox-group input[type="checkbox"] { width: 1rem; height: 1rem; cursor: pointer; accent-color: var(--color-primary); }
 .checkbox-group label { font-size: var(--font-size-sm); cursor: pointer; margin: 0; }
 
+/* Ayudas de carga: controles siempre visibles, explicación a pedido. */
+.antecedentes-compactos { gap: 0.25rem 1rem; }
+.antecedentes-compactos .checkbox-group { min-height: 44px; min-width: 0; padding: 0; }
+.antecedentes-compactos label { flex: 1; padding: 0.5rem 0; }
+.antecedentes-compactos input { flex-shrink: 0; }
+.ayuda-carga { margin: 0.6rem 0; font-size: var(--font-size-sm); color: var(--color-text-secondary); }
+.ayuda-carga > summary, .completud-detalle > summary { cursor: pointer; padding: 0.5rem 0; }
+.ayuda-carga > summary:focus-visible, .completud-detalle > summary:focus-visible,
+.tabla-detallada > summary:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 3px; }
+.ayuda-carga dl, .ayuda-carga ul { margin: 0.5rem 0; line-height: 1.5; }
+.ayuda-carga dt { font-weight: 600; margin-top: 0.45rem; }
+.ayuda-carga dd { margin-left: 0; }
+.ayuda-carga li { margin-bottom: 0.3rem; }
+.completud-detalle { margin: 0.75rem 0; font-size: var(--font-size-sm); }
+#completud-resumen { margin-left: 0.5rem; color: var(--color-text-secondary); }
+.completud-detalle.con-errores > summary, .completud-detalle.con-errores #completud-resumen { color: var(--color-error); font-weight: 600; }
+
 /* ── BUTTONS ── */
 .btn {
     display: inline-flex;
@@ -669,6 +686,7 @@ details[open] summary::after { content: ' ▲'; }
     .bulls-eye-container { flex-direction: column; }
     .bulls-eye-arrow { transform: rotate(90deg); }
     .grid { grid-template-columns: 1fr 1fr; }
+    .antecedentes-compactos { grid-template-columns: 1fr; }
     .protocol-tabs { gap: 0.25rem; }
     .protocol-tab { font-size: 0.75rem; padding: 0.4rem 0.6rem; }
 }

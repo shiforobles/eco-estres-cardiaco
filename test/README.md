@@ -23,6 +23,7 @@ npm test
 | `harness.js` | Carga la app y da los helpers (`casoBase`, `todoNormal`, `informe`, `linea`) |
 | `motilidad-reposo.js` | Que la línea de Reposo se lea del bull's eye de reposo y no de la clasificación de respuesta al esfuerzo |
 | `motilidad-grados-mixtos.js` | Que cada grupo conserve su grado basal o post-esfuerzo, y que cambiar el motor textual no cambie puntajes, índices ni diagnóstico |
+| `formulario-agil.js` | Persistencia aditiva de la aclaración, recuperación de registros antiguos, salidas sin cambios y validación activa con el panel plegado |
 | `medidas-vi.js` | Que una medida implausible del VI no produzca un RWT o una masa con cara de resultado |
 | `parrafo-pronostico.js` | Niveles, fusión de extensión, tope y exentos del párrafo pronóstico |
 | `barrido.js` | 800 casos al azar contra todas las invariantes a la vez |

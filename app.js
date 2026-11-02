@@ -5049,7 +5049,7 @@ function motivoNoConcluyente(H) {
 let HUELLA_INFORME = null;
 
 // Campos que NO alimentan el informe: cambiarlos no lo desactualiza.
-const CAMPOS_AJENOS_AL_INFORME = ['categorizacion', 'firma_medico', 'paciente_nombre'];
+const CAMPOS_AJENOS_AL_INFORME = ['categorizacion', 'firma_medico', 'paciente_nombre', 'indicacion_aclaracion'];
 
 function huellaDelEstudio() {
     const campos = {};
@@ -5330,6 +5330,15 @@ function validarEstudio(rama) {
 function mostrarValidacion(av) {
     const panel = document.getElementById('validacion-panel');
     if (!panel) return true;
+    const resumen = document.getElementById('completud-resumen');
+    const detalle = document.getElementById('completud-detalle');
+    const errores = av.filter(a => a.nivel === 'error').length;
+    const avisos = av.length - errores;
+    if (resumen) resumen.textContent = av.length
+        ? [errores ? `${errores} ${errores === 1 ? 'error' : 'errores'}` : '',
+           avisos ? `${avisos} ${avisos === 1 ? 'aviso' : 'avisos'}` : ''].filter(Boolean).join(' · ')
+        : 'Sin observaciones';
+    if (detalle) detalle.classList.toggle('con-errores', errores > 0);
     if (!av.length) {
         panel.style.display = 'block';
         panel.className = 'validacion-panel val-ok';
@@ -6174,6 +6183,10 @@ function resetFormulario() {
     restaurarCuadrosOsecac(null, null);   // paciente nuevo: los cuadros arrancan vacíos
     document.getElementById('resultado-banner').style.display = 'none';
     document.getElementById('validacion-panel').style.display = 'none';
+    const completud = document.getElementById('completud-detalle');
+    if (completud) { completud.open = false; completud.classList.remove('con-errores'); }
+    const resumenCompletud = document.getElementById('completud-resumen');
+    if (resumenCompletud) resumenCompletud.textContent = 'Sin comprobar';
     setFechaHoy();
     medicacionActual = [];
     renderMedicacion();
@@ -6463,7 +6476,9 @@ function aplicarEstudio(d) {
     // dato no distingue CRM de ATC y el informe no puede elegir uno por él.
     CRM_AMBIGUO = !d.crmSoloCirugia;
 
-    restoreFields(d.fields);
+    // Campo aditivo: un estudio anterior sin esta clave no hereda la aclaración
+    // del paciente que estaba en pantalla. No se descartan ni migran borradores.
+    restoreFields({ indicacion_aclaracion: '', ...(d.fields || {}) });
     // El "Resumen de HC" de los estudios viejos pasa a "Otros antecedentes
     // relevantes", que sí sale en el informe.
     migrarResumenHC();
