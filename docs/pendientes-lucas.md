@@ -59,10 +59,14 @@ Las tandas 2–5 siguen pendientes. No se activaron propuestas clínicas anterio
 
 ## Tanda 2 — Automatización y diastólico
 
-Estado: pendiente. No implementar por implicación de la tanda 1.
+Estado: diagnóstico y propuesta conjunta preparados; implementación pendiente de
+aprobación. Ver `docs/propuesta-tanda-2.md`. No se cambió el comportamiento.
 
-- [ ] Revisar geometría del VI automática y trazabilidad del criterio aplicado.
-- [ ] Revisar diastología automática de reposo y esfuerzo y sus dependencias.
+- [x] Relevar geometría del VI y trazabilidad; detectado automático obsoleto al borrar una medida.
+- [ ] Implementar panel automático y manejo de correcciones tras aprobación.
+- [x] Relevar motores basales/de esfuerzo, dependencias y texto libre basal.
+- [x] Reproducir Indeterminado → No evaluado y aviso incorrecto; propuesta conjunta y textos preparados.
+- [ ] Implementar conexión y textos aprobados, conservando los criterios actuales.
 - [ ] Resolver la pérdida de **Indeterminado → No evaluado** entre cálculo,
   selector oculto, informe largo y OSECAC.
 - [ ] Distinguir no realizado, evaluación incompleta con mediciones faltantes,
@@ -78,7 +82,9 @@ Estado: pendiente. No implementar por implicación de la tanda 1.
 - [ ] Resolver controles de presión pulmonar/VD tras comprobar dependencias; no
   agregar por rutina TAPSE, S' o FAC ni modificar criterios en esta tanda visual.
 
-Textos propuestos y migración pendiente: `docs/propuestas-tanda-1.md`.
+Propuesta vigente de esta tanda: `docs/propuesta-tanda-2.md`; antecedente de
+textos/motores: `docs/propuestas-tanda-1.md`. Cinco decisiones agrupadas, sin
+activar cambios clínicos. Mantener PP/VD y texto libre por sus dependencias.
 
 ## Tanda 3 — Indicaciones y módulos
 
