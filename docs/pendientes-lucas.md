@@ -59,11 +59,24 @@ Las tandas 2–5 siguen pendientes. No se activaron propuestas clínicas anterio
 
 ## Tanda 2 — Automatización y diastólico
 
-Estado: diagnóstico y propuesta conjunta preparados; implementación pendiente de
-aprobación. Ver `docs/propuesta-tanda-2.md`. No se cambió el comportamiento.
+Estado: **simplificación basal implementada** según actualización de Lucas del
+02/11/2026. La conexión del diastólico de esfuerzo y sus textos siguen pendientes.
+La propuesta inicial de conservar controles visibles quedó reemplazada por este
+pedido explícito; `docs/propuesta-tanda-2.md` conserva el diagnóstico histórico.
 
 - [x] Relevar geometría del VI y trazabilidad; detectado automático obsoleto al borrar una medida.
-- [ ] Implementar panel automático y manejo de correcciones tras aprobación.
+- [x] Reemplazar selector visible de geometría por panel automático con resultado,
+  cifras, criterios y faltantes. Retirar automáticos obsoletos al perder medidas.
+- [x] Reemplazar selector visible basal diastólico por panel calculado; sin datos
+  suficientes mostrar no clasificable. Conservar los criterios actuales.
+- [x] Retirar de la interfaz texto libre basal, presión pulmonar estimada y función
+  de VD, sin reubicarlos en desplegables. Los nodos internos y sus valores se
+  mantienen sólo por compatibilidad/persistencia, sin acceso por teclado.
+- [x] Conservar banderas y valores manuales; mostrar resultado calculado separado
+  del utilizado en el informe, con advertencia específica de discrepancia.
+- [x] No descartar borradores ni subir DRAFT_VERSION. Conservar los informes
+  editados y campos históricos; avisar en pantalla cuando hay datos retirados
+  que siguen alimentando informe/módulos.
 - [x] Relevar motores basales/de esfuerzo, dependencias y texto libre basal.
 - [x] Reproducir Indeterminado → No evaluado y aviso incorrecto; propuesta conjunta y textos preparados.
 - [ ] Implementar conexión y textos aprobados, conservando los criterios actuales.
@@ -79,12 +92,43 @@ aprobación. Ver `docs/propuesta-tanda-2.md`. No se cambió el comportamiento.
 - [ ] Conservar correcciones manuales antiguas y su procedencia; mostrarlas para
   revisión sin borrarlas ni ignorarlas. Resultado efectivo coherente en pantalla,
   copiloto, informes e historial.
-- [ ] Resolver controles de presión pulmonar/VD tras comprobar dependencias; no
-  agregar por rutina TAPSE, S' o FAC ni modificar criterios en esta tanda visual.
+- [x] Revisar dependencias de PP/VD: retirar controles, conservar lógica interna.
+  No agregar TAPSE, S' ni FAC. Pendiente clínico: resolver los supuestos de PP y
+  cómo cargar información excepcional de VD sin reintroducir campos de rutina.
 
 Propuesta vigente de esta tanda: `docs/propuesta-tanda-2.md`; antecedente de
 textos/motores: `docs/propuestas-tanda-1.md`. Cinco decisiones agrupadas, sin
-activar cambios clínicos. Mantener PP/VD y texto libre por sus dependencias.
+activar cambios clínicos de esfuerzo. PP/VD y texto libre se conservan como datos
+internos, **no como controles visibles**. No borrar valores para simplificar UI.
+
+Pruebas de cierre: `basales-automaticos.js` cubre cuatro geometrías/ambos sexos,
+normal/I/II/III/indeterminada/incompleta basal, borrado de medidas, plausibilidad,
+correcciones, borrador, historial e informe editado. Comparación contra `acf6a82`
+de ambos informes y fila Sheets: idénticos para caso completo automático y caso
+con datos/correcciones heredados. Navegador PC: cinco controles sin representación
+visual, resultados calculados y actualización al borrar datos; sin desborde.
+No se modificaron plantillas ni criterios de esfuerzo. Batería completa `cd test && npm test` terminó con código 0: sin fallas,
+incluidos 800 casos propios y 400 con texto Doppler. Entrega en el commit de
+simplificación basal; no equivale a cerrar el diastólico de esfuerzo.
+
+### Dependencias conservadas tras retirar controles
+
+- `pp_reposo`: `psapSugerida()`/`autocompletarInterpretacion()` siguen estimando
+  con VRT basal y PAD asumida de 5, tal como antes. Informe, `datosEAoEjercicio()`
+  y módulos siguen leyendo el dato interno. No se agregó ni cambió ese supuesto.
+  Sin VRT ni valor heredado, no se crea una presión; ya no hay entrada manual
+  de rutina para una medición independiente. Su futura carga excepcional queda pendiente.
+- `vd_funcion`: sólo disponía de selección manual; no existe motor que deduzca
+  la función de VD. Para nuevos estudios queda sin evaluación, sin inventar
+  normalidad ni introducir mediciones. Valores históricos siguen en informe/Sheets.
+- `reposo_libre`: el dato histórico sigue sustituyendo `piezas.reposoEco` y llega
+  a ambos informes; conservarlo evita cambios de contenido por retirar el control.
+  Su presencia se avisa en pantalla. No hay editor basal libre nuevo ni desplegable.
+- Los manuales se reconocen por `corregidos`; no se inventa autor/fecha ni se
+  atribuye al algoritmo una corrección. Las plantillas actuales, incluyendo su
+  forma de describir diastología sin grado, quedan para revisión de informe.
+- Corregir la pérdida de indeterminado de esfuerzo y sus avisos **no está incluido
+  en este commit**; tampoco se aprobó la actualización ASE 2025.
 
 ## Tanda 3 — Indicaciones y módulos
 
@@ -96,8 +140,8 @@ Estado: pendiente.
 - [ ] Orientar los módulos al protocolo de ejercicio y separar dobutamina.
 - [ ] Mantener la identificación de gradiente/PSAP post-esfuerzo y el tiempo de
   adquisición; no confundirlos con datos medidos durante el pedaleo.
-- [ ] Revisar texto libre basal y sus dependencias junto con las tandas 2–4;
-  conservar lo persistido y evitar doble redacción o pérdida de datos.
+- [x] Texto libre basal retirado de la interfaz en tanda 2; conservar sus datos.
+- [ ] Revisar la doble redacción histórica en tanda 4 sin pérdida de datos.
 
 ## Tanda 4 — Informe OSECAC
 
@@ -112,7 +156,7 @@ Estado: pendiente. Requiere un ejemplo aprobado antes de cambiar contenido clín
   de aprobación. Definir aparte si debe viajar a Sheets y cómo conservar su contrato.
 - [ ] Resolver interpretación/resultado tras comprobar sus dependencias; no ocultar
   ni eliminar ahora los campos persistidos.
-- [ ] Verificar el comportamiento del texto libre basal al reorganizar los bloques.
+- [ ] Conciliar textos libres basales históricos con los bloques; su control ya fue retirado en tanda 2.
 
 El **segundo formato/informe largo y su reordenamiento quedan postergados**. En
 esta tanda visual no se mueve la hemodinamia que hoy aparece bajo Reposo.

@@ -87,6 +87,15 @@ document.addEventListener('DOMContentLoaded', () => {
         if (el) el.addEventListener('change', calcEjercicio);
     });
 
+    // Sólo la presentación/conexión basal: mismos cálculos y mismos cortes.
+    ['peso', 'altura', 'sexo', 'ddvi', 'siv_d', 'pp_d', 'fevi_reposo',
+     'e_onda_rep', 'a_onda_rep', 'e_prima_rep', 'e_prima_lat_rep', 'vrt_rep', 'volvi_reposo']
+        .forEach(id => ['input', 'change'].forEach(ev =>
+            document.getElementById(id).addEventListener(ev, () => {
+                calcGeometria(); calcDiastolico();
+            })));
+    calcGeometria(); calcDiastolico();
+
     // Cambiar el trastorno de conducción reclasifica los segmentos septales:
     // hay que rehacer el resumen de motilidad y el aviso del WMSI.
     ['change', 'input'].forEach(ev =>
@@ -309,11 +318,51 @@ function medidasVI() {
     return { ddvi, siv, pp, bsa, masa, imvi, rwt, problemas: [] };
 }
 
+// Vista automática separada del valor efectivo conservado para informes antiguos.
+// Los selects ocultos mantienen IDs, opciones y persistencia; no son controles de carga.
+function pintarResultadoBasal(id, calculado, nombres, nota) {
+    const panel = document.getElementById(id + '_calculo');
+    const aviso = document.getElementById(id + '_discrepancia');
+    const campo = document.getElementById(id);
+    const txt = valor => nombres[valor] || 'No clasificable con los datos disponibles';
+    if (panel) panel.textContent = txt(calculado);
+    if (aviso) {
+        const manual = fueCorregido(id);
+        aviso.hidden = !manual;
+        aviso.textContent = manual
+            ? `Corrección manual guardada: ${textoSelect(id) || 'No evaluada'}. ` +
+              `Se conserva como resultado utilizado en el informe. Cálculo actual: ${txt(calculado)}.` +
+              (campo.value !== (calculado || '') ? ' Difiere del cálculo automático; revisar el estudio recuperado.' : '')
+            : '';
+    }
+    // La nota del cálculo permanece visible aun con una corrección histórica.
+    if (fueCorregido(id)) notaOrigen(id, 'Corrección manual conservada. ' + (nota || ''), true);
+}
+
+function mostrarDatosBasalesHeredados() {
+    const aviso = document.getElementById('datos-basales-heredados-aviso');
+    if (!aviso) return;
+    const datos = [];
+    if (v('reposo_libre')) datos.push('descripción libre de reposo');
+    if (v('pp_reposo') && fueCorregido('pp_reposo')) datos.push('presión pulmonar corregida manualmente');
+    if (v('vd_funcion')) datos.push('función del ventrículo derecho');
+    aviso.hidden = !datos.length;
+    aviso.textContent = datos.length
+        ? 'Datos conservados del estudio: ' + listarEnProsa(datos) +
+          '. Sus controles ya no se muestran; los valores siguen disponibles para el informe y los módulos. No fueron borrados.'
+        : '';
+}
+
 function calcGeometria() {
     const { ddvi, siv, pp, bsa, masa, imvi, rwt, problemas } = medidasVI();
 
     const setVal2 = (id, txt) => { const el = document.getElementById(id); if (el) el.value = txt; };
     const box = document.getElementById('geometria_criterios');
+    const pintar = (valor, nota) => pintarResultadoBasal('geometria_vi', valor, {
+        normal: 'Geometría ventricular normal', remodelado: 'Remodelado concéntrico',
+        hvi_concentrica: 'Hipertrofia ventricular concéntrica',
+        hvi_excentrica: 'Hipertrofia ventricular excéntrica'
+    }, nota);
 
     // Medida implausible: los campos derivados quedan vacíos, no se propone geometría
     // y el problema se dice al lado del campo. Lo mismo vuelve a salir en la
@@ -326,6 +375,7 @@ function calcGeometria() {
                 `<div class="criterio-ase criterio-alto">▲ ${p}</div>`).join('');
         }
         sugerir('geometria_vi', '', problemas[0]);
+        pintar('', problemas[0]);
         return;
     }
 
@@ -336,8 +386,10 @@ function calcGeometria() {
         if (!(ddvi > 0)) faltan.push('el DDVI');
         if (!(siv > 0)) faltan.push('el septum');
         if (!(pp > 0)) faltan.push('la pared posterior');
-        sugerir('geometria_vi', undefined, faltan.length
-            ? `Falta ${listarEnProsa(faltan)} para calcular la masa y el espesor relativo.` : '');
+        const nota = faltan.length
+            ? `Falta ${listarEnProsa(faltan)} para calcular la masa y el espesor relativo.` : '';
+        sugerir('geometria_vi', '', nota);
+        pintar('', nota);
         return;
     }
 
@@ -345,8 +397,9 @@ function calcGeometria() {
     if (imvi === null) {
         setVal2('imvi', '');
         if (box) { box.style.display = 'none'; box.innerHTML = ''; }
-        sugerir('geometria_vi', undefined,
-            `Masa ${nProsa(masa, 0)} g y RWT ${nProsa(rwt, 2)}. Falta el peso y la altura para indexar la masa.`);
+        const nota = `Masa ${nProsa(masa, 0)} g y RWT ${nProsa(rwt, 2)}. Falta el peso y la altura para indexar la masa.`;
+        sugerir('geometria_vi', '', nota);
+        pintar('', nota);
         return;
     }
 
@@ -361,7 +414,9 @@ function calcGeometria() {
         ? (espesorAlto ? 'hvi_concentrica' : 'hvi_excentrica')
         : (espesorAlto ? 'remodelado' : 'normal');
 
-    sugerir('geometria_vi', geo, 'Deducido de la masa indexada y el espesor relativo. Podés corregirlo.');
+    const notaGeo = 'Calculado desde las medidas basales, la masa indexada y el espesor relativo.';
+    sugerir('geometria_vi', geo, notaGeo);
+    pintar(geo, notaGeo);
 
     if (box) {
         box.style.display = 'block';
@@ -496,7 +551,9 @@ function presionesLlenadoEnProsa(grado) {
 
 function autocompletarDiastolicaReposo() {
     const R = clasificarDiastolica();
-    sugerir('diast_grado', R.grado === null ? undefined : R.grado, notaDiastolica(R));
+    const nota = notaDiastolica(R).replace(/ Podés corregirlo\./g, '');
+    sugerir('diast_grado', R.grado === null ? '' : R.grado, nota);
+    pintarResultadoBasal('diast_grado', R.grado, DIAST_GRADO_PROSA, nota);
 
     // Los criterios, uno por uno, con su corte: es la parte que permite discutir
     // el veredicto en vez de aceptarlo.
@@ -6191,6 +6248,7 @@ function resetFormulario() {
     medicacionActual = [];
     renderMedicacion();
     camposCorregidos = {};   // paciente nuevo: la app vuelve a proponer todo
+    calcGeometria(); calcDiastolico(); mostrarDatosBasalesHeredados();
     setProtocol('ejercicio');
     setSpecialTab('viabilidad');
     updateChecklistBadge();
@@ -6478,7 +6536,8 @@ function aplicarEstudio(d) {
 
     // Campo aditivo: un estudio anterior sin esta clave no hereda la aclaración
     // del paciente que estaba en pantalla. No se descartan ni migran borradores.
-    restoreFields({ indicacion_aclaracion: '', ...(d.fields || {}) });
+    restoreFields({ indicacion_aclaracion: '', reposo_libre: '', pp_reposo: '',
+        vd_funcion: '', geometria_vi: '', diast_grado: '', ...(d.fields || {}) });
     // El "Resumen de HC" de los estudios viejos pasa a "Otros antecedentes
     // relevantes", que sí sale en el informe.
     migrarResumenHC();
@@ -6505,6 +6564,8 @@ function aplicarEstudio(d) {
     updateResultBanner(); updateChecklistBadge();
     // Las notas vuelven a decir si el valor lo puso la app o lo corregiste vos
     refrescarNotasOrigen();
+    calcGeometria(); autocompletarDiastolicaReposo();
+    mostrarDatosBasalesHeredados();
 
     medicacionActual = Array.isArray(d.medicacion) ? d.medicacion.map(m => ({ ...m })) : [];
     renderMedicacion();

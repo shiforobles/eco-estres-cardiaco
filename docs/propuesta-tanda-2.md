@@ -1,6 +1,12 @@
 # Tanda 2 — diagnóstico y propuesta conjunta
 
-Estado: **para decidir; sin implementación**. Código revisado en `728fbfd`.
+Estado histórico: propuesta inicial revisada en `728fbfd`. **Actualización de
+Lucas del 02/11/2026:** implementar sólo simplificación de paneles basales y retirar
+texto libre/PP/VD de la interfaz. La recomendación original de conservar controles
+visibles/corrección secundaria queda sustituida. Mantener datos internos y
+correcciones históricas con aviso; no cambiar informes. Textos y conexión del
+diastólico de esfuerzo continúan sin implementar. Estado vigente en
+`docs/pendientes-lucas.md`.
 Los criterios descritos son los que ejecuta la app, no una validación nueva de guía.
 No se actualiza a ASE 2025, no se cambia Motor C ni el segundo formato.
 
