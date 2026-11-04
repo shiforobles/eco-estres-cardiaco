@@ -108,7 +108,12 @@ const HEADERS_DOPPLER = [
   "ATC/Stent",
   "Recambio Ao",
   "Recambio Mitral",
-  "Observaciones"
+  "Observaciones",
+  // La app de Doppler ya mandaba esta columna; faltaba acá (04/11/2026).
+  "MCH JSON v1",
+  // Identificador del estudio (última): el upsert por 'ID' reemplaza la fila en vez
+  // de duplicarla, igual que en la hoja de Estrés.
+  "ID"
 ];
 
 // ESQUEMA ESTRÉS v4 — 75 columnas. Generado del contrato de la app
