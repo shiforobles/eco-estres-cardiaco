@@ -1559,7 +1559,7 @@
         </div>
         <div id="informe-desactualizado" class="aviso-desactualizado" style="display:none">
             ⚠ <strong>Este informe quedó desactualizado.</strong> Cambiaste datos después de generarlo.
-            Al guardar en el historial o en la planilla se regenera solo, para que el texto y los datos
+            Al guardar en la planilla se regenera solo, para que el texto y los datos
             sean la misma versión.
         </div>
         <div id="reporte-output" class="reporte-output" style="display:none"
@@ -1693,61 +1693,6 @@
     <!-- ══════════════════════════════════════
          PANELES LATERALES (se abren desde la botonera y el encabezado)
          ══════════════════════════════════════ -->
-    <div class="panel-lateral" id="panel-historial" hidden role="dialog" aria-modal="true" aria-labelledby="panel-historial-titulo">
-        <div class="panel-lateral__fondo" onclick="cerrarPanel()"></div>
-        <div class="panel-lateral__caja">
-            <div class="panel-lateral__cabecera">
-                <h2 id="panel-historial-titulo">Historial y casuística</h2>
-                <button type="button" class="panel-lateral__cerrar" onclick="cerrarPanel()" aria-label="Cerrar">✕</button>
-            </div>
-    <section class="card" id="card-historial">
-        <details open>
-            <summary class="section-title" style="cursor:pointer; list-style:none; display:flex; justify-content:space-between; align-items:center; margin-bottom:0">
-                Historial de Estudios <span class="badge-secondary" id="historial-badge">0</span>
-            </summary>
-            <p class="module-description" style="margin-top:0.75rem">
-                Los estudios guardados quedan en <strong>este navegador y esta computadora</strong> (localStorage). No se envían a ningún servidor.
-                Son un <strong>respaldo dentro de la jornada</strong>, no un archivo: se descartan solos a las 12 horas y el registro
-                definitivo es el informe firmado en la historia clínica.
-            </p>
-            <div class="historial-acciones">
-                <button class="btn btn-secondary btn-sm" onclick="exportarJornada(false)">⬇ Exportar jornada</button>
-                <button class="btn btn-secondary btn-sm" onclick="exportarJornada(true)">⬇ Exportar sin datos del paciente</button>
-                <button class="btn btn-danger btn-sm" onclick="cerrarJornada()">🔒 Cerrar jornada</button>
-                <span class="historial-nota">Vacía el historial de esta computadora. Usalo al terminar el día.</span>
-            </div>
-            <div class="historial-acciones">
-                <button class="btn btn-secondary btn-sm" onclick="mostrarRevisionEscalaWMSI()">⚠ Revisar por cambio de escala del WMSI</button>
-                <span class="historial-nota">Hasta el 25/10/2026 el WMSI iba inflado y podía disparar la frase del 5 % anual sin corresponder. Recalcula los estudios guardados acá.</span>
-            </div>
-            <div id="revision-wmsi" style="display:none; margin-top:0.75rem"></div>
-            <div id="historial-lista"></div>
-        </details>
-    </section>
-    <section class="card" id="card-casuistica">
-        <details open>
-            <summary class="section-title" style="cursor:pointer; list-style:none; display:flex; justify-content:space-between; align-items:center; margin-bottom:0">
-                Casuística <span class="badge-secondary" id="casuistica-badge">0</span>
-            </summary>
-            <p class="module-description" style="margin-top:0.75rem">
-                Cuando un estudio se descarta del historial, sus datos identificatorios se borran y la parte clínica queda acá.
-                <strong>No vence.</strong> Sirve para revisar tu serie y para compartir casos sin tener que anonimizar a mano.
-            </p>
-            <div class="historial-acciones">
-                <button class="btn btn-secondary btn-sm" onclick="exportarCasuistica()">⬇ Exportar casuística</button>
-                <button class="btn btn-danger btn-sm" onclick="borrarCasuistica()">🗑 Borrar casuística</button>
-            </div>
-            <div class="form-group" style="margin-bottom:0.5rem">
-                <input autocomplete="off" type="search" id="casuistica-buscar"
-                    placeholder="Buscar en los antecedentes: bicúspide, chagas, marcapasos…"
-                    oninput="buscarCasuistica()">
-                <span class="firma-nota">Busca en los antecedentes, la valvulopatía y el texto del informe.</span>
-            </div>
-            <div id="casuistica-resumen"></div>
-        </details>
-    </section>
-        </div>
-    </div>
 
     <div class="panel-lateral" id="panel-sync" hidden role="dialog" aria-modal="true" aria-labelledby="panel-sync-titulo">
         <div class="panel-lateral__fondo" onclick="cerrarPanel()"></div>
@@ -1763,17 +1708,13 @@
             </summary>
             <p class="module-description" style="margin-top:0.75rem">
                 Cada estudio se agrega como una fila a una hoja de Google Sheets, con el informe completo en la última columna.
-                <strong>Se guarda una copia local antes de enviar.</strong> El navegador no permite leer la respuesta del script,
-                así que la app <em>no puede saber</em> si el estudio llegó: quedan en el respaldo hasta que mires la planilla
-                y confirmes. Si algo no llegó, se reenvía o se exporta a CSV.
+                Se envía <strong>directo al Sheet</strong>, sin copia local. El navegador no permite leer la respuesta del script,
+                así que la app <em>no puede confirmar</em> la recepción: si alguna vez falla, lo vas a ver al revisar la planilla.
+                Guardar dos veces el mismo estudio <strong>reemplaza la fila anterior</strong> por la versión nueva, no la duplica.
             </p>
             <div class="historial-acciones">
                 <button class="btn btn-secondary btn-sm" onclick="abrirConfigPlanilla()">⚙ Configurar planilla</button>
-                <button class="btn btn-secondary btn-sm" onclick="reintentarPendientes()">↻ Reenviar</button>
-                <button class="btn btn-secondary btn-sm" onclick="exportarPlanillaCSV()">⬇ Exportar CSV</button>
-                <button class="btn btn-secondary btn-sm" onclick="confirmarEnviados()">✓ Confirmar recepción</button>
             </div>
-            <div id="planilla-estado"></div>
         </details>
     </section>
     <section class="card">
@@ -1787,7 +1728,6 @@
             <section class="card">
                 <h2 class="section-title">Otras salidas</h2>
                 <div class="historial-acciones">
-                    <button type="button" class="btn btn-secondary btn-sm" onclick="abrirPanel('historial')">🗂️ Historial y casuística (estudios guardados antes)</button>
                     <button type="button" class="btn btn-secondary btn-sm" onclick="imprimirReporte()">🖨️ Imprimir informe</button>
                     <button type="button" class="btn btn-secondary btn-sm" onclick="generarReporte()">📊 Planilla de datos (dobutamina / dipiridamol)</button>
                 </div>
@@ -1837,8 +1777,8 @@
 <script src="pearls.js?v=2.3-estetica-1"></script>
 <script src="motility-groups.js?v=2.2"></script>
 <script src="report-templates.js?v=2.2-grados-1"></script>
-<script src="sheets-storage.js?v=2.2"></script>
-<script src="app.js?v=2.4-antecedentes-1"></script>
+<script src="sheets-storage.js?v=2.4-id"></script>
+<script src="app.js?v=2.4-guardar"></script>
 <script>
 // Control de versión: si el navegador sirvió una mezcla de archivos viejos y nuevos,
 // los botones fallan en silencio. Esto lo convierte en un aviso visible.

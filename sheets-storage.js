@@ -3,8 +3,8 @@
    ================================================
 
    Mismo patrón que la app de Eco Doppler —una fila plana por estudio,
-   enviada a un Apps Script que la agrega a una hoja— con cuatro
-   correcciones sobre aquel diseño, tomadas de mirar la planilla real:
+   enviada a un Apps Script que la agrega a una hoja— con estas correcciones
+   sobre aquel diseño, tomadas de mirar la planilla real:
 
    1. Los ratios viajan como NÚMERO, no como texto, y el script les fuerza
       formato numérico. En la planilla de Doppler, Sheets interpretó E/e'
@@ -12,11 +12,17 @@
    2. La columna Informe se llena siempre: si no se generó, se genera.
    3. Hay una columna Resultado con valor categórico único, para poder
       graficar sin parsear texto.
-   4. Va el identificador, no el nombre del paciente.
+   4. Va el identificador de HC, no el nombre del paciente.
 
-   Además, acá el estudio se guarda LOCAL ANTES de intentar el envío. El
-   POST usa mode:'no-cors', que entrega pero impide leer la respuesta: sin
-   respaldo, un script caído hace perder el estudio sin aviso.
+   El estudio se envía DIRECTO al Sheet: sin copia local, sin cola, sin
+   contador. El POST usa mode:'no-cors', que entrega pero impide leer la
+   respuesta, así que la app no puede confirmar la recepción; si alguna vez
+   falla, se ve al revisar la planilla.
+
+   Para no duplicar filas, cada estudio lleva un ID propio (columna 'ID',
+   última). El ID se arma al empezar el estudio y se mantiene mientras sea el
+   mismo: guardar dos veces manda el MISMO id y el Apps Script REEMPLAZA la
+   fila en vez de agregar otra. Un estudio nuevo lleva un id nuevo.
    ================================================ */
 
 const EstresSheets = {
@@ -24,7 +30,6 @@ const EstresSheets = {
     URL_KEY:   'ecoestres_script_url',
     HOJA_KEY:  'ecoestres_hoja',
     SHEET_KEY: 'ecoestres_sheet_url',
-    COLA_KEY:  'ecoestres_cola_envio',
     HOJA_DEF:  'Estrés',
 
     getUrl()          { return localStorage.getItem(this.URL_KEY) || ''; },
@@ -74,8 +79,13 @@ const EstresSheets = {
         "E/e' reposo", "E/e' esfuerzo", 'VRT reposo', 'VRT esfuerzo', 'Diastólico esfuerzo',
         // Resultado
         'Resultado', 'Categorización', 'Avisos',
-        // Texto completo, al final
-        'Informe'
+        // Texto completo
+        'Informe',
+        // Identificador propio del estudio, para no duplicar filas al reguardar.
+        // Última columna: así agregarlo no corre ninguna de las anteriores ni cambia
+        // los índices de formato numérico. En el Apps Script, si el ID ya está en la
+        // hoja se reemplaza esa fila; si no, se agrega.
+        'ID'
     ],
 
     // Columnas que Sheets puede confundir con fechas si van como texto.
@@ -94,7 +104,7 @@ const EstresSheets = {
         if (rama === 'positivaMulti') return 'multiterritorial';
         if (rama === 'positivaUnico' || rama === 'hipotensiva') {
             // Un ápex comprometido en bloque toca tres territorios por anatomía: no es
-            // multiterritorial y no debe contarse como tal en la casuística.
+            // multiterritorial y no debe contarse como tal.
             if (H.patronApical) return 'positivo apical';
             if (H.territoriosIsquemia.length > 1) return 'multiterritorial';
             const t = H.territoriosIsquemia[0];
@@ -118,7 +128,14 @@ const EstresSheets = {
         return txt;
     },
 
-    construirFila(informe) {
+    // Identificador de reserva: sólo se usa si el llamador no pasó uno (p. ej. los
+    // tests). En la app el id lo arma y lo mantiene app.js, para que guardar dos
+    // veces el mismo estudio mande el mismo id.
+    idDeReserva() {
+        return 'ee-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+    },
+
+    construirFila(informe, id) {
         const H = recolectarHallazgos();
         const nada = '-';
         const t = x => (x === null || x === undefined || x === '' || Number.isNaN(x)) ? nada : x;
@@ -138,6 +155,7 @@ const EstresSheets = {
 
         const cat = evaluarCategorizacion();
         const avisos = evaluarAvisosClinicos().map(a => a.titulo).join(' | ');
+        const idEstudio = id || this.idDeReserva();
 
         return [
             fechaEst, v('paciente_id') || nada,
@@ -192,56 +210,10 @@ const EstresSheets = {
             cat.noConcluyente ? 'no categorizable' : cat.nivel,
             avisos || nada,
 
-            this.limpiarInforme(informe) || nada
+            this.limpiarInforme(informe) || nada,
+
+            idEstudio
         ];
-    },
-
-    // ── Cola de envíos pendientes ──
-    leerCola() {
-        try { return JSON.parse(localStorage.getItem(this.COLA_KEY)) || []; }
-        catch (e) { return []; }
-    },
-    COLA_MAX: 200,
-
-    // Nunca se descarta un pendiente en silencio: antes `slice(0, 200)` cortaba el
-    // final de la lista, que es justo donde se agregan los nuevos, así que el envío
-    // 201 desaparecía y el aviso igual decía que había quedado local. Y el catch vacío
-    // ocultaba un almacenamiento lleno.
-    guardarCola(c) {
-        if (c.length > this.COLA_MAX) {
-            return { ok: false, motivo: 'COLA_LLENA', pendientes: c.length, max: this.COLA_MAX };
-        }
-        try {
-            localStorage.setItem(this.COLA_KEY, JSON.stringify(c));
-            return { ok: true, pendientes: c.length };
-        } catch (e) {
-            return { ok: false, motivo: 'ALMACENAMIENTO_LLENO', detalle: String(e && e.message || e) };
-        }
-    },
-    // Identificador propio del estudio: sin esto, reintentar podía duplicar la fila
-    // si el primer envío sí había llegado y lo que falló fue la respuesta.
-    nuevoId() {
-        return 'ee-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
-    },
-
-    encolar(fila, etiqueta, id) {
-        const cola = this.leerCola();
-        cola.push({ ts: Date.now(), id: id || this.nuevoId(), etiqueta, fila, enviado: false });
-        const ts = cola[cola.length - 1].ts;
-        const r = this.guardarCola(cola);
-        // El resultado del guardado viaja al llamador: sólo puede decir "quedó local"
-        // quien sepa que efectivamente se escribió.
-        return { ...r, ts, pendientes: cola.length };
-    },
-    marcarEnviado(ts) {
-        const cola = this.leerCola().map(x => x.ts === ts ? { ...x, enviado: true } : x);
-        this.guardarCola(cola);
-    },
-    quitarDeCola(ts) {
-        this.guardarCola(this.leerCola().filter(x => x.ts !== ts));
-    },
-    pendientes() {
-        return this.leerCola().filter(x => !x.enviado);
     },
 
     async enviar(fila) {
@@ -304,16 +276,34 @@ function doPost(e) {
       });
     }
 
-    sheet.appendRow(data.row);
+    // Upsert por ID: si la fila trae un id ya presente en la columna 'ID', se
+    // reemplaza esa fila en vez de agregar otra. Así, reguardar un estudio
+    // corregido deja en la planilla la versión final, no dos filas.
+    var idCol = HEADERS_ESTRES.indexOf('ID') + 1;
+    var destino = 0;
+    if (idCol > 0 && data.row[idCol - 1] !== '' && data.row[idCol - 1] != null) {
+      var ultima = sheet.getLastRow();
+      if (ultima >= 2) {
+        var ids = sheet.getRange(2, idCol, ultima - 1, 1).getValues();
+        for (var i = 0; i < ids.length; i++) {
+          if (String(ids[i][0]) === String(data.row[idCol - 1])) { destino = i + 2; break; }
+        }
+      }
+    }
 
-    // Y se reafirma en la fila recién escrita, por si la columna se reformateó
-    const fila = sheet.getLastRow();
+    if (destino) {
+      sheet.getRange(destino, 1, 1, data.row.length).setValues([data.row]);
+    } else {
+      sheet.appendRow(data.row);
+      destino = sheet.getLastRow();
+    }
+
     COLUMNAS_NUMERICAS.forEach(function (col) {
-      sheet.getRange(fila, col).setNumberFormat('0.00');
+      sheet.getRange(destino, col).setNumberFormat('0.00');
     });
 
     return ContentService
-      .createTextOutput(JSON.stringify({ status: 'ok', fila: fila }))
+      .createTextOutput(JSON.stringify({ status: 'ok', fila: destino }))
       .setMimeType(ContentService.MimeType.JSON);
 
   } catch (err) {
@@ -328,16 +318,6 @@ function doGet(e) {
     .createTextOutput(JSON.stringify({ status: 'ok', message: 'Script activo ✓' }))
     .setMimeType(ContentService.MimeType.JSON);
 }`;
-    },
-
-    // ── Exportación local a CSV ──
-    exportarCSV(filas) {
-        if (!filas || !filas.length) return false;
-        const esc = x => `"${String(x ?? '-').replace(/"/g, '""')}"`;
-        const csv = [this.HEADERS.map(esc).join(';')]
-            .concat(filas.map(f => f.map(esc).join(';'))).join('\r\n');
-        descargarTexto('﻿' + csv, `eco-estres-${new Date().toISOString().slice(0, 10)}.csv`);
-        return true;
     }
 };
 

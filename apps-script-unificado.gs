@@ -111,10 +111,12 @@ const HEADERS_DOPPLER = [
   "Observaciones"
 ];
 
-// ESQUEMA ESTRÉS v3 — 74 columnas. Generado del contrato de la app
+// ESQUEMA ESTRÉS v4 — 75 columnas. Generado del contrato de la app
 // (EstresSheets.HEADERS): no transcribir a mano. Si la app agrega una columna,
 // este bloque, ESQUEMA_ESTRES_V y ESQUEMAS_PREVIOS se actualizan JUNTOS.
-const ESQUEMA_ESTRES_V = 3;
+// v4 (04/11/2026): se agregó 'ID' como ÚLTIMA columna, para no duplicar filas al
+// reguardar un estudio. Al ir al final no corre ninguna columna anterior.
+const ESQUEMA_ESTRES_V = 4;
 const HEADERS_ESTRES = [
   "Fecha", "HC", "Edad", "Sexo",
   "Peso", "Altura", "SC", "Indicación",
@@ -134,7 +136,7 @@ const HEADERS_ESTRES = [
   "ST tipo", "ST mm", "ST morfología", "ST derivaciones",
   "Arritmias", "E/e' reposo", "E/e' esfuerzo", "VRT reposo",
   "VRT esfuerzo", "Diastólico esfuerzo", "Resultado", "Categorización",
-  "Avisos", "Informe"
+  "Avisos", "Informe", "ID"
 ];
 
 // Encabezados de los esquemas anteriores, para migrar las filas ya guardadas.
@@ -175,6 +177,27 @@ const ESQUEMAS_PREVIOS = {
     "E/e' reposo", "E/e' esfuerzo", "VRT reposo", "VRT esfuerzo",
     "Diastólico esfuerzo", "Resultado", "Categorización", "Avisos",
     "Informe"
+  ],
+  74: [
+    "Fecha", "HC", "Edad", "Sexo",
+    "Peso", "Altura", "SC", "Indicación",
+    "Medicación", "Betabloqueo", "Valvulopatía", "Severidad valvular",
+    "Bicúspide", "Fecha estudio previo", "Vmax previa", "Gradiente previo",
+    "AVA previa", "Aorta previa", "Δ Vmax/año", "Δ Gradiente/año",
+    "Δ AVA/año", "Δ Aorta/año", "Otros antecedentes", "Protocolo",
+    "Carga Kgm/min", "Etapa", "Duración", "Causa detención",
+    "FC reposo", "TA basal", "FC pico", "TA pico",
+    "FC rec 1min", "DP máximo", "% FCMT", "Índice cronotrópico",
+    "Reserva FC", "HRR1", "METs", "% METs predicho",
+    "Ventana", "Seg hasta imagen", "FC al adquirir", "% FC pico al adquirir",
+    "FEy reposo", "FEy post", "Delta FEy", "Función VD",
+    "WMSI reposo", "WMSI post", "Delta WMSI", "Escala WMSI",
+    "Motor texto", "Seg isquémicos", "Seg secuela", "Territorio",
+    "Patrón", "Ritmo", "Conducción", "ST basal",
+    "ST tipo", "ST mm", "ST morfología", "ST derivaciones",
+    "Arritmias", "E/e' reposo", "E/e' esfuerzo", "VRT reposo",
+    "VRT esfuerzo", "Diastólico esfuerzo", "Resultado", "Categorización",
+    "Avisos", "Informe"
   ]
 };
 
@@ -238,15 +261,38 @@ function doPost(e) {
       }
     }
 
-    sheet.appendRow(data.row);
+    // Upsert por ID: si la hoja tiene columna 'ID' y la fila trae un id ya
+    // presente, se REEMPLAZA esa fila en vez de agregar otra. Así, reguardar un
+    // estudio corregido deja en la planilla la versión final, no dos filas. Si la
+    // hoja no tiene columna 'ID', o el id viene vacío, se agrega como siempre.
+    var idCol = headers.indexOf('ID') + 1;
+    var fila = 0;
+    if (idCol > 0 && data.row[idCol - 1] !== '' && data.row[idCol - 1] != null) {
+      var ultima = sheet.getLastRow();
+      if (ultima >= 2) {
+        var ids = sheet.getRange(2, idCol, ultima - 1, 1).getValues();
+        for (var i = 0; i < ids.length; i++) {
+          if (String(ids[i][0]) === String(data.row[idCol - 1])) { fila = i + 2; break; }
+        }
+      }
+    }
 
-    const fila = sheet.getLastRow();
+    var accion;
+    if (fila) {
+      sheet.getRange(fila, 1, 1, data.row.length).setValues([data.row]);
+      accion = 'reemplazada';
+    } else {
+      sheet.appendRow(data.row);
+      fila = sheet.getLastRow();
+      accion = 'agregada';
+    }
+
     numCols.forEach(function (col) {
       sheet.getRange(fila, col).setNumberFormat('0.00');
     });
 
     return ContentService
-      .createTextOutput(JSON.stringify({ status: 'ok', hoja: nombre, fila: fila }))
+      .createTextOutput(JSON.stringify({ status: 'ok', hoja: nombre, fila: fila, accion: accion }))
       .setMimeType(ContentService.MimeType.JSON);
 
   } catch (err) {

@@ -18,28 +18,25 @@ const acciones = dock ? [...dock.querySelectorAll('button')].map(b => b.getAttri
  "abrirPanel('sync')"].forEach(a =>
     exigir(acciones.includes(a), `la botonera tiene ${a}`));
 exigir(acciones.length === 5, 'y sólo esos cinco botones, como en eco Doppler');
-exigir(d.querySelector("#panel-sync button[onclick=\"abrirPanel('historial')\"]"),
-    'el historial viejo se abre desde Sincronizar');
 
-// Los botones viejos del informe ya no están en pantalla...
-['limpiarFormulario()', 'guardarEnHistorial()', 'guardarEnPlanilla()'].forEach(a =>
-    exigir(![...d.querySelectorAll('button')].some(b => b.getAttribute('onclick') === a),
-        `${a} ya no tiene botón propio`));
-// ...pero sus funciones siguen (las usa GUARDAR ESTUDIO y la batería)
-['limpiarFormulario', 'guardarEnHistorial', 'guardarEnPlanilla', 'imprimirReporte',
- 'generarReporte', 'applyPreset', 'updateChecklistBadge'].forEach(f =>
-    exigir(typeof w[f] === 'function', `${f} sigue existiendo`));
+// El botón viejo "Nuevo estudio" ya no está en pantalla: lo reemplaza BORRAR TODO.
+exigir(![...d.querySelectorAll('button')].some(b => b.getAttribute('onclick') === 'limpiarFormulario()'),
+    'limpiarFormulario ya no tiene botón propio');
+// Pero sus funciones siguen (las usa la botonera y la batería)
+['limpiarFormulario', 'imprimirReporte', 'generarReporte', 'applyPreset', 'updateChecklistBadge']
+    .forEach(f => exigir(typeof w[f] === 'function', `${f} sigue existiendo`));
 
-// ── Nada se borró: presets, checklist, planilla, historial y firma siguen en el documento ──
-['pre_consent', 'checklist-badge', 'planilla-estado', 'historial-lista', 'casuistica-buscar',
- 'firma_informe', 'historial-badge', 'casuistica-badge'].forEach(id =>
+// ── Presets, checklist, planilla y firma siguen en el documento ──
+['pre_consent', 'checklist-badge', 'firma_informe'].forEach(id =>
     exigir(d.getElementById(id), `${id} sigue en el documento`));
-exigir(d.querySelector('#panel-historial #card-historial') && d.querySelector('#panel-historial #card-casuistica'),
-    'historial y casuística viven en el panel HISTORIAL');
 exigir(d.querySelector('#panel-sync #card-planilla') && d.querySelector('#panel-sync #firma_informe'),
     'planilla y firma viven en el panel SINCRONIZAR');
 exigir(d.getElementById('herramientas-retiradas').style.display === 'none',
     'presets y checklist quedan fuera de la pantalla');
+// ── Historial, casuística y cola: discontinuados, no quedan en el documento ──
+exigir(!d.getElementById('panel-historial') && !d.getElementById('card-historial') &&
+       !d.getElementById('card-casuistica') && !d.getElementById('planilla-estado'),
+    'el historial, la casuística y la cola ya no están en el documento');
 
 // ── Perlas: fuera del flujo, todas en el panel ──
 exigir(!d.querySelector('.pearl-container'), 'no quedan perlas en medio de las secciones');
@@ -100,12 +97,10 @@ exigir(w.eval('WM.estres[1]') === 3 && w.eval('WM.estres[7]') === 3, 'y la motil
 exigir(w.eval('MOTILIDAD_TOCADA') === true, 'con la motilidad como leída, igual que antes');
 exigir(informe(w).texto === antes, 'el informe vuelve a ser idéntico al de antes de borrar');
 
-// ── GUARDAR ESTUDIO: exactamente como eco Doppler — sólo el Sheet ──
+// ── GUARDAR ESTUDIO: exactamente como eco Doppler — sólo el Sheet, sin copia local ──
 casoBase(w); todoNormal(w);
 d.getElementById('paciente_id').value = 'HC-100';
 w.generarInforme();
-const histAntes = w.localStorage.getItem('eco-estres-historial');
-const colaAntes = JSON.stringify(w.eval('EstresSheets').leerCola());
 let enviados = [];
 w.eval('EstresSheets.estaConfigurado = () => false');
 w.guardarEstudio().then(() => {
@@ -116,8 +111,13 @@ w.guardarEstudio().then(() => {
     return w.guardarEstudio();
 }).then(() => {
     exigir(enviados.length === 1, 'con planilla configurada se envía una fila');
-    exigir(w.localStorage.getItem('eco-estres-historial') === histAntes, 'no escribe el historial');
-    exigir(JSON.stringify(w.eval('EstresSheets').leerCola()) === colaAntes, 'ni la cola local');
+    const fila = enviados[0];
+    exigir(fila && fila.length === w.eval('EstresSheets').HEADERS.length,
+        'la fila respeta el contrato de columnas');
+    exigir(fila && fila[fila.length - 1] === w.eval('estudioId'),
+        'la fila lleva el id del estudio en la última columna');
+    exigir(w.localStorage.getItem('eco-estres-historial') === null, 'no escribe el historial');
+    exigir(w.localStorage.getItem('ecoestres_cola_envio') === null, 'ni la cola local');
     if (fallas) { console.log(`\n${fallas} falla(s)`); process.exit(1); }
     console.log('Sin fallas — estética: botonera de eco Doppler, paneles, perlas, orden y deshacer');
 });

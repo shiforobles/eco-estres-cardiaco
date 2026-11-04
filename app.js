@@ -123,6 +123,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Fecha del estudio: por defecto hoy
     setFechaHoy();
+    nuevoEstudioId();   // id del estudio en curso; cambia al iniciar uno nuevo
     initFirma();
 
     calcEjercicio();
@@ -141,9 +142,13 @@ document.addEventListener('DOMContentLoaded', () => {
     updateChecklistBadge();
     renderBancos();
     renderMedicacion();
-    renderHistorial(true);
-    renderCasuistica();
-    renderPendientes();
+
+    // Limpieza única: el historial local, la casuística y la cola de envío se
+    // discontinuaron. Se borran sus claves de ESTA computadora al cargar. El
+    // borrador del estudio en curso NO se toca.
+    ['eco-estres-historial', 'eco-estres-casuistica', 'ecoestres_cola_envio']
+        .forEach(k => { try { localStorage.removeItem(k); } catch (e) { /* noop */ } });
+    refrescarBadgePlanilla();
 
     // Autosave / recuperación del estudio en curso (al final, con todo ya construido)
     setupAutosave();
@@ -5517,462 +5522,30 @@ function updateChecklistBadge() {
     badge.style.color = ok === todos.length ? 'var(--color-success)' : '';
 }
 
-// ══════════════════════════════════════════════
-//  HISTORIAL LOCAL DE ESTUDIOS
-// ══════════════════════════════════════════════
-const HIST_KEY = 'eco-estres-historial';
-const HIST_MAX = 50;
-const HIST_VIDA_MS = 12 * 60 * 60 * 1000;   // el historial es respaldo de la jornada, no archivo
-
-function leerHistorial() {
-    try { return JSON.parse(localStorage.getItem(HIST_KEY)) || []; }
-    catch (e) { return []; }
-}
-
-// Descarta lo que pasó las 12 h. Devuelve cuántos se fueron, para poder avisarlo:
-// borrar datos de pacientes en silencio sería peor que no borrarlos.
-function purgarHistorialVencido() {
-    const lista = leerHistorial();
-    if (!lista.length) return 0;
-    const limite = Date.now() - HIST_VIDA_MS;
-    const vigentes = lista.filter(h => (h.ts || 0) >= limite);
-    if (vigentes.length === lista.length) return 0;
-    // Antes de descartar, la parte clínica se conserva sin identificadores
-    archivarEnCasuistica(lista.filter(h => (h.ts || 0) < limite));
-    try { localStorage.setItem(HIST_KEY, JSON.stringify(vigentes)); } catch (e) { return 0; }
-    renderCasuistica();
-    return lista.length - vigentes.length;
-}
-
-// Fin del día: se vacía todo de esta computadora.
-function cerrarJornada() {
-    const lista = leerHistorial();
-    if (!lista.length) { showNotice('El historial ya está vacío.', 'ok'); return; }
-    const nombres = lista.slice(0, 3).map(h => h.nombre || h.id).join(', ');
-    if (!confirm(
-        `Se van a borrar ${lista.length} estudio(s) del historial de esta computadora` +
-        `\n(${nombres}${lista.length > 3 ? ', …' : ''}).\n\n` +
-        `Los informes ya firmados en la historia clínica no se tocan.\n` +
-        `Esta acción no se puede deshacer. ¿Cerrar la jornada?`)) return;
-    const archivados = archivarEnCasuistica(lista);
-    try { localStorage.removeItem(HIST_KEY); } catch (e) { /* noop */ }
-    renderHistorial();
-    renderCasuistica();
-    showNotice(`Historial vaciado. ${archivados} estudio(s) quedaron en la casuística, sin datos de pacientes.`, 'ok');
-}
-
-function guardarEnHistorial() {
-    // Texto y datos son una misma versión: si cambiaron los datos, se regenera.
-    const reporte = informeParaGuardar();
-    if (!reporte) { alert('Primero generá el informe.'); return; }
-
-    // Sin HC el estudio no se puede identificar después: se avisa y se pide confirmación
-    // explícita en vez de dejarlo pasar sin más.
-    // Con el nombre alcanza para identificarlo: sólo se pregunta si no hay ni HC ni nombre.
-    if (!v('paciente_id') && !v('paciente_nombre')) {
-        const campo = document.getElementById('paciente_id');
-        campo.focus();
-        campo.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        if (!confirm('El estudio no tiene ni HC ni nombre.\n\n' +
-                     'No vas a poder distinguirlo de los demás en el historial.\n\n' +
-                     '¿Guardar igual, sin identificar?')) return;
-    }
-
-    const lista = leerHistorial();
-    const resEl = document.getElementById('resultado_estudio');
-    lista.unshift({
-        ts: Date.now(),
-        id: v('paciente_id') || 's/ID',
-        nombre: v('paciente_nombre') || '',
-        resultado: resEl.value ? textoSelect('resultado_estudio') : '—',
-        protocolo: currentProtocol,
-        reporte,
-        estudio: {
-            fields: captureFields(),
-            // Sin esto, recuperar un estudio del historial perdía las correcciones
-            // manuales: una geometría corregida a mano volvía a la calculada.
-            corregidos: { ...camposCorregidos },
-            // Desde el 28/10/2026 la casilla `ant_crm` significa SÓLO cirugía. Los
-            // estudios guardados antes no distinguían CRM de ATC, y convertirlos en
-            // "cirugía" les atribuiría un antecedente que nadie afirmó.
-            crmSoloCirugia: true,
-            wm: { reposo: { ...WM.reposo }, estres: { ...WM.estres } },
-            protocol: currentProtocol,
-            specialTab: currentSpecialTab,
-            dobStages: captureDobStages(),
-            medicacion: medicacionActual.map(m => ({ ...m })),
-        }
-    });
-    try {
-        localStorage.setItem(HIST_KEY, JSON.stringify(lista.slice(0, HIST_MAX)));
-        renderHistorial();
-        showNotice('Estudio guardado en el historial de esta computadora.', 'ok');
-        return true;
-    } catch (e) {
-        alert('No se pudo guardar en el historial (almacenamiento lleno).');
-    }
-}
 
 // ══════════════════════════════════════════════
-//  CASUÍSTICA ANÓNIMA — no vence
-//  Cuando un estudio se descarta del historial, sus identificadores se
-//  borran pero los datos clínicos se conservan acá. Así el descarte a las
-//  12 h deja de llevarse la casuística sin volver a acumular nombres en
-//  una computadora compartida.
+//  IDENTIFICADOR DEL ESTUDIO
+//  Se arma al empezar cada estudio y se mantiene mientras sea el mismo: guardar
+//  dos veces manda el MISMO id y el Apps Script REEMPLAZA la fila en vez de
+//  duplicarla, así una corrección deja en la planilla la versión final. Cambia
+//  al iniciar un estudio nuevo (otro paciente). Viaja en el borrador para que
+//  recuperar un estudio en curso conserve su identidad.
 // ══════════════════════════════════════════════
-const CASUISTICA_KEY = 'eco-estres-casuistica';
-const CASUISTICA_MAX = 500;
+let estudioId = null;
 
-// ══════════════════════════════════════════════
-//  REVISIÓN POR CAMBIO DE ESCALA DEL WMSI
-//  Hasta el 25/10/2026 el índice sumaba el puntaje crudo 1-5 e iba inflado. El
-//  corte >1,7 dispara en el informe la frase "~5 % de eventos cardíacos por año",
-//  que sale de literatura hecha con la escala 1-4. Un informe ya firmado puede
-//  llevar esa cifra sin corresponder.
-//  El historial y la casuística guardan los puntajes por segmento, así que se puede
-//  saber exactamente a cuáles les pasó en vez de estimarlo.
-// ══════════════════════════════════════════════
-
-// El cálculo VIEJO, tal como estaba: puntaje crudo, los 17 segmentos.
-function wmsiEscalaVieja(wm, fase, excluir) {
-    if (!wm || !wm[fase]) return null;
-    let sum = 0, n = 0;
-    for (let id = 1; id <= 17; id++) {
-        if (excluir && excluir.includes(id)) continue;
-        const sc = wm[fase][id];
-        if (sc > 0) { sum += sc; n++; }
-    }
-    return n === 0 ? null : sum / n;
+function generarEstudioId() {
+    const f = v('fecha_estudio') || new Date().toISOString().slice(0, 10);
+    // La unicidad y la estabilidad las da el sufijo temporal. NO se arma con la HC:
+    // la HC suele cargarse o corregirse DESPUÉS de empezar, y si el id dependiera de
+    // ella, corregir la HC crearía una fila nueva en vez de reemplazar la anterior.
+    // La HC ya va en su propia columna.
+    return 'ee-' + f + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
 }
 
-// El cálculo NUEVO, sobre los mismos puntajes guardados.
-function wmsiEscalaNueva(wm, fase, excluir) {
-    if (!wm || !wm[fase]) return null;
-    let sum = 0, n = 0;
-    for (let id = 1; id <= 17; id++) {
-        if (id === SEGMENTO_APEX) continue;
-        if (excluir && excluir.includes(id)) continue;
-        const peso = PESO_WMSI[wm[fase][id]];
-        if (peso) { sum += peso; n++; }
-    }
-    return n === 0 ? null : sum / n;
-}
+function nuevoEstudioId() { estudioId = generarEstudioId(); return estudioId; }
 
-// Un estudio guardado puede tener trastorno de conducción: ahí los septales no
-// entraban al índice, ni antes ni ahora.
-function excluirSeptalesDe(campos) {
-    const c = (campos && campos.ecg_conduccion) || '';
-    return CONDUCCION_LIMITA_SEPTUM.includes(c) ? SEGMENTOS_SEPTALES : null;
-}
-
-// Devuelve los estudios guardados cuyo informe lleva la frase del corte de 1,7 sin
-// que el WMSI corregido lo sostenga.
-function revisarEscalaWMSI() {
-    const items = [];
-    leerHistorial().forEach(h => items.push({
-        origen: 'historial',
-        id: h.id && h.id !== 's/ID' ? h.id : '',
-        nombre: h.nombre || '',
-        ts: h.ts,
-        wm: h.estudio && h.estudio.wm,
-        campos: (h.estudio && h.estudio.fields) || {},
-        informe: h.reporte || ''
-    }));
-    leerCasuistica().forEach(c => items.push({
-        origen: 'casuística',
-        id: '', nombre: '', ts: c.ts,
-        wm: c.wm,
-        campos: { ecg_conduccion: c.conduccion || '' },
-        informe: c.informe || ''
-    }));
-
-    const revisar = [], sinPuntajes = [];
-    items.forEach(it => {
-        if (!it.wm) { sinPuntajes.push(it); return; }
-        const ex = excluirSeptalesDe(it.campos);
-        const viejo = wmsiEscalaVieja(it.wm, 'estres', ex);
-        const nuevo = wmsiEscalaNueva(it.wm, 'estres', ex);
-        if (viejo === null || nuevo === null) return;
-        // El criterio decisivo es el TEXTO del informe firmado, no la inferencia:
-        // sólo cuenta si la frase del corte de 1,7 salió impresa de verdad.
-        const loDice = /por encima de 1,7|5 % anual|cercana al 5 %/.test(it.informe);
-        if (viejo > 1.7 && nuevo <= 1.7)
-            revisar.push({ ...it, viejo, nuevo, loDice });
-    });
-    revisar.sort((a, b) => b.viejo - a.viejo);
-    return { revisar, sinPuntajes: sinPuntajes.length, total: items.length };
-}
-
-function mostrarRevisionEscalaWMSI() {
-    const r = revisarEscalaWMSI();
-    const cont = document.getElementById('revision-wmsi');
-    if (!cont) return;
-    cont.style.display = 'block';
-
-    if (!r.total) {
-        cont.innerHTML = '<div class="aviso-clinico aviso-atencion"><div class="aviso-titulo">' +
-            'No hay estudios guardados en esta computadora</div><div class="aviso-fundamento">' +
-            'El historial se vacía a las 12 horas y al cerrar la jornada. Si revisaste estudios en ' +
-            'otra computadora o en otro navegador, corré esto allá.</div></div>';
-        return;
-    }
-    const conFrase = r.revisar.filter(x => x.loDice);
-    const sinFrase = r.revisar.filter(x => !x.loDice);
-    const fecha = ts => new Date(ts).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-    const fila = x =>
-        `<li><strong>${[x.id, x.nombre].filter(Boolean).join(' · ') || x.origen}</strong> — ${fecha(x.ts)}` +
-        `<span class="cat-conducta">WMSI pico ${nProsa(x.viejo.toFixed(2), 2)} con la escala vieja → ` +
-        `${nProsa(x.nuevo.toFixed(2), 2)} con la corregida</span></li>`;
-
-    let html = `<div class="aviso-clinico ${conFrase.length ? 'aviso-alto' : 'aviso-atencion'}">` +
-        `<div class="aviso-titulo">${conFrase.length
-            ? `${conFrase.length} informe${conFrase.length === 1 ? '' : 's'} con la frase del 5 % anual sin corresponder`
-            : 'Ningún informe guardado lleva la frase del 5 % anual sin corresponder'}</div>` +
-        `<div class="aviso-fundamento">Se revis${r.total === 1 ? 'ó 1 estudio guardado' : `aron ${r.total} estudios guardados`}` +
-        (r.sinPuntajes ? `; ${r.sinPuntajes} no tienen los puntajes por segmento y no se pudieron recalcular` : '') +
-        '.</div></div>';
-
-    if (conFrase.length)
-        html += '<p class="module-description"><strong>Estos informes tienen escrita la cifra y el WMSI corregido ' +
-            'no la sostiene.</strong> Son los que convendría revisar:</p><ul class="cat-motivos">' +
-            conFrase.map(fila).join('') + '</ul>';
-
-    if (sinFrase.length)
-        html += `<p class="module-description">${sinFrase.length === 1 ? 'Otro estudio cruzaba' : `Otros ${sinFrase.length} cruzaban`} el corte con la escala vieja ` +
-            'pero su informe no llegó a imprimir la frase (el párrafo pronóstico la omite si hay hallazgos ' +
-            'de más peso, o el estudio es anterior a esa frase). No requiere revisión:</p>' +
-            '<ul class="cat-motivos">' + sinFrase.map(fila).join('') + '</ul>';
-
-    cont.innerHTML = html;
-}
-
-function leerCasuistica() {
-    try { return JSON.parse(localStorage.getItem(CASUISTICA_KEY)) || []; }
-    catch (e) { return []; }
-}
-
-// Quita todo lo que identifica al paciente y deja lo clínicamente útil
-function anonimizarEstudio(h) {
-    const f = (h.estudio && h.estudio.fields) || {};
-    let informe = h.reporte || '';
-    // El encabezado del informe lleva nombre, HC y fecha: se descarta entero
-    informe = informe.split('\n').slice(2).join('\n').trim();
-    if (h.nombre) informe = informe.split(h.nombre).join('[paciente]');
-    if (h.id && h.id !== 's/ID') informe = informe.split(h.id).join('[HC]');
-
-    return {
-        ts: h.ts,
-        // Sin nombre, sin HC, sin resumen de historia clínica
-        edad: f.edad || '', sexo: f.sexo || '',
-        resultado: h.resultado || '—',
-        protocolo: h.protocolo || '',
-        categorizacion: f.categorizacion || '',
-        fey: f.fevi_reposo || '', feyPico: f.fevi_pico || '',
-        mets: f.ej_mets || '', carga: f.ej_carga || '',
-        causaDetencion: f.ej_causa_detencion || '',
-        conduccion: f.ecg_conduccion || '',
-        wm: h.estudio && h.estudio.wm ? h.estudio.wm : null,
-        // Texto libre y valvulopatía estructurada: es lo que permite encontrar
-        // después "las bicúspides" o "los que tenían tal antecedente". Las notas
-        // privadas NO viajan: se quedan en el navegador.
-        antOtros: f.ant_otros || '',
-        valvTipo: f.valv_tipo || '',
-        valvSeveridad: f.valv_severidad || '',
-        valvBicuspide: f.valv_bicuspide || '',
-        informe
-    };
-}
-
-// Devuelve cuántos se archivaron
-function archivarEnCasuistica(estudios) {
-    if (!estudios || !estudios.length) return 0;
-    const casos = leerCasuistica();
-    const yaEstan = new Set(casos.map(c => c.ts));
-    const nuevos = estudios.filter(h => !yaEstan.has(h.ts)).map(anonimizarEstudio);
-    if (!nuevos.length) return 0;
-    try {
-        localStorage.setItem(CASUISTICA_KEY, JSON.stringify(nuevos.concat(casos).slice(0, CASUISTICA_MAX)));
-        return nuevos.length;
-    } catch (e) {
-        showNotice('La casuística está llena: exportala y borrala para seguir archivando.', 'warn');
-        return 0;
-    }
-}
-
-// Búsqueda sobre la casuística: el texto libre de antecedentes se puede encontrar
-// ("bicúspide"), y la valvulopatía estructurada se puede CONTAR sin ambigüedad.
-function buscarCasuistica() { renderCasuistica(); }
-
-function filtrarCasos(casos, q) {
-    const t = (q || '').trim().toLowerCase();
-    if (!t) return casos;
-    return casos.filter(c => [c.antOtros, c.valvTipo, c.valvSeveridad,
-        c.valvBicuspide === 'si' ? 'bicúspide bicuspide' : '',
-        c.resultado, c.informe, c.categorizacion]
-        .filter(Boolean).join(' ').toLowerCase().includes(t));
-}
-
-function renderCasuistica() {
-    const cont = document.getElementById('casuistica-resumen');
-    if (!cont) return;
-    const q = (document.getElementById('casuistica-buscar') || {}).value || '';
-    const todos = leerCasuistica();
-    const casos = filtrarCasos(todos, q);
-    const badge = document.getElementById('casuistica-badge');
-    if (badge) badge.textContent = todos.length;
-    if (!casos.length) {
-        cont.innerHTML = q
-            ? `<p class="module-description">Ningún estudio de los ${todos.length} archivados ` +
-              `coincide con «${q}».</p>`
-            : '<p class="module-description">Todavía no hay estudios archivados. ' +
-              'Los estudios pasan acá, sin datos del paciente, cuando se descartan del historial.</p>';
-        return;
-    }
-    const cab = q ? `<p class="module-description">${casos.length} de ${todos.length} coinciden con «${q}».</p>` : '';
-    const porResultado = {};
-    casos.forEach(c => { porResultado[c.resultado] = (porResultado[c.resultado] || 0) + 1; });
-    const filas = Object.entries(porResultado).sort((a, b) => b[1] - a[1])
-        .map(([r, n]) => `<div class="calc-row"><span>${r}</span><span class="calc-value">${n}</span></div>`).join('');
-    const desde = new Date(Math.min(...casos.map(c => c.ts))).toLocaleDateString('es-AR');
-    cont.innerHTML = cab + `<div class="calc-box"><div class="calc-row"><span><strong>Total archivado</strong> (desde ${desde})</span>` +
-        `<span class="calc-value"><strong>${casos.length}</strong></span></div>${filas}</div>`;
-}
-
-function exportarCasuistica() {
-    const casos = leerCasuistica();
-    if (!casos.length) { showNotice('No hay casuística para exportar.', 'warn'); return; }
-    const sep = '═'.repeat(70);
-    const partes = [`CASUÍSTICA ECO ESTRÉS — ${casos.length} estudio(s)`,
-                    'Sin datos identificatorios de pacientes.', ''];
-    casos.forEach((c, i) => {
-        const f = new Date(c.ts).toLocaleDateString('es-AR');
-        partes.push(sep,
-            `${i + 1}. ${f} · ${c.edad || '—'} años · ${c.sexo === 'F' ? 'femenino' : 'masculino'} · ${c.resultado}`,
-            sep, '', c.informe || '(sin informe)', '');
-    });
-    descargarTexto(partes.join('\n'), `casuistica-eco-estres-${new Date().toISOString().slice(0, 10)}.txt`);
-    showNotice(`Exportados ${casos.length} estudio(s) de la casuística.`, 'ok');
-}
-
-function borrarCasuistica() {
-    const casos = leerCasuistica();
-    if (!casos.length) { showNotice('La casuística ya está vacía.', 'ok'); return; }
-    if (!confirm(`Se van a borrar ${casos.length} estudio(s) de la casuística anónima.\n\n` +
-                 `No contienen datos de pacientes, pero sí tu registro clínico acumulado.\n` +
-                 `Esta acción no se puede deshacer. ¿Continuar?`)) return;
-    try { localStorage.removeItem(CASUISTICA_KEY); } catch (e) { /* noop */ }
-    renderCasuistica();
-    showNotice('Casuística borrada.', 'ok');
-}
-
-// ══════════════════════════════════════════════
-//  GUARDADO EN LA PLANILLA
-// ══════════════════════════════════════════════
-async function guardarEnPlanilla() {
-    // El informe es lo que se quiere poder graficar y leer después:
-    // si no se generó, se genera antes de armar la fila.
-    const informe = informeParaGuardar();
-    if (!informe) { alert('No se pudo generar el informe: revisá los datos del estudio.'); return; }
-
-    if (!EstresSheets.estaConfigurado()) {
-        showNotice('Configurá la planilla primero con el botón ⚙ Configurar planilla.', 'warn');
-        abrirConfigPlanilla();
-        return;
-    }
-
-    let fila;
-    try { fila = EstresSheets.construirFila(informe); }
-    catch (e) { alert('No se pudo armar la fila del estudio: ' + e.message); return; }
-
-    // Primero al respaldo local, después al envío: el POST no-cors no permite
-    // confirmar la recepción, así que el estudio no puede depender de él.
-    const etiqueta = (v('paciente_id') || v('paciente_nombre') || 's/ID');
-    // El respaldo local se VERIFICA antes de enviar: si no se escribió, decir después
-    // "quedó guardado localmente" sería mentira. Y nada se descarta en silencio.
-    const guardado = EstresSheets.encolar(fila, etiqueta);
-    renderPendientes();
-    if (!guardado.ok) {
-        const motivo = guardado.motivo === 'COLA_LLENA'
-            ? `La cola llegó a ${guardado.max} estudios pendientes y no entra uno más.`
-            : `No se pudo escribir el respaldo local (${guardado.detalle || 'almacenamiento lleno'}).`;
-        alert('NO se envió el estudio.\n\n' + motivo + '\n\n' +
-              'Confirmá los pendientes que ya estén en el Sheet para liberar lugar, ' +
-              'o exportá la jornada antes de seguir.');
-        return;
-    }
-    const ts = guardado.ts || Date.now();
-
-    try {
-        await EstresSheets.enviar(fila);
-        // NO se marca como confirmado: el modo no-cors hace que fetch resuelva
-        // aunque la URL no exista o el script falle. Comprobado: con una URL
-        // inexistente el envío "sale bien". La confirmación la da el operador
-        // después de ver la fila en el Sheet.
-        renderPendientes();
-        showNotice(`Enviado — ${etiqueta}. Verificá que aparezca en el Sheet y marcalo como confirmado.`, 'ok');
-    } catch (e) {
-        renderPendientes();
-        showNotice(`No se pudo enviar: ${e.message}. Quedó guardado localmente.`, 'warn');
-    }
-}
-
-async function reintentarPendientes() {
-    const pend = EstresSheets.pendientes();
-    if (!pend.length) { showNotice('No hay envíos pendientes.', 'ok'); return; }
-    let ok = 0, fallaron = 0;
-    for (const p of pend) {
-        try { await EstresSheets.enviar(p.fila); ok++; }
-        catch (e) { fallaron++; }
-    }
-    renderPendientes();
-    // El aviso decía "Reenviados N" usando el total de pendientes: podía afirmar que
-    // se reenviaron todos aunque hubieran fallado todos.
-    const msg = fallaron === 0
-        ? `Reenviados ${ok} de ${pend.length}. Verificá el Sheet y marcalos como confirmados.`
-        : `Reenviados ${ok} de ${pend.length}; ${fallaron} siguen sin salir y quedan pendientes.`;
-    showNotice(msg, fallaron ? 'warn' : 'ok');
-}
-
-// Confirmar es un acto del operador: mirar el Sheet y decir "está".
-function confirmarEnviados() {
-    const cola = EstresSheets.leerCola();
-    if (!cola.length) { showNotice('No hay estudios en el respaldo.', 'ok'); return; }
-    if (!confirm(`¿Verificaste que los ${cola.length} estudio(s) aparecen en la planilla?\n\n` +
-                 `Al confirmar se quitan del respaldo local. Si alguno no llegó, reintentá primero.`)) return;
-    EstresSheets.guardarCola([]);
-    renderPendientes();
-    showNotice(`${cola.length} estudio(s) confirmados y quitados del respaldo local.`, 'ok');
-}
-
-function exportarPlanillaCSV() {
-    const cola = EstresSheets.leerCola();
-    if (!cola.length) { showNotice('No hay estudios para exportar.', 'warn'); return; }
-    EstresSheets.exportarCSV(cola.map(x => x.fila));
-    showNotice(`Exportados ${cola.length} estudio(s) a CSV.`, 'ok');
-}
-
-function renderPendientes() {
-    const cont = document.getElementById('planilla-estado');
-    if (!cont) return;
-    const cola = EstresSheets.leerCola();
-    const pend = cola.filter(x => !x.enviado);
-    const badge = document.getElementById('planilla-badge');
-    if (badge) badge.textContent = pend.length ? `${pend.length} pendiente(s)` : (EstresSheets.estaConfigurado() ? 'OK' : 'sin configurar');
-
-    if (!cola.length) {
-        cont.innerHTML = '<p class="module-description">Todavía no se envió ningún estudio a la planilla.</p>';
-        return;
-    }
-    cont.innerHTML = `<div class="calc-box">
-        <div class="calc-row"><span>Estudios en el respaldo local</span><span class="calc-value">${cola.length}</span></div>
-        <div class="calc-row"><span>Sin confirmar en el Sheet</span><span class="calc-value" style="color:var(--color-warning)">${pend.length}</span></div>
-        </div>
-        <p class="firma-nota" style="margin-top:0.5rem">El navegador no permite confirmar la recepción, así que la app no sabe
-        si llegaron. Mirá la planilla y usá <strong>✓ Confirmar recepción</strong> para vaciar el respaldo.</p>` +
-        (pend.length ? '<div class="med-lista" style="margin-top:0.5rem">' + pend.map(p =>
-            `<span class="med-item">${p.etiqueta} <em>${new Date(p.ts).toLocaleString('es-AR', {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</em></span>`
-        ).join('') + '</div>' : '');
-}
+// El guardado en la planilla lo hace guardarEstudio() desde la botonera (GUARDAR
+// ESTUDIO). Acá sólo queda la configuración de la planilla.
 
 // ── Configuración de la planilla ──
 function abrirConfigPlanilla() {
@@ -6013,8 +5586,14 @@ function guardarConfigPlanilla() {
     EstresSheets.setHoja(document.getElementById('cfg_hoja').value);
     EstresSheets.setSheetUrl(document.getElementById('cfg_sheet').value);
     document.getElementById('modal-planilla').remove();
-    renderPendientes();
+    refrescarBadgePlanilla();
     showNotice('Configuración guardada.', 'ok');
+}
+
+// La insignia del panel de planilla: sólo dice si la planilla está configurada.
+function refrescarBadgePlanilla() {
+    const badge = document.getElementById('planilla-badge');
+    if (badge) badge.textContent = EstresSheets.estaConfigurado() ? 'configurada' : 'sin configurar';
 }
 
 function verCodigoScript() {
@@ -6031,35 +5610,6 @@ function probarPlanilla() {
     window.open(u, '_blank');
 }
 
-// ── Exportar la jornada ───────────────────────
-// Saca los estudios de esta computadora a un archivo que guardás donde quieras.
-// Sirve tanto si después se descartan como si se conservan.
-function exportarJornada(anonimo) {
-    const lista = leerHistorial();
-    if (!lista.length) { showNotice('No hay estudios para exportar.', 'warn'); return; }
-
-    const fecha = new Date().toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
-    const sep = '═'.repeat(70);
-    const partes = [`ECO ESTRÉS — ESTUDIOS DEL ${fecha}`, `${lista.length} estudio(s)`, ''];
-
-    lista.forEach((h, i) => {
-        const hora = new Date(h.ts).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
-        let informe = h.reporte || '(sin informe generado)';
-        let encabezado = `${i + 1}. ${h.id}${h.nombre ? ' — ' + h.nombre : ''} · ${hora}`;
-        if (anonimo) {
-            // Se quitan los identificadores del encabezado y de la primera línea del informe
-            encabezado = `${i + 1}. Estudio ${i + 1} · ${hora}`;
-            informe = informe.split('\n').slice(2).join('\n').trim();
-            if (h.nombre) informe = informe.split(h.nombre).join('[paciente]');
-            if (h.id && h.id !== 's/ID') informe = informe.split(h.id).join('[HC]');
-        }
-        partes.push(sep, encabezado, sep, '', informe, '');
-    });
-
-    const nombreArchivo = `eco-estres-${new Date().toISOString().slice(0, 10)}${anonimo ? '-anonimo' : ''}.txt`;
-    descargarTexto(partes.join('\n'), nombreArchivo);
-    showNotice(`Exportados ${lista.length} estudio(s) a ${nombreArchivo}.`, 'ok');
-}
 
 function descargarTexto(texto, nombreArchivo) {
     try {
@@ -6080,65 +5630,6 @@ function descargarTexto(texto, nombreArchivo) {
     }
 }
 
-function renderHistorial(avisarPurga) {
-    const cont = document.getElementById('historial-lista');
-    if (!cont) return;
-    const purgados = purgarHistorialVencido();
-    if (purgados && avisarPurga)
-        showNotice(purgados === 1
-            ? 'Se descartó del historial 1 estudio de más de 12 h.'
-            : `Se descartaron del historial ${purgados} estudios de más de 12 h.`, 'warn');
-    const lista = leerHistorial();
-    document.getElementById('historial-badge').textContent = lista.length;
-    const badgeDock = document.getElementById('historial-badge-dock');
-    if (badgeDock) badgeDock.textContent = lista.length ? String(lista.length) : '';
-    if (!lista.length) {
-        cont.innerHTML = '<p class="module-description">Todavía no hay estudios guardados.</p>';
-        return;
-    }
-    cont.innerHTML = lista.map((h, i) => {
-        const f = new Date(h.ts).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
-        return `<div class="hist-item">
-            <div class="hist-info">
-                <strong>${h.id}</strong>${h.nombre ? ' — ' + h.nombre : ''}
-                <span class="hist-meta">${f} · ${h.resultado}</span>
-            </div>
-            <div class="hist-actions">
-                <button class="btn btn-secondary btn-sm" onclick="verReporteHistorial(${i})">Ver informe</button>
-                <button class="btn btn-secondary btn-sm" onclick="cargarDelHistorial(${i})">Cargar</button>
-                <button class="btn btn-danger btn-sm" onclick="borrarDelHistorial(${i})">✕</button>
-            </div>
-        </div>`;
-    }).join('');
-}
-
-function verReporteHistorial(i) {
-    const h = leerHistorial()[i];
-    if (!h) return;
-    const out = document.getElementById('reporte-output');
-    out.style.display = 'block';
-    out.textContent = h.reporte;
-    out.scrollIntoView({ behavior: 'smooth', block: 'start' });
-}
-
-function cargarDelHistorial(i) {
-    const h = leerHistorial()[i];
-    if (!h) return;
-    if (!confirm(`¿Cargar el estudio de ${h.id}? Se reemplazan los datos actuales del formulario.`)) return;
-    resetFormulario();
-    aplicarEstudio(h.estudio);
-    showNotice('Estudio cargado desde el historial.', 'ok');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-}
-
-function borrarDelHistorial(i) {
-    const lista = leerHistorial();
-    if (!lista[i]) return;
-    if (!confirm(`¿Borrar del historial el estudio de ${lista[i].id}?`)) return;
-    lista.splice(i, 1);
-    localStorage.setItem(HIST_KEY, JSON.stringify(lista));
-    renderHistorial();
-}
 
 function getResponseText(scRep, scEst) {
     const r = classifyResponse(scRep, scEst);
@@ -6344,6 +5835,7 @@ function resetFormulario() {
     const resumenCompletud = document.getElementById('completud-resumen');
     if (resumenCompletud) resumenCompletud.textContent = 'Sin comprobar';
     setFechaHoy();
+    nuevoEstudioId();   // paciente nuevo: id nuevo, para no reemplazar la fila del anterior
     medicacionActual = [];
     renderMedicacion();
     camposCorregidos = {};   // paciente nuevo: la app vuelve a proponer todo
@@ -6526,6 +6018,10 @@ function construirBorrador() {
         return {
             version: DRAFT_VERSION,
             savedAt: new Date().toISOString(),
+            // Identidad del estudio: así recuperar un borrador reguarda sobre la misma
+            // fila del Sheet en vez de duplicarla. Campo aditivo: un borrador viejo sin
+            // esta clave no es incompatible (readDraft no cambia de versión por esto).
+            estudioId: estudioId,
             fields: captureFields(),
             wm: { reposo: { ...WM.reposo }, estres: { ...WM.estres } },
             protocol: currentProtocol,
@@ -6627,9 +6123,13 @@ function restoreDobStages(saved) {
     });
 }
 
-// Aplica un estudio completo (borrador o entrada del historial) al formulario
+// Aplica un estudio completo (borrador recuperado) al formulario
 function aplicarEstudio(d) {
     if (!d) return;
+
+    // Identidad del estudio: se conserva la del borrador, así reguardarlo reemplaza
+    // su fila en el Sheet. Un borrador viejo sin id recibe uno nuevo.
+    estudioId = d.estudioId || generarEstudioId();
 
     // Las correcciones manuales se restauran ANTES que nada: los recálculos de más
     // abajo consultan esta marca, y si llega después ya pisaron el valor corregido.
@@ -6982,24 +6482,26 @@ function generarDesdeBotonera() {
 // GUARDAR ESTUDIO: exactamente como en la app de eco Doppler (pedido de Lucas,
 // 03/11/2026). Manda la fila al Sheet y avisa con un cartel; sin copia local, sin
 // historial y sin "Confirmar recepción". Sin la planilla configurada no envía nada
-// y lo dice. El historial y la cola viejos siguen en ⚙ Sincronizar.
+// y lo dice. Lleva el id del estudio: reguardar el mismo estudio reemplaza la fila
+// en vez de duplicarla.
 async function guardarEstudio() {
     const informe = informeParaGuardar();
     if (!informe) { alert('No se pudo generar el informe: revisá los datos del estudio.'); return; }
     const hc = v('paciente_id') || '(sin ID)';
+    if (!estudioId) nuevoEstudioId();
     if (!window.EstresSheets || !EstresSheets.estaConfigurado()) {
         showNotice('⚠️ No se envió el estudio: falta la URL de Apps Script. Cargala en ⚙ Sincronizar. ' +
                    'El informe sigue disponible para copiar.', 'warn');
         return;
     }
     let fila;
-    try { fila = EstresSheets.construirFila(informe); }
+    try { fila = EstresSheets.construirFila(informe, estudioId); }
     catch (e) { showNotice('❌ Error: ' + e.message, 'warn'); return; }
     const btn = document.getElementById('btn_save_study');
     if (btn) btn.disabled = true;
     try {
         await EstresSheets.enviar(fila);
-        showNotice(`✅ Guardado en Google Sheets — ${hc}`, 'ok');
+        showNotice(`✅ Guardado en Google Sheets — ${hc}. Si lo volvés a guardar, reemplaza la fila.`, 'ok');
     } catch (e) {
         showNotice(`⚠️ Error al guardar: ${e.message}`, 'warn');
     } finally {
