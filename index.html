@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=2.4-antecedentes-1">
+    <link rel="stylesheet" href="styles.css?v=2.5-ecg">
 </head>
 <body>
 <div class="container">
@@ -1809,17 +1809,19 @@
 <script src="pearls.js?v=2.3-estetica-1"></script>
 <script src="motility-groups.js?v=2.2"></script>
 <script src="report-templates.js?v=2.2-grados-1"></script>
-<script src="sheets-storage.js?v=2.4-id"></script>
-<script src="app.js?v=2.4-guardar"></script>
+<script src="sheets-storage.js?v=2.5-ecg"></script>
+<script src="app.js?v=2.5-ecg"></script>
 <script>
 // Control de versión: si el navegador sirvió una mezcla de archivos viejos y nuevos,
 // los botones fallan en silencio. Esto lo convierte en un aviso visible.
 (function () {
-    var APP_VERSION = '2.4';
+    var APP_VERSION = '2.5';
     var faltan = ['generarInforme', 'recolectarHallazgos', 'calcEjercicio'].filter(function (f) {
         return typeof window[f] !== 'function';
     });
     if (typeof NARRATIVA === 'undefined') faltan.push('report-templates.js');
+    // El módulo ECG (rediseño V9) vive en app.js: si falta, es un app.js viejo en caché.
+    if (typeof ECGmod === 'undefined') faltan.push('app.js (módulo ECG)');
     if (!faltan.length) return;
     if (document.getElementById('aviso-version')) return;
     var aviso = document.createElement('div');
