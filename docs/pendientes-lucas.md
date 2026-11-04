@@ -182,6 +182,33 @@ Estado: pendiente de investigación/propuestas y validación clínica de Lucas.
   regional y coherencia entre motores. No cambiar exclusiones/evaluabilidad de forma
   incidental.
 
+## Tanda estética v2.3 — botonera y orden de eco Doppler
+
+Estado: terminada el 03/11/2026 (Claude, chat de coordinación). Sólo presentación:
+informes idénticos antes y después en los 10 presets (comparación por hash del
+informe largo y de los tres cuadros de OSECAC). Sin cambios de criterios,
+plantillas, `vendor/`, contrato de Sheets ni DRAFT_VERSION.
+
+- [x] Botonera anclada abajo, la misma de eco Doppler: BORRAR TODO, GENERAR
+  INFORME, COPIAR INFORME, GUARDAR ESTUDIO, HISTORIAL, SINCRONIZAR.
+- [x] GUARDAR ESTUDIO = historial + planilla si está configurada; la edición a mano
+  se pregunta una sola vez.
+- [x] BORRAR TODO sin confirmación, con Deshacer de 15 s que devuelve el estudio
+  entero. Deja la motilidad en verde y sin leer, como al abrir la app.
+- [x] Historial y casuística en un panel; planilla, firma, imprimir y planilla de
+  datos en ⚙ Sincronizar. Presets y checklist fuera de la pantalla, en el documento.
+- [x] Perlas clínicas fuera del flujo: panel 📚 en el encabezado, por tema.
+- [x] Motilidad antes del eco post-esfuerzo; bloque 4 "Post-esfuerzo".
+- [x] Situaciones especiales plegadas, con "EAo con ejercicio" primero; se abren
+  solas con indicación de EAo o válvula bicúspide.
+- [x] Barra de secciones fija; cada chip deja el cursor en el primer campo vacío.
+- [x] Paleta, tarjetas y campos de eco Doppler v18.7; calculados sin caja.
+  Contraste medido: 0 textos bajo 4,5:1 en claro, oscuro y teléfono.
+
+Pendiente de Lucas: confirmar si la frase del recuadro "Estrés diastólico"
+("Criterio positivo: E/e' >14 + PSAP >50 mmHg o e' <7") se actualiza al criterio
+ASE 2016 que la app ya aplica. Es texto clínico: no se tocó.
+
 ## Límites y conservación
 
 - No borrar estudios, borradores, campos heredados ni correcciones manuales.

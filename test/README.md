@@ -27,6 +27,7 @@ npm test
 | `basales-automaticos.js` | Paneles basales, eliminación de automáticos obsoletos y conservación de campos/correcciones históricas sin controles de carga |
 | `medidas-vi.js` | Que una medida implausible del VI no produzca un RWT o una masa con cara de resultado |
 | `parrafo-pronostico.js` | Niveles, fusión de extensión, tope y exentos del párrafo pronóstico |
+| `estetica-botonera.js` | Botonera de eco Doppler, paneles de historial/sincronizar/perlas, motilidad antes del eco post, BORRAR TODO con Deshacer y una sola pregunta al guardar una edición a mano |
 | `barrido.js` | 800 casos al azar contra todas las invariantes a la vez |
 | `barra-motilidad.js` | Pincel de grado, grupos por unión, apagado, fase y filtro de vista |
 | `drift-grupos.js` | Que `motility-groups.js` no se separe del `motility-model.js` de la app de Doppler |

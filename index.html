@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=2.2-basales-1">
+    <link rel="stylesheet" href="styles.css?v=2.3-estetica-1">
 </head>
 <body>
 <div class="container">
@@ -17,16 +17,31 @@
     <header class="app-header">
         <div>
             <h1>Eco Estrés Cardíaco</h1>
-            <p class="version">v2.2 — Sin preámbulo redundante</p>
+            <p class="version">v2.3 — Misma botonera que eco Doppler</p>
         </div>
         <div class="header-controls">
+            <button type="button" class="btn btn-header" onclick="abrirPanel('perlas')" title="Perlas clínicas de los cursos, por tema">
+                📚 Perlas clínicas
+            </button>
             <button id="btn-theme-toggle" class="btn btn-icon" title="Cambiar Tema">
                 <span id="theme-icon">🌙</span>
             </button>
         </div>
     </header>
 
-    <div class="bloque-sep">
+    <!-- Barra fija. Cada chip baja a su bloque y deja el cursor en el primer campo
+         vacío (irASeccion), para seguir cargando sin buscar con el mouse. -->
+    <nav class="quick-nav" aria-label="Ir a una sección">
+        <a class="quick-nav__chip" href="#sec-identificacion" onclick="return irASeccion(event, 'sec-identificacion')"><span class="quick-nav__num">1</span> Identificación</a>
+        <a class="quick-nav__chip" href="#sec-reposo" onclick="return irASeccion(event, 'sec-reposo')"><span class="quick-nav__num">2</span> Reposo</a>
+        <a class="quick-nav__chip" href="#sec-esfuerzo" onclick="return irASeccion(event, 'sec-esfuerzo')"><span class="quick-nav__num">3</span> Esfuerzo</a>
+        <a class="quick-nav__chip" href="#sec-motilidad" onclick="return irASeccion(event, 'sec-motilidad')"><span class="quick-nav__num">4</span> Motilidad</a>
+        <a class="quick-nav__chip" href="#sec-post" onclick="return irASeccion(event, 'sec-post')">Eco post</a>
+        <a class="quick-nav__chip" href="#sec-especiales" onclick="return irASeccion(event, 'sec-especiales')">Válvulas</a>
+        <a class="quick-nav__chip" href="#sec-informe" onclick="return irASeccion(event, 'sec-informe')"><span class="quick-nav__num">5</span> Informe</a>
+    </nav>
+
+    <div class="bloque-sep" id="sec-identificacion">
         <span class="bloque-num">1</span>
         <span class="bloque-nombre">Identificación</span>
         <span class="bloque-hint">paciente, contexto e indicación</span>
@@ -80,7 +95,7 @@
             </div>
             <div class="form-group">
                 <label>Superficie Corporal (m²)</label>
-                <input autocomplete="off" type="text" id="sc_display" class="calculated-value" disabled>
+                <input autocomplete="off" type="text" id="sc_display" class="calculated-value" placeholder="—" disabled>
             </div>
         </div>
     </section>
@@ -277,7 +292,7 @@
         </div>
     </section>
 
-    <div class="bloque-sep">
+    <div class="bloque-sep" id="sec-reposo">
         <span class="bloque-num">2</span>
         <span class="bloque-nombre">Reposo</span>
         <span class="bloque-hint">eco basal y ECG basal</span>
@@ -319,11 +334,11 @@
             </div>
             <div class="form-group">
                 <label>Masa VI indexada (g/m²)</label>
-                <input autocomplete="off" type="text" id="imvi" class="calculated-value" disabled>
+                <input autocomplete="off" type="text" id="imvi" class="calculated-value" placeholder="—" disabled>
             </div>
             <div class="form-group">
                 <label>Espesor relativo — RWT</label>
-                <input autocomplete="off" type="text" id="rwt" class="calculated-value" disabled>
+                <input autocomplete="off" type="text" id="rwt" class="calculated-value" placeholder="—" disabled>
             </div>
             <div class="form-group" style="grid-column: 1 / -1">
                 <h3 class="subsection-title">Geometría del ventrículo izquierdo — cálculo automático</h3>
@@ -376,7 +391,7 @@
             </div>
             <div class="form-group">
                 <label>E/e' promedio Reposo</label>
-                <input autocomplete="off" type="text" id="ee_reposo" class="calculated-value" disabled>
+                <input autocomplete="off" type="text" id="ee_reposo" class="calculated-value" placeholder="—" disabled>
             </div>
             <div class="form-group">
                 <label for="vrt_rep">VRT Reposo (m/s)</label>
@@ -384,11 +399,11 @@
             </div>
             <div class="form-group">
                 <label>E/A</label>
-                <input autocomplete="off" type="text" id="ea_reposo" class="calculated-value" disabled>
+                <input autocomplete="off" type="text" id="ea_reposo" class="calculated-value" placeholder="—" disabled>
             </div>
             <div class="form-group">
                 <label for="lavi_reposo">Volumen AI indexado — LAVi (mL/m²)</label>
-                <input autocomplete="off" type="text" id="lavi_reposo" class="calculated-value" disabled>
+                <input autocomplete="off" type="text" id="lavi_reposo" class="calculated-value" placeholder="—" disabled>
             </div>
         </div>
 
@@ -472,10 +487,10 @@
     </section>
 
 
-    <div class="bloque-sep">
+    <div class="bloque-sep" id="sec-esfuerzo">
         <span class="bloque-num">3</span>
         <span class="bloque-nombre">Esfuerzo</span>
-        <span class="bloque-hint">hemodinamia, ECG, eco post-esfuerzo y motilidad</span>
+        <span class="bloque-hint">hemodinamia y ECG del esfuerzo</span>
     </div>
 
     <!-- ══════════════════════════════════════
@@ -627,7 +642,6 @@
             <div id="aviso-dp" class="aviso-adquisicion" style="display:none"></div>
             <div id="aviso-adquisicion" class="aviso-adquisicion" style="display:none"></div>
 
-            <div class="pearl-container" data-pearl="ejercicio"></div>
             <details class="plegable-tecnica" style="margin-top:0.75rem">
             <summary class="firma-nota" style="cursor:pointer">⚠ Contraindicaciones y criterios de suspensión</summary>
             <div class="info-banner info-banner-warning" style="margin-top:0.5rem">
@@ -710,7 +724,6 @@
                     <option value="criterio_medico">Criterio Médico</option>
                 </select>
             </div>
-            <div class="pearl-container" data-pearl="dobutamina"></div>
             <div class="info-banner info-banner-warning" style="margin-top:0.75rem">
                 <strong>Contraindicaciones:</strong> IAM reciente (&lt;3d), angina inestable, arritmias ventriculares complejas, HTA severa no controlada (>200/120), estenosis aórtica severa sintomática. &nbsp;|&nbsp; <strong>Antídoto:</strong> Metoprolol 1–5 mg EV o Esmolol.
             </div>
@@ -773,7 +786,6 @@
                     </select>
                 </div>
             </div>
-            <div class="pearl-container" data-pearl="dipiridamol"></div>
             <div class="info-banner info-banner-warning" style="margin-top:0.75rem">
                 <strong>Contraindicado en:</strong> Asma / EPOC activo, BAV 2°–3° sin marcapasos, hipotensión sistólica &lt;90 mmHg, estenosis carotídea bilateral severa, teofilina en las últimas 24 h. &nbsp;|&nbsp; <strong>Antídoto:</strong> Aminofilina 125–250 mg EV lento.
             </div>
@@ -800,7 +812,6 @@
                     <textarea autocomplete="off" id="nc_descripcion" rows="3" placeholder="Descripción del apremio no convencional utilizado, dosis, duración..."></textarea>
                 </div>
             </div>
-            <div class="pearl-container" data-pearl="noconvencional"></div>
         </div>
     </section>
 
@@ -893,92 +904,17 @@
         </details>
     </section>
 
-    <!-- ══════════════════════════════════════
-         ECO POST-ESFUERZO
-         ══════════════════════════════════════ -->
-    <section class="card">
-        <h2 class="section-title">Eco post-esfuerzo</h2>
-        <div class="grid">
-            <div class="form-group">
-                <label for="fevi_pico">FEy post-esfuerzo (%)</label>
-                <input autocomplete="off" type="number" id="fevi_pico" placeholder="%" min="10" max="80" oninput="calcFEVI()">
-            </div>
-            <div class="form-group">
-                <label>ΔFEy (Reposo → Pico)</label>
-                <input autocomplete="off" type="text" id="delta_fevi" class="calculated-value" disabled>
-            </div>
-            <!-- Opcionales, como los de reposo. El VTS post-esfuerzo sale como dato en
-                 la línea del esfuerzo; no mueve ningún criterio de positividad. -->
-            <div class="form-group">
-                <label for="vtd_pico">VTD post-esfuerzo (mL) <span class="firma-nota">(opcional)</span></label>
-                <input autocomplete="off" type="number" id="vtd_pico" placeholder="mL" min="20" max="500">
-            </div>
-            <div class="form-group">
-                <label for="vts_pico">VTS post-esfuerzo (mL) <span class="firma-nota">(opcional)</span></label>
-                <input autocomplete="off" type="number" id="vts_pico" placeholder="mL" min="5" max="400">
-            </div>
-        </div>
-
-        <!-- Retirado de la pantalla: la FEy de recuperación no sale en el informe ni en
-             la planilla. Un estudio guardado la restaura acá y la sigue mostrando en su
-             resumen técnico. -->
-        <div style="display:none" aria-hidden="true">
-            <input type="number" id="fevi_recup">
-        </div>
-
-        <h3 class="subsection-title" style="margin-top:1.25rem">Estrés diastólico</h3>
-        <div class="pearl-container" data-pearl="diastolico"></div>
-        <p class="module-description">
-            Evalúa la presión de llenado inducida por el ejercicio. E/e' &gt;14 con estrés sugiere disfunción diastólica inducible. Criterio positivo: E/e' &gt;14 + PSAP &gt;50 mmHg o e' &lt;7 cm/s con ejercicio.
-        </p>
-        <div class="grid">
-            <div class="form-group">
-                <label for="e_onda_est">E onda Estrés (cm/s)</label>
-                <input autocomplete="off" type="number" id="e_onda_est" placeholder="cm/s" step="0.1" oninput="calcDiastolico()">
-            </div>
-            <div class="form-group">
-                <label for="e_prima_est">e' septal Estrés (cm/s)</label>
-                <input autocomplete="off" type="number" id="e_prima_est" placeholder="cm/s" step="0.1" oninput="calcDiastolico()">
-            </div>
-            <div class="form-group">
-                <label for="e_prima_lat_est">e' lateral Estrés (cm/s)</label>
-                <input autocomplete="off" type="number" id="e_prima_lat_est" placeholder="cm/s" step="0.1" oninput="calcDiastolico()">
-            </div>
-            <div class="form-group">
-                <label>E/e' promedio Estrés</label>
-                <input autocomplete="off" type="text" id="ee_estres" class="calculated-value" disabled>
-            </div>
-            <div class="form-group">
-                <label for="vrt_est">VRT Estrés (m/s)</label>
-                <input autocomplete="off" type="number" id="vrt_est" placeholder="m/s" step="0.1" min="0" max="6" oninput="calcDiastolico()">
-            </div>
-        </div>
-        <div class="calc-box" style="margin-top:0.75rem">
-            <div class="calc-row"><span>E/e' Reposo:</span><span id="diast_rep_interp" class="calc-value">—</span></div>
-            <div class="calc-row"><span>E/e' Estrés:</span><span id="diast_est_interp" class="calc-value">—</span></div>
-            <div class="calc-row"><span>Respuesta de e' al esfuerzo:</span><span id="diast_eprima_resp" class="calc-value">—</span></div>
-            <div class="calc-row"><span>Test diastólico de esfuerzo:</span><span id="diast_respuesta" class="calc-value">—</span></div>
-        </div>
-        <!-- Los tres criterios a la vista. El selector manual se fue: el resultado
-             es automático y se ve de dónde sale. -->
-        <div id="diast-criterios" class="criterios-box" style="display:none; margin-top:0.5rem"></div>
-        <!-- Campo del resultado: oculto, lo completa el cálculo. Sigue existiendo
-             porque los estudios guardados lo traen y la planilla lo lee. -->
-        <select id="diast_resultado" style="display:none" aria-hidden="true">
-            <option value="no_evaluado">No evaluado</option>
-            <option value="negativo">Negativo</option>
-            <option value="positivo">Positivo</option>
-        </select>
-        <span id="diast_resultado_origen" style="display:none"></span>
-    </section>
-
+    <div class="bloque-sep" id="sec-motilidad">
+        <span class="bloque-num">4</span>
+        <span class="bloque-nombre">Post-esfuerzo</span>
+        <span class="bloque-hint">motilidad primero, después el Doppler y las válvulas</span>
+    </div>
 
     <!-- ══════════════════════════════════════
          MOTILIDAD PARIETAL — 17 SEGMENTOS
          ══════════════════════════════════════ -->
     <section class="card">
         <h2 class="section-title">Motilidad Parietal Segmentaria — Modelo AHA 17 Segmentos</h2>
-        <div class="pearl-container" data-pearl="motilidad"></div>
 
         <div class="wall-motion-legend">
             <span class="wm-dot wm-0">0</span>&nbsp;No evaluado &nbsp;
@@ -1140,25 +1076,101 @@
     </section>
 
 
-    <div class="bloque-sep">
-        <span class="bloque-num">4</span>
-        <span class="bloque-nombre">Situaciones especiales</span>
-        <span class="bloque-hint">viabilidad y estenosis aórtica</span>
-    </div>
+    <!-- ══════════════════════════════════════
+         ECO POST-ESFUERZO
+         ══════════════════════════════════════ -->
+    <section class="card" id="sec-post">
+        <h2 class="section-title">Eco post-esfuerzo</h2>
+        <div class="grid">
+            <div class="form-group">
+                <label for="fevi_pico">FEy post-esfuerzo (%)</label>
+                <input autocomplete="off" type="number" id="fevi_pico" placeholder="%" min="10" max="80" oninput="calcFEVI()">
+            </div>
+            <div class="form-group">
+                <label>ΔFEy (Reposo → Pico)</label>
+                <input autocomplete="off" type="text" id="delta_fevi" class="calculated-value" placeholder="—" disabled>
+            </div>
+            <!-- Opcionales, como los de reposo. El VTS post-esfuerzo sale como dato en
+                 la línea del esfuerzo; no mueve ningún criterio de positividad. -->
+            <div class="form-group">
+                <label for="vtd_pico">VTD post-esfuerzo (mL) <span class="firma-nota">(opcional)</span></label>
+                <input autocomplete="off" type="number" id="vtd_pico" placeholder="mL" min="20" max="500">
+            </div>
+            <div class="form-group">
+                <label for="vts_pico">VTS post-esfuerzo (mL) <span class="firma-nota">(opcional)</span></label>
+                <input autocomplete="off" type="number" id="vts_pico" placeholder="mL" min="5" max="400">
+            </div>
+        </div>
+
+        <!-- Retirado de la pantalla: la FEy de recuperación no sale en el informe ni en
+             la planilla. Un estudio guardado la restaura acá y la sigue mostrando en su
+             resumen técnico. -->
+        <div style="display:none" aria-hidden="true">
+            <input type="number" id="fevi_recup">
+        </div>
+
+        <h3 class="subsection-title" style="margin-top:1.25rem">Estrés diastólico</h3>
+        <p class="module-description">
+            Evalúa la presión de llenado inducida por el ejercicio. E/e' &gt;14 con estrés sugiere disfunción diastólica inducible. Criterio positivo: E/e' &gt;14 + PSAP &gt;50 mmHg o e' &lt;7 cm/s con ejercicio.
+        </p>
+        <div class="grid">
+            <div class="form-group">
+                <label for="e_onda_est">E onda Estrés (cm/s)</label>
+                <input autocomplete="off" type="number" id="e_onda_est" placeholder="cm/s" step="0.1" oninput="calcDiastolico()">
+            </div>
+            <div class="form-group">
+                <label for="e_prima_est">e' septal Estrés (cm/s)</label>
+                <input autocomplete="off" type="number" id="e_prima_est" placeholder="cm/s" step="0.1" oninput="calcDiastolico()">
+            </div>
+            <div class="form-group">
+                <label for="e_prima_lat_est">e' lateral Estrés (cm/s)</label>
+                <input autocomplete="off" type="number" id="e_prima_lat_est" placeholder="cm/s" step="0.1" oninput="calcDiastolico()">
+            </div>
+            <div class="form-group">
+                <label>E/e' promedio Estrés</label>
+                <input autocomplete="off" type="text" id="ee_estres" class="calculated-value" placeholder="—" disabled>
+            </div>
+            <div class="form-group">
+                <label for="vrt_est">VRT Estrés (m/s)</label>
+                <input autocomplete="off" type="number" id="vrt_est" placeholder="m/s" step="0.1" min="0" max="6" oninput="calcDiastolico()">
+            </div>
+        </div>
+        <div class="calc-box" style="margin-top:0.75rem">
+            <div class="calc-row"><span>E/e' Reposo:</span><span id="diast_rep_interp" class="calc-value">—</span></div>
+            <div class="calc-row"><span>E/e' Estrés:</span><span id="diast_est_interp" class="calc-value">—</span></div>
+            <div class="calc-row"><span>Respuesta de e' al esfuerzo:</span><span id="diast_eprima_resp" class="calc-value">—</span></div>
+            <div class="calc-row"><span>Test diastólico de esfuerzo:</span><span id="diast_respuesta" class="calc-value">—</span></div>
+        </div>
+        <!-- Los tres criterios a la vista. El selector manual se fue: el resultado
+             es automático y se ve de dónde sale. -->
+        <div id="diast-criterios" class="criterios-box" style="display:none; margin-top:0.5rem"></div>
+        <!-- Campo del resultado: oculto, lo completa el cálculo. Sigue existiendo
+             porque los estudios guardados lo traen y la planilla lo lee. -->
+        <select id="diast_resultado" style="display:none" aria-hidden="true">
+            <option value="no_evaluado">No evaluado</option>
+            <option value="negativo">Negativo</option>
+            <option value="positivo">Positivo</option>
+        </select>
+        <span id="diast_resultado_origen" style="display:none"></span>
+    </section>
+
+
 
     <!-- ══════════════════════════════════════
-         SECCIÓN 8: MÓDULOS ESPECIALES
+         SECCIÓN 8: SITUACIONES ESPECIALES
+         Plegado. Se abre solo en la pestaña de EAo con ejercicio cuando la
+         indicación es de EAo o se tilda válvula bicúspide (abrirModuloValvular).
          ══════════════════════════════════════ -->
-    <section class="card">
-        <details>
-            <summary class="section-title" style="cursor:pointer; list-style:none; display:flex; justify-content:space-between; align-items:center; margin-bottom:0">
-                Módulos Especiales <span class="badge-secondary">Avanzado</span>
+    <section class="card" id="sec-especiales">
+        <details id="especiales-detalle">
+            <summary class="section-title summary-plegable">
+                Situaciones especiales <span class="firma-nota">— válvulas con ejercicio y protocolos con dobutamina</span>
             </summary>
 
             <div class="special-tabs" style="margin-top:1rem">
-                <button class="special-tab active" onclick="setSpecialTab('viabilidad')">Viabilidad</button>
-                <button class="special-tab" onclick="setSpecialTab('estenosis_ao')">EAo bajo flujo</button>
-                <button class="special-tab" onclick="setSpecialTab('eao_ejercicio')">EAo asintomática</button>
+                <button class="special-tab active" onclick="setSpecialTab('eao_ejercicio')">EAo con ejercicio</button>
+                <button class="special-tab" onclick="setSpecialTab('viabilidad')">Viabilidad (dobutamina)</button>
+                <button class="special-tab" onclick="setSpecialTab('estenosis_ao')">EAo bajo flujo (dobutamina)</button>
                 <!-- CFR, strain y MCH quedan ocultos: calculan en pantalla y no llegan
                      al informe ni a la planilla. Los paneles siguen en el documento, así
                      que un estudio guardado con esa pestaña activa la vuelve a abrir. -->
@@ -1168,9 +1180,8 @@
             </div>
 
             <!-- VIABILIDAD -->
-            <div id="panel-viabilidad" class="special-panel" style="padding-top:0.5rem">
+            <div id="panel-viabilidad" class="special-panel" style="display:none; padding-top:0.5rem">
                 <h3 class="subsection-title">Viabilidad Miocárdica — Dobutamina Baja Dosis</h3>
-                <div class="pearl-container" data-pearl="viabilidad"></div>
                 <p class="module-description">Dosis bajas (2.5–10 mcg/kg/min) evalúan reserva contráctil. La respuesta bifásica (mejora a baja dosis → deterioro a alta dosis) identifica miocardio hibernado viable con isquemia superpuesta. (Dr. Jorge Lax)</p>
                 <div class="grid">
                     <div class="form-group">
@@ -1203,7 +1214,6 @@
             <!-- ESTENOSIS AÓRTICA -->
             <div id="panel-estenosis_ao" class="special-panel" style="display:none; padding-top:0.5rem">
                 <h3 class="subsection-title">Estenosis Aórtica — Bajo Flujo / Bajo Gradiente (Dr. Salvador Spina)</h3>
-                <div class="pearl-container" data-pearl="estenosis_ao"></div>
                 <p class="module-description">Dobutamina baja dosis diferencia estenosis aórtica verdadera severa de pseudoestenosis en pacientes con FEy deprimida. EAo verdadera: gradiente aumenta ≥40 mmHg, AVA no cambia. Pseudoestenosis: AVA aumenta &gt;1 cm², gradiente no alcanza ≥40 mmHg.</p>
                 <div class="grid">
                     <div class="form-group">
@@ -1239,7 +1249,7 @@
             </div>
 
             <!-- EAo SEVERA ASINTOMÁTICA CON EJERCICIO -->
-            <div id="panel-eao_ejercicio" class="special-panel" style="display:none; padding-top:0.5rem">
+            <div id="panel-eao_ejercicio" class="special-panel" style="padding-top:0.5rem">
                 <h3 class="subsection-title">Estenosis Aórtica severa asintomática — evaluación con ejercicio</h3>
                 <p class="module-description">
                     Indicación distinta de la de bajo flujo/bajo gradiente: acá el paciente ya tiene EAo severa
@@ -1313,11 +1323,11 @@
                     </div>
                     <div class="form-group">
                         <label>Δ Gradiente medio</label>
-                        <input autocomplete="off" type="text" id="eaoej_delta_grad" class="calculated-value" disabled>
+                        <input autocomplete="off" type="text" id="eaoej_delta_grad" class="calculated-value" placeholder="—" disabled>
                     </div>
                     <div class="form-group">
                         <label>PSAP post-esfuerzo (mmHg)</label>
-                        <input autocomplete="off" type="text" id="eaoej_psap_post" class="calculated-value" disabled>
+                        <input autocomplete="off" type="text" id="eaoej_psap_post" class="calculated-value" placeholder="—" disabled>
                         <span class="firma-nota">Se deduce de la VRT post-esfuerzo que ya cargás en el estrés diastólico.</span>
                     </div>
                 </div>
@@ -1358,7 +1368,6 @@
             <!-- CFR -->
             <div id="panel-cfr" class="special-panel" style="display:none; padding-top:0.5rem">
                 <h3 class="subsection-title">Reserva de Flujo Coronario — CFR (Dr. Jorge Lowenstein)</h3>
-                <div class="pearl-container" data-pearl="cfr"></div>
                 <p class="module-description">El CFR se mide con Doppler pulsado en la arteria DA distal. Relación velocidades diastólicas estrés/reposo. CFR ≥2.0 = normal. CFR &lt;2.0 = reducida (estenosis o disfunción microvascular).</p>
                 <div class="grid">
                     <div class="form-group">
@@ -1371,11 +1380,11 @@
                     </div>
                     <div class="form-group">
                         <label>CFR Calculado</label>
-                        <input autocomplete="off" type="text" id="cfr_resultado" class="calculated-value" disabled>
+                        <input autocomplete="off" type="text" id="cfr_resultado" class="calculated-value" placeholder="—" disabled>
                     </div>
                     <div class="form-group">
                         <label>Interpretación CFR</label>
-                        <input autocomplete="off" type="text" id="cfr_interp" class="calculated-value" disabled>
+                        <input autocomplete="off" type="text" id="cfr_interp" class="calculated-value" placeholder="—" disabled>
                     </div>
                 </div>
                 <div class="info-banner" style="margin-top:0.5rem">
@@ -1386,7 +1395,6 @@
             <!-- STRAIN -->
             <div id="panel-strain" class="special-panel" style="display:none; padding-top:0.5rem">
                 <h3 class="subsection-title">Strain Longitudinal Global (GLS) con Estrés (Dra. Rosina Arbucci)</h3>
-                <div class="pearl-container" data-pearl="strain"></div>
                 <p class="module-description">GLS normal en reposo ≤ −20%. Reserva de strain (ΔGLS) ≥2% indica contractilidad normal. La ausencia de mejoría o el empeoramiento del GLS con estrés sugiere disfunción subclínica o isquemia inducible.</p>
                 <div class="grid">
                     <div class="form-group">
@@ -1399,11 +1407,11 @@
                     </div>
                     <div class="form-group">
                         <label>Reserva de Strain (ΔGLS)</label>
-                        <input autocomplete="off" type="text" id="strain_reserva" class="calculated-value" disabled>
+                        <input autocomplete="off" type="text" id="strain_reserva" class="calculated-value" placeholder="—" disabled>
                     </div>
                     <div class="form-group">
                         <label>Interpretación</label>
-                        <input autocomplete="off" type="text" id="strain_interp" class="calculated-value" disabled>
+                        <input autocomplete="off" type="text" id="strain_interp" class="calculated-value" placeholder="—" disabled>
                     </div>
                 </div>
             </div>
@@ -1411,7 +1419,6 @@
             <!-- MCH / CHAGAS -->
             <div id="panel-mch" class="special-panel" style="display:none; padding-top:0.5rem">
                 <h3 class="subsection-title">MCH y Enfermedad de Chagas (Dr. Rodrigo Ibáñez / Dr. Miguel Amor)</h3>
-                <div class="pearl-container" data-pearl="mch"></div>
                 <p class="module-description">En MCH: el estrés puede inducir/incrementar la obstrucción del TSVI (obstrucción latente si gradiente &gt;30 mmHg con estrés). En Chagas: evalúa isquemia, disfunción segmentaria y reserva contráctil.</p>
                 <div class="grid">
                     <div class="form-group">
@@ -1424,11 +1431,11 @@
                     </div>
                     <div class="form-group">
                         <label>ΔGradiente TSVI</label>
-                        <input autocomplete="off" type="text" id="mch_delta_grad" class="calculated-value" disabled>
+                        <input autocomplete="off" type="text" id="mch_delta_grad" class="calculated-value" placeholder="—" disabled>
                     </div>
                     <div class="form-group">
                         <label>Obstrucción Latente</label>
-                        <input autocomplete="off" type="text" id="mch_obs_latente" class="calculated-value" disabled>
+                        <input autocomplete="off" type="text" id="mch_obs_latente" class="calculated-value" placeholder="—" disabled>
                     </div>
                     <div class="form-group">
                         <label for="mch_sam">Movimiento Anterior Sistólico (SAM)</label>
@@ -1451,7 +1458,7 @@
         </details>
     </section>
 
-    <div class="bloque-sep">
+    <div class="bloque-sep" id="sec-informe">
         <span class="bloque-num">5</span>
         <span class="bloque-nombre">Informe</span>
         <span class="bloque-hint">avisos, interpretación y texto generado</span>
@@ -1474,7 +1481,6 @@
          ══════════════════════════════════════ -->
     <section class="card card-result">
         <h2 class="section-title">Interpretación y Resultado</h2>
-        <div class="pearl-container" data-pearl="errores"></div>
 
         <!-- Lo que el operador OBSERVA y la app no puede deducir: queda a la vista. -->
         <div class="grid grid-2col">
@@ -1560,20 +1566,9 @@
          ══════════════════════════════════════ -->
     <section class="card">
         <h2 class="section-title">Informe Final</h2>
-        <div class="report-controls">
-            <button class="btn btn-primary" onclick="generarInforme()">📄 Generar informe</button>
-            <button class="btn btn-secondary" onclick="copiarReporte()">📋 Copiar al portapapeles</button>
-            <button class="btn btn-secondary" onclick="imprimirReporte()">🖨️ Imprimir</button>
-            <button class="btn btn-secondary" onclick="generarReporte()">📊 Planilla de datos</button>
-            <button class="btn btn-primary" onclick="guardarEnPlanilla()">📊 Guardar en planilla</button>
-            <button class="btn btn-secondary" onclick="guardarEnHistorial()">💾 Guardar en Historial</button>
-            <button class="btn btn-danger" onclick="limpiarFormulario()">🗑️ Nuevo Estudio</button>
-        </div>
-        <div class="form-group firma-config">
-            <label for="firma_informe">Firma del informe</label>
-            <input autocomplete="off" type="text" id="firma_informe" placeholder="Ej: Dra. Nombre Apellido · Matrícula 12345">
-            <span class="firma-nota">Se guarda sólo en este navegador: no viaja al repositorio ni a ningún servidor. Se agrega al pie del informe.</span>
-        </div>
+        <!-- Los botones del informe viven en la botonera de abajo, igual que en la
+             app de eco Doppler. La firma pasó a ⚙ Sincronizar. -->
+        <p class="informe-vacio" id="informe-vacio">El informe aparece acá al apretar <strong>Generar informe</strong> en la botonera de abajo.</p>
         <details id="completud-detalle" class="completud-detalle">
             <summary>Ver completud <span id="completud-resumen" role="status" aria-live="polite">Sin comprobar</span></summary>
             <div id="validacion-panel" class="validacion-panel" style="display:none"></div>
@@ -1642,16 +1637,35 @@
         </div>
     </section>
 
-    <div class="bloque-sep">
-        <span class="bloque-num">·</span>
-        <span class="bloque-nombre">Herramientas</span>
-        <span class="bloque-hint">presets, checklist y archivo</span>
-    </div>
-
 
     <!-- ══════════════════════════════════════
-         PRESETS DE CARGA RÁPIDA (sólo para probar)
+         BOTONERA — la misma de la app de eco Doppler
          ══════════════════════════════════════ -->
+    <section class="action-buttons" aria-label="Acciones del estudio">
+        <button type="button" id="btn_reset" class="btn btn-dock-clear" onclick="borrarTodo()" title="Vacía el estudio sin preguntar. Unos segundos queda un Deshacer.">
+            <span>🗑️</span> BORRAR TODO
+        </button>
+        <button type="button" id="btn_generate" class="btn btn-primary" onclick="generarDesdeBotonera()">
+            <span>📋</span> GENERAR INFORME
+        </button>
+        <button type="button" id="btn_copy" class="btn btn-success" onclick="copiarReporte()">
+            <span>📄</span> COPIAR INFORME
+        </button>
+        <button type="button" id="btn_save_study" class="btn btn-success" onclick="guardarEstudio()" title="Guarda en el historial de esta computadora y, si está configurada, envía a la planilla">
+            <span>💾</span> GUARDAR ESTUDIO
+        </button>
+        <button type="button" id="btn_historial" class="btn btn-secondary" onclick="abrirPanel('historial')" title="Historial de la jornada y casuística">
+            <span>🗂️</span> HISTORIAL <span class="badge-dock" id="historial-badge-dock"></span>
+        </button>
+        <button type="button" id="btn_sync_setup" class="btn btn-secondary" onclick="abrirPanel('sync')" title="Planilla de Google Sheets y firma del informe">
+            <span>⚙️</span> SINCRONIZAR
+        </button>
+    </section>
+
+    <!-- Retirados de la pantalla, no borrados: los presets son para probar (los usa
+         la batería) y el checklist no alimenta nada. Siguen en el documento para que
+         un estudio guardado los restaure igual. -->
+    <div id="herramientas-retiradas" style="display:none" aria-hidden="true">
     <section class="card preset-section">
         <details>
             <summary class="section-title" style="cursor:pointer; list-style:none; display:flex; justify-content:space-between; align-items:center; margin-bottom:0">
@@ -1674,10 +1688,6 @@
             </div>
         </details>
     </section>
-
-    <!-- ══════════════════════════════════════
-         CHECKLIST PRE-ESTUDIO
-         ══════════════════════════════════════ -->
     <section class="card">
         <details id="checklist-details">
             <summary class="section-title" style="cursor:pointer; list-style:none; display:flex; justify-content:space-between; align-items:center; margin-bottom:0">
@@ -1701,62 +1711,20 @@
             </div>
         </details>
     </section>
+    </div>
 
     <!-- ══════════════════════════════════════
-         PLANILLA DE ESTUDIOS (Google Sheets)
+         PANELES LATERALES (se abren desde la botonera y el encabezado)
          ══════════════════════════════════════ -->
-    <section class="card" id="card-planilla">
-        <details>
-            <summary class="section-title" style="cursor:pointer; list-style:none; display:flex; justify-content:space-between; align-items:center; margin-bottom:0">
-                Planilla de Estudios <span class="badge-secondary" id="planilla-badge">sin configurar</span>
-            </summary>
-            <p class="module-description" style="margin-top:0.75rem">
-                Cada estudio se agrega como una fila a una hoja de Google Sheets, con el informe completo en la última columna.
-                <strong>Se guarda una copia local antes de enviar.</strong> El navegador no permite leer la respuesta del script,
-                así que la app <em>no puede saber</em> si el estudio llegó: quedan en el respaldo hasta que mires la planilla
-                y confirmes. Si algo no llegó, se reenvía o se exporta a CSV.
-            </p>
-            <div class="historial-acciones">
-                <button class="btn btn-secondary btn-sm" onclick="abrirConfigPlanilla()">⚙ Configurar planilla</button>
-                <button class="btn btn-secondary btn-sm" onclick="reintentarPendientes()">↻ Reenviar</button>
-                <button class="btn btn-secondary btn-sm" onclick="exportarPlanillaCSV()">⬇ Exportar CSV</button>
-                <button class="btn btn-secondary btn-sm" onclick="confirmarEnviados()">✓ Confirmar recepción</button>
+    <div class="panel-lateral" id="panel-historial" hidden role="dialog" aria-modal="true" aria-labelledby="panel-historial-titulo">
+        <div class="panel-lateral__fondo" onclick="cerrarPanel()"></div>
+        <div class="panel-lateral__caja">
+            <div class="panel-lateral__cabecera">
+                <h2 id="panel-historial-titulo">Historial y casuística</h2>
+                <button type="button" class="panel-lateral__cerrar" onclick="cerrarPanel()" aria-label="Cerrar">✕</button>
             </div>
-            <div id="planilla-estado"></div>
-        </details>
-    </section>
-
-    <!-- ══════════════════════════════════════
-         CASUÍSTICA ANÓNIMA (no vence)
-         ══════════════════════════════════════ -->
-    <section class="card" id="card-casuistica">
-        <details>
-            <summary class="section-title" style="cursor:pointer; list-style:none; display:flex; justify-content:space-between; align-items:center; margin-bottom:0">
-                Casuística <span class="badge-secondary" id="casuistica-badge">0</span>
-            </summary>
-            <p class="module-description" style="margin-top:0.75rem">
-                Cuando un estudio se descarta del historial, sus datos identificatorios se borran y la parte clínica queda acá.
-                <strong>No vence.</strong> Sirve para revisar tu serie y para compartir casos sin tener que anonimizar a mano.
-            </p>
-            <div class="historial-acciones">
-                <button class="btn btn-secondary btn-sm" onclick="exportarCasuistica()">⬇ Exportar casuística</button>
-                <button class="btn btn-danger btn-sm" onclick="borrarCasuistica()">🗑 Borrar casuística</button>
-            </div>
-            <div class="form-group" style="margin-bottom:0.5rem">
-                <input autocomplete="off" type="search" id="casuistica-buscar"
-                    placeholder="Buscar en los antecedentes: bicúspide, chagas, marcapasos…"
-                    oninput="buscarCasuistica()">
-                <span class="firma-nota">Busca en los antecedentes, la valvulopatía y el texto del informe.</span>
-            </div>
-            <div id="casuistica-resumen"></div>
-        </details>
-    </section>
-
-    <!-- ══════════════════════════════════════
-         SECCIÓN 10: HISTORIAL DE ESTUDIOS
-         ══════════════════════════════════════ -->
     <section class="card" id="card-historial">
-        <details>
+        <details open>
             <summary class="section-title" style="cursor:pointer; list-style:none; display:flex; justify-content:space-between; align-items:center; margin-bottom:0">
                 Historial de Estudios <span class="badge-secondary" id="historial-badge">0</span>
             </summary>
@@ -1779,23 +1747,103 @@
             <div id="historial-lista"></div>
         </details>
     </section>
+    <section class="card" id="card-casuistica">
+        <details open>
+            <summary class="section-title" style="cursor:pointer; list-style:none; display:flex; justify-content:space-between; align-items:center; margin-bottom:0">
+                Casuística <span class="badge-secondary" id="casuistica-badge">0</span>
+            </summary>
+            <p class="module-description" style="margin-top:0.75rem">
+                Cuando un estudio se descarta del historial, sus datos identificatorios se borran y la parte clínica queda acá.
+                <strong>No vence.</strong> Sirve para revisar tu serie y para compartir casos sin tener que anonimizar a mano.
+            </p>
+            <div class="historial-acciones">
+                <button class="btn btn-secondary btn-sm" onclick="exportarCasuistica()">⬇ Exportar casuística</button>
+                <button class="btn btn-danger btn-sm" onclick="borrarCasuistica()">🗑 Borrar casuística</button>
+            </div>
+            <div class="form-group" style="margin-bottom:0.5rem">
+                <input autocomplete="off" type="search" id="casuistica-buscar"
+                    placeholder="Buscar en los antecedentes: bicúspide, chagas, marcapasos…"
+                    oninput="buscarCasuistica()">
+                <span class="firma-nota">Busca en los antecedentes, la valvulopatía y el texto del informe.</span>
+            </div>
+            <div id="casuistica-resumen"></div>
+        </details>
+    </section>
+        </div>
+    </div>
 
+    <div class="panel-lateral" id="panel-sync" hidden role="dialog" aria-modal="true" aria-labelledby="panel-sync-titulo">
+        <div class="panel-lateral__fondo" onclick="cerrarPanel()"></div>
+        <div class="panel-lateral__caja">
+            <div class="panel-lateral__cabecera">
+                <h2 id="panel-sync-titulo">Sincronizar y firma</h2>
+                <button type="button" class="panel-lateral__cerrar" onclick="cerrarPanel()" aria-label="Cerrar">✕</button>
+            </div>
+    <section class="card" id="card-planilla">
+        <details open>
+            <summary class="section-title" style="cursor:pointer; list-style:none; display:flex; justify-content:space-between; align-items:center; margin-bottom:0">
+                Planilla de Estudios <span class="badge-secondary" id="planilla-badge">sin configurar</span>
+            </summary>
+            <p class="module-description" style="margin-top:0.75rem">
+                Cada estudio se agrega como una fila a una hoja de Google Sheets, con el informe completo en la última columna.
+                <strong>Se guarda una copia local antes de enviar.</strong> El navegador no permite leer la respuesta del script,
+                así que la app <em>no puede saber</em> si el estudio llegó: quedan en el respaldo hasta que mires la planilla
+                y confirmes. Si algo no llegó, se reenvía o se exporta a CSV.
+            </p>
+            <div class="historial-acciones">
+                <button class="btn btn-secondary btn-sm" onclick="abrirConfigPlanilla()">⚙ Configurar planilla</button>
+                <button class="btn btn-secondary btn-sm" onclick="reintentarPendientes()">↻ Reenviar</button>
+                <button class="btn btn-secondary btn-sm" onclick="exportarPlanillaCSV()">⬇ Exportar CSV</button>
+                <button class="btn btn-secondary btn-sm" onclick="confirmarEnviados()">✓ Confirmar recepción</button>
+            </div>
+            <div id="planilla-estado"></div>
+        </details>
+    </section>
+    <section class="card">
+            <h2 class="section-title">Firma del informe</h2>
+            <div class="form-group firma-config">
+                <label for="firma_informe">Firma del informe</label>
+                <input autocomplete="off" type="text" id="firma_informe" placeholder="Ej: Dra. Nombre Apellido · Matrícula 12345">
+                <span class="firma-nota">Se guarda sólo en este navegador: no viaja al repositorio ni a ningún servidor. Se agrega al pie del informe.</span>
+            </div>
+    </section>
+            <section class="card">
+                <h2 class="section-title">Otras salidas</h2>
+                <div class="historial-acciones">
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="imprimirReporte()">🖨️ Imprimir informe</button>
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="generarReporte()">📊 Planilla de datos (dobutamina / dipiridamol)</button>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <div class="panel-lateral" id="panel-perlas" hidden role="dialog" aria-modal="true" aria-labelledby="panel-perlas-titulo">
+        <div class="panel-lateral__fondo" onclick="cerrarPanel()"></div>
+        <div class="panel-lateral__caja">
+            <div class="panel-lateral__cabecera">
+                <h2 id="panel-perlas-titulo">📚 Perlas clínicas</h2>
+                <button type="button" class="panel-lateral__cerrar" onclick="cerrarPanel()" aria-label="Cerrar">✕</button>
+            </div>
+            <p class="firma-nota" style="margin-bottom:0.75rem">De los cursos, por tema. No alimentan el informe: están para consultar.</p>
+            <div id="perlas-lista"></div>
+        </div>
+    </div>
 
 </div>
 <script src="vendor/doppler/motility-model.js?v=2.2"></script>
 <script src="vendor/doppler/motility-engine.js?v=2.2"></script>
 <script src="vendor/doppler/territory-engine.js?v=2.2"></script>
 <script src="motility-estres.js?v=2.2"></script>
-<script src="pearls.js?v=2.2"></script>
+<script src="pearls.js?v=2.3-estetica-1"></script>
 <script src="motility-groups.js?v=2.2"></script>
 <script src="report-templates.js?v=2.2-grados-1"></script>
 <script src="sheets-storage.js?v=2.2"></script>
-<script src="app.js?v=2.2-basales-1"></script>
+<script src="app.js?v=2.3-estetica-1"></script>
 <script>
 // Control de versión: si el navegador sirvió una mezcla de archivos viejos y nuevos,
 // los botones fallan en silencio. Esto lo convierte en un aviso visible.
 (function () {
-    var APP_VERSION = '2.2';
+    var APP_VERSION = '2.3';
     var faltan = ['generarInforme', 'recolectarHallazgos', 'calcEjercicio'].filter(function (f) {
         return typeof window[f] !== 'function';
     });

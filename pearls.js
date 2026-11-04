@@ -273,3 +273,31 @@ function initPearls() {
 }
 
 document.addEventListener('DOMContentLoaded', initPearls);
+
+// ── PANEL DE PERLAS ─────────────────────────────
+// Las perlas salieron del flujo de carga: estaban en el medio de cada sección y
+// no alimentan nada. Ahora viven en un panel aparte (📚 en el encabezado),
+// agrupadas por tema y en el orden en que se usan con ejercicio.
+const PERLAS_ORDEN = [
+    'ejercicio', 'motilidad', 'diastolico', 'interpretacion', 'errores',
+    'estenosis_ao', 'especiales', 'coronarias_normales', 'dolor_mcd',
+    'viabilidad', 'dobutamina', 'dipiridamol', 'noconvencional',
+    'contraste', 'cfr', 'strain', 'mch'
+];
+
+function renderPerlasPanel() {
+    const cont = document.getElementById('perlas-lista');
+    if (!cont || cont.dataset.listo) return;
+    const claves = PERLAS_ORDEN.filter(k => PEARLS_DATA[k])
+        .concat(Object.keys(PEARLS_DATA).filter(k => !PERLAS_ORDEN.includes(k)));
+    cont.innerHTML = claves.map((k, i) => {
+        const d = PEARLS_DATA[k];
+        const items = d.pearls.map(p => `<li data-icon="${p.icon}">${p.text}</li>`).join('');
+        return `<details class="perla-tema"${i === 0 ? ' open' : ''}>
+            <summary><span class="perla-tema__curso">${d.course}</span>
+                <span class="perla-tema__prof">${d.professor}</span></summary>
+            <ul class="pearl-list">${items}</ul>
+        </details>`;
+    }).join('');
+    cont.dataset.listo = '1';
+}

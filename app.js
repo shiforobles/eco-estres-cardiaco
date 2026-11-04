@@ -44,7 +44,7 @@ const SCORE_COLORS = ['#9CA3AF','#22C55E','#FDE047','#FB923C','#EF4444','#A855F7
 const SCORE_LABELS = ['—','Normal','Hipoc.L','Hipoc.M','Acinesia','Discinesia'];
 
 let currentProtocol = 'ejercicio';
-let currentSpecialTab = 'viabilidad';
+let currentSpecialTab = 'eao_ejercicio';   // la pestaña de quien hace ejercicio
 
 // ── INIT ──────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
@@ -2025,7 +2025,7 @@ function getResponse(scoreRep, scoreEst) {
 function makeBtns(segId, stateKey) {
     return SCORE_COLORS.map((color, i) =>
         `<button class="seg-score-btn ${WM[stateKey][segId] === i ? 'active' : ''}"
-            style="background:${color}; color:${i >= 4 ? '#fff' : '#111'}"
+            style="background:${i === 4 ? '#B91C1C' : i === 5 ? '#7E22CE' : color}; color:${i >= 4 ? '#fff' : '#111'}"
             onclick="setScore(${segId},'${stateKey}',${i})" title="${SCORE_LABELS[i]}">${i}</button>`
     ).join('');
 }
@@ -5152,6 +5152,9 @@ function marcarInformeDesactualizado() {
 // Antes de guardar en cualquier lado: el texto tiene que ser de esta versión.
 // Devuelve el informe a guardar, o '' si no hay nada que guardar.
 function informeParaGuardar() {
+    // GUARDAR ESTUDIO guarda en el historial y en la planilla en un mismo acto: la
+    // decisión sobre una edición a mano se toma una sola vez, no dos.
+    if (INFORME_DECIDIDO !== null) return INFORME_DECIDIDO;
     const out = document.getElementById('reporte-output');
     let texto = out ? out.textContent.trim() : '';
     if (!texto) { generarInforme(); return out ? out.textContent.trim() : ''; }
@@ -5513,6 +5516,7 @@ function guardarEnHistorial() {
         localStorage.setItem(HIST_KEY, JSON.stringify(lista.slice(0, HIST_MAX)));
         renderHistorial();
         showNotice('Estudio guardado en el historial de esta computadora.', 'ok');
+        return true;
     } catch (e) {
         alert('No se pudo guardar en el historial (almacenamiento lleno).');
     }
@@ -5995,6 +5999,8 @@ function renderHistorial(avisarPurga) {
             : `Se descartaron del historial ${purgados} estudios de más de 12 h.`, 'warn');
     const lista = leerHistorial();
     document.getElementById('historial-badge').textContent = lista.length;
+    const badgeDock = document.getElementById('historial-badge-dock');
+    if (badgeDock) badgeDock.textContent = lista.length ? String(lista.length) : '';
     if (!lista.length) {
         cont.innerHTML = '<p class="module-description">Todavía no hay estudios guardados.</p>';
         return;
@@ -6250,7 +6256,7 @@ function resetFormulario() {
     camposCorregidos = {};   // paciente nuevo: la app vuelve a proponer todo
     calcGeometria(); calcDiastolico(); mostrarDatosBasalesHeredados();
     setProtocol('ejercicio');
-    setSpecialTab('viabilidad');
+    setSpecialTab('eao_ejercicio');
     updateChecklistBadge();
     calcEjercicio();
     document.getElementById('aviso-adquisicion').style.display = 'none';
@@ -6419,9 +6425,10 @@ function captureDobStages() {
 }
 
 // ── Guardado ──────────────────────────────────
-function saveDraft() {
-    try {
-        const draft = {
+// Foto completa del estudio en pantalla: la usa el autosave y el Deshacer de
+// BORRAR TODO, que la devuelve con aplicarEstudio().
+function construirBorrador() {
+        return {
             version: DRAFT_VERSION,
             savedAt: new Date().toISOString(),
             fields: captureFields(),
@@ -6443,6 +6450,11 @@ function saveDraft() {
             osecac: cuadrosOsecacEnPantalla(),
             osecacGenerado: { ...TEXTO_OSECAC }
         };
+}
+
+function saveDraft() {
+    try {
+        const draft = construirBorrador();
         localStorage.setItem(draftKeyActual, JSON.stringify(draft));
     } catch (e) {
         console.warn('No se pudo guardar el borrador:', e);
@@ -6853,3 +6865,156 @@ const PRESETS = {
     }
 };
 
+
+
+// ══════════════════════════════════════════════
+//  BOTONERA, PANELES Y NAVEGACIÓN — igual que la app de eco Doppler
+//  Sólo presentación: no cambia cálculos, criterios ni texto del informe.
+// ══════════════════════════════════════════════
+
+// Lo decidido sobre una edición a mano mientras dura GUARDAR ESTUDIO (ver
+// informeParaGuardar). Fuera de ese acto vale null.
+let INFORME_DECIDIDO = null;
+
+// GENERAR INFORME: el narrativo es de ejercicio; con dobutamina o dipiridamol el
+// mismo botón arma la planilla de datos, que es lo que esos protocolos tienen.
+function generarDesdeBotonera() {
+    if (currentProtocol !== 'ejercicio') { generarReporte(); return; }
+    generarInforme();
+    const out = document.getElementById('reporte-output');
+    if (out && out.style.display === 'block' && out.scrollIntoView)
+        out.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// GUARDAR ESTUDIO: historial de esta computadora y, si está configurada, la
+// planilla. Es lo mismo que antes hacían los dos botones por separado.
+async function guardarEstudio() {
+    const texto = informeParaGuardar();
+    if (!texto) { alert('No se pudo generar el informe: revisá los datos del estudio.'); return; }
+    INFORME_DECIDIDO = texto;
+    try {
+        if (!guardarEnHistorial()) return;
+        if (window.EstresSheets && EstresSheets.estaConfigurado()) await guardarEnPlanilla();
+        else showNotice('Guardado en el historial. La planilla no está configurada (⚙ Sincronizar).', 'ok');
+    } finally {
+        INFORME_DECIDIDO = null;
+    }
+}
+
+// BORRAR TODO: sin preguntar, como en eco Doppler. La página vuelve a como se
+// abre (motilidad en verde y sin leer) y unos segundos queda un Deshacer que
+// devuelve el estudio tal como estaba.
+const DESHACER_SEGUNDOS = 15;
+function borrarTodo() {
+    const previo = construirBorrador();
+    previo.crmSoloCirugia = !CRM_AMBIGUO;
+    const motilidadTocada = MOTILIDAD_TOCADA;
+
+    resetFormulario();
+    SEGMENTS.forEach(s => { WM.reposo[s.id] = 1; WM.estres[s.id] = 1; });
+    MOTILIDAD_TOCADA = false;
+    renderBullsEye('svg-reposo', 'reposo');
+    renderBullsEye('svg-estres', 'estres');
+    buildSegmentsTable();
+    updateWMSI();
+    if (typeof sincronizarBarraMotilidad === 'function') sincronizarBarraMotilidad();
+    clearDraft();
+    if (window.scrollTo) { try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (e) { /* jsdom */ } }
+    ofrecerDeshacerBorrado(previo, motilidadTocada);
+}
+
+function ofrecerDeshacerBorrado(previo, motilidadTocada) {
+    const vieja = document.getElementById('undo-reset');
+    if (vieja) vieja.remove();
+    const barra = document.createElement('div');
+    barra.id = 'undo-reset';
+    barra.className = 'undo-bar';
+    barra.setAttribute('role', 'status');
+    barra.innerHTML = '<span>Estudio borrado.</span><button type="button" class="undo-bar__btn">Deshacer</button>';
+    let temporizador;
+    const cerrar = () => { clearTimeout(temporizador); barra.remove(); };
+    barra.querySelector('button').addEventListener('click', () => {
+        cerrar();
+        aplicarEstudio(previo);
+        MOTILIDAD_TOCADA = motilidadTocada;   // aplicarEstudio la da por leída
+        updateWMSI();
+        saveDraft();
+        showNotice('Estudio recuperado.', 'ok');
+    });
+    temporizador = setTimeout(cerrar, DESHACER_SEGUNDOS * 1000);
+    document.body.appendChild(barra);
+}
+
+// ── Paneles laterales: historial, sincronizar, perlas ──
+let panelAbierto = null;
+function abrirPanel(nombre) {
+    cerrarPanel();
+    const p = document.getElementById('panel-' + nombre);
+    if (!p) return;
+    if (nombre === 'perlas' && typeof renderPerlasPanel === 'function') renderPerlasPanel();
+    p.hidden = false;
+    panelAbierto = p;
+    document.body.classList.add('con-panel');
+    const cerrarBtn = p.querySelector('.panel-lateral__cerrar');
+    if (cerrarBtn) cerrarBtn.focus();
+}
+function cerrarPanel() {
+    if (!panelAbierto) return;
+    panelAbierto.hidden = true;
+    panelAbierto = null;
+    document.body.classList.remove('con-panel');
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') cerrarPanel(); });
+
+// ── Barra de secciones: baja al bloque y deja el cursor en el primer campo vacío ──
+function camposDeSeccion(inicio) {
+    const nodos = [inicio];
+    if (inicio.classList.contains('bloque-sep')) {
+        let n = inicio.nextElementSibling;
+        while (n && !n.classList.contains('bloque-sep') && !n.classList.contains('action-buttons')) {
+            nodos.push(n); n = n.nextElementSibling;
+        }
+    }
+    const visible = el => !!(el.offsetParent || el.getClientRects().length);
+    const campos = [];
+    nodos.forEach(n => n.querySelectorAll && n.querySelectorAll('input, textarea').forEach(el => {
+        if (el.disabled || el.readOnly || el.classList.contains('calculated-value')) return;
+        if (['checkbox', 'radio', 'hidden', 'button', 'date', 'search'].includes(el.type)) return;
+        if (el.closest('details:not([open])') || !visible(el)) return;
+        campos.push(el);
+    }));
+    return campos;
+}
+
+function irASeccion(ev, id) {
+    if (ev && ev.preventDefault) ev.preventDefault();
+    const destino = document.getElementById(id);
+    if (!destino) return false;
+    const plegado = destino.querySelector('details');
+    if (id === 'sec-especiales' && plegado) plegado.open = true;
+    if (destino.scrollIntoView) destino.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    // En pantalla táctil, enfocar abre el teclado encima de lo que se quiere ver.
+    const tactil = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+    if (!tactil) {
+        const vacio = camposDeSeccion(destino).find(el => !el.value);
+        if (vacio) vacio.focus({ preventScroll: true });
+    }
+    return false;
+}
+
+// ── Situaciones especiales: se abre sola cuando el estudio es valvular ──
+function abrirModuloValvular() {
+    const ind = (document.getElementById('indicacion') || {}).value;
+    const bic = (document.getElementById('ant_bicuspide') || {}).checked;
+    if (!(ind === 'eao_asintomatica' || ind === 'eao_moderada' || bic)) return;
+    if (currentProtocol !== 'ejercicio') return;
+    const det = document.getElementById('especiales-detalle');
+    if (det) det.open = true;
+    if (currentSpecialTab !== 'eao_ejercicio') setSpecialTab('eao_ejercicio');
+}
+document.addEventListener('DOMContentLoaded', () => {
+    ['indicacion', 'ant_bicuspide'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('change', abrirModuloValvular);
+    });
+});
