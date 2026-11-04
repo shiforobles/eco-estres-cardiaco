@@ -422,46 +422,75 @@
         <details class="plegable-tecnica">
             <summary class="section-title" style="cursor:pointer; list-style:none">ECG basal <span class="firma-nota">— lo carga la técnica; se despliega con un clic</span></summary>
 
-        
+        <p class="firma-nota" style="margin:0.25rem 0 0.75rem">Todo arranca en normal: sólo cambiás lo alterado. «+ Agregar» suma otro hallazgo en el mismo apartado (BCRD + HBAI, T negativas + infradesnivel).</p>
+
         <div class="grid">
             <div class="form-group">
                 <label for="ecg_ritmo">Ritmo de base</label>
                 <select autocomplete="off" id="ecg_ritmo">
                     <option value="sinusal">Ritmo sinusal</option>
+                    <option value="bradi">Bradicardia sinusal</option>
+                    <option value="taqui">Taquicardia sinusal</option>
                     <option value="fa">Fibrilación auricular</option>
                     <option value="aleteo">Aleteo auricular</option>
                     <option value="marcapasos">Ritmo de marcapasos</option>
-                    <option value="otro">Otro</option>
+                    <option value="otro">Otro ritmo</option>
                 </select>
+                <div id="ecg_ritmo_otro_box" class="hidden-ecg" style="margin-top:0.4rem">
+                    <input autocomplete="off" type="text" id="ecg_ritmo_otro" placeholder="¿Cuál? Ej.: ritmo auricular ectópico" aria-label="Otro ritmo">
+                </div>
             </div>
             <div class="form-group">
-                <label for="ecg_conduccion">Trastorno de conducción</label>
-                <select autocomplete="off" id="ecg_conduccion" onchange="sincronizarCasillasConduccion(); calcEjercicio()">
-                    <option value="ninguno">Ninguno</option>
-                    <option value="bcri">BCRI — bloqueo completo de rama izquierda</option>
-                    <option value="marcapasos">Estimulación por marcapasos</option>
-                    <option value="preexcitacion">Preexcitación ventricular</option>
-                    <option value="bcrd">BCRD — bloqueo completo de rama derecha</option>
-                    <option value="hbai">Hemibloqueo anterior izquierdo</option>
-                    <option value="hbpi">Hemibloqueo posterior izquierdo</option>
-                    <option value="bcrd_hbai">BCRD + hemibloqueo anterior izquierdo</option>
-                </select>
+                <label>Trastorno de conducción</label>
+                <div id="ecgx_condList" class="ecg-flist"></div>
                 <span class="firma-nota">Sólo BCRI, marcapasos y preexcitación limitan la valoración septal.</span>
             </div>
-            <div class="form-group">
-                <label for="ecg_st_basal">ST-T basal</label>
-                <select autocomplete="off" id="ecg_st_basal">
-                    <option value="normal">Normal</option>
-                    <option value="repol">Alteraciones inespecíficas de la repolarización</option>
-                    <option value="hvi">HVI con sobrecarga</option>
-                    <option value="infra_basal">Infradesnivel del ST basal</option>
-                    <option value="no_interpretable">No interpretable para isquemia</option>
-                </select>
+        </div>
+        <div class="form-group" style="margin-top:0.75rem">
+            <label>Segmento ST-T basal</label>
+            <div id="ecgx_stbList" class="ecg-flist"></div>
+        </div>
+        <div class="form-group" style="margin-top:0.75rem">
+            <label>Ondas Q / secuela eléctrica <span class="firma-nota">(independiente del ST-T)</span></label>
+            <div id="ecgx_qList" class="ecg-flist"></div>
+        </div>
+        <div class="form-group" style="margin-top:0.75rem">
+            <label for="ecg_otros_basal">Otros hallazgos del ECG basal</label>
+            <input autocomplete="off" type="text" id="ecg_otros_basal" placeholder="Ej: imagen de secuela inferolateral">
+        </div>
+        <div class="form-group" style="margin-top:0.75rem">
+            <label>Arritmias basales</label>
+            <div class="ecg-addbar">
+                <button type="button" class="btn btn-secondary btn-sm" data-ecg-add="EV" data-ecg-phase="Reposo">+ EV</button>
+                <button type="button" class="btn btn-secondary btn-sm" data-ecg-add="ESV" data-ecg-phase="Reposo">+ ESV</button>
             </div>
-            <div class="form-group">
-                <label for="ecg_otros_basal">Otros hallazgos del ECG basal</label>
-                <input autocomplete="off" type="text" id="ecg_otros_basal" placeholder="Ej: imagen de secuela inferolateral">
-            </div>
+            <div id="ecgx_eventosBasal" class="ecg-eventos"></div>
+        </div>
+
+        <!-- ══════════════════════════════════════════════
+             Campos del modelo anterior del ECG basal. El bloque visible de arriba los
+             escribe; siguen existiendo para el autosave, para abrir estudios guardados
+             con el diseño viejo y para la sincronización con las casillas de
+             antecedentes (ant_bcri, ant_marcapasos, ant_preexcitacion, ant_fa_ritmo).
+             ══════════════════════════════════════════════ -->
+        <div class="hidden-ecg" aria-hidden="true">
+            <select autocomplete="off" id="ecg_conduccion" onchange="sincronizarCasillasConduccion(); calcEjercicio()">
+                <option value="ninguno">Ninguno</option>
+                <option value="bcri">BCRI — bloqueo completo de rama izquierda</option>
+                <option value="marcapasos">Estimulación por marcapasos</option>
+                <option value="preexcitacion">Preexcitación ventricular</option>
+                <option value="bcrd">BCRD — bloqueo completo de rama derecha</option>
+                <option value="hbai">Hemibloqueo anterior izquierdo</option>
+                <option value="hbpi">Hemibloqueo posterior izquierdo</option>
+                <option value="bcrd_hbai">BCRD + hemibloqueo anterior izquierdo</option>
+            </select>
+            <select autocomplete="off" id="ecg_st_basal">
+                <option value="normal">Normal</option>
+                <option value="repol">Alteraciones inespecíficas de la repolarización</option>
+                <option value="hvi">HVI con sobrecarga</option>
+                <option value="infra_basal">Infradesnivel del ST basal</option>
+                <option value="no_interpretable">No interpretable para isquemia</option>
+            </select>
         </div>
         </details>
     </section>
@@ -803,84 +832,86 @@
         <details class="plegable-tecnica">
             <summary class="section-title" style="cursor:pointer; list-style:none">ECG post-esfuerzo <span class="firma-nota">— incluye arritmias; se despliega con un clic</span></summary>
 
-        
-        <div class="grid">
-            <div class="form-group">
-                <label for="ecg_st_tipo">Cambios del ST-T</label>
-                <select autocomplete="off" id="ecg_st_tipo">
-                    <option value="">Sin cambios</option>
-                    <option value="infra">Infradesnivel del ST</option>
-                    <option value="supra">Supradesnivel del ST</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label for="ecg_st_morfologia">Morfología del infradesnivel</label>
-                <select autocomplete="off" id="ecg_st_morfologia" onchange="calcEjercicio()">
-                    <option value="">—</option>
-                    <option value="horizontal">Horizontal</option>
-                    <option value="descendente">Descendente</option>
-                    <option value="ascendente_lento">Ascendente lento</option>
-                    <option value="ascendente_rapido">Ascendente rápido</option>
-                </select>
-                <span class="firma-nota">El ascendente rápido es respuesta normal: no cuenta como isquémico.</span>
-            </div>
-            <div class="form-group">
-                <label for="ecg_st_mm">Desnivel máximo (mm)</label>
-                <input autocomplete="off" type="number" id="ecg_st_mm" placeholder="mm" min="0" max="10" step="0.5">
-            </div>
-            <div class="form-group">
-                <label for="ecg_st_deriv">Derivaciones comprometidas</label>
-                <input autocomplete="off" type="text" id="ecg_st_deriv" placeholder="Ej: V4-V6, DII, aVF">
-            </div>
-        </div>
-
-        <!-- Aparición y resolución del ST: retiradas de la pantalla. Se cargaban y no
-             salían en el informe ni en la planilla. Un estudio que las trae las sigue
-             mostrando en su resumen técnico. -->
-        <div style="display:none" aria-hidden="true">
-            <input type="text" id="ecg_st_aparicion">
-            <input type="text" id="ecg_st_resolucion">
+        <div class="form-group">
+            <label>Cambios del ST-T</label>
+            <div id="ecgx_steList" class="ecg-flist"></div>
+            <span class="firma-nota">El ascendente rápido es respuesta normal y no está en el menú. El lentamente ascendente deja el estudio no concluyente, no positivo.</span>
         </div>
 
         <div class="info-banner">
-            <strong>Criterio ECG de isquemia:</strong> infradesnivel del ST ≥1 mm horizontal o descendente a 80 ms del punto J.
+            <strong>Criterio ECG de isquemia (SAC 2026):</strong> infradesnivel ≥1 mm horizontal o descendente, o supradesnivel ≥1 mm en derivaciones sin ondas Q.
             &nbsp;|&nbsp; La <strong>discordancia</strong> entre ECG y motilidad es frecuente: la alteración de motilidad precede al ST en la cascada isquémica y manda en el informe del eco estrés.
         </div>
 
-        <h4 class="subsection-title" style="margin-top:1rem">Arritmias</h4>
-        <div class="grid grid-3col">
-            <div class="checkbox-group"><input autocomplete="off" type="checkbox" class="chk-arr" id="arr_esv"><label for="arr_esv">ESV / ESSV aisladas</label></div>
-            <div class="checkbox-group"><input autocomplete="off" type="checkbox" class="chk-arr" id="arr_ev_mono"><label for="arr_ev_mono">EV monomorfas aisladas</label></div>
-            <div class="checkbox-group"><input autocomplete="off" type="checkbox" class="chk-arr" id="arr_ev_poli"><label for="arr_ev_poli">EV polimorfas</label></div>
-            <div class="checkbox-group"><input autocomplete="off" type="checkbox" class="chk-arr" id="arr_bigeminia"><label for="arr_bigeminia">Bigeminia / trigeminia</label></div>
-            <div class="checkbox-group"><input autocomplete="off" type="checkbox" class="chk-arr" id="arr_dupletas"><label for="arr_dupletas">Dupletas</label></div>
-            <div class="checkbox-group"><input autocomplete="off" type="checkbox" class="chk-arr" id="arr_tvns"><label for="arr_tvns">TV no sostenida</label></div>
-            <div class="checkbox-group"><input autocomplete="off" type="checkbox" class="chk-arr" id="arr_fa_tsv"><label for="arr_fa_tsv">FA / TSV inducida</label></div>
-            <div class="checkbox-group"><input autocomplete="off" type="checkbox" class="chk-arr" id="arr_aumenta"><label for="arr_aumenta">Aumentan con la carga</label></div>
+        <div class="form-group" style="margin-top:0.75rem">
+            <label>Arritmias y trastornos inducidos</label>
+            <div class="ecg-addbar">
+                <button type="button" class="btn btn-secondary btn-sm" data-ecg-add="EV"   data-ecg-phase="Esfuerzo">+ EV</button>
+                <button type="button" class="btn btn-secondary btn-sm" data-ecg-add="ESV"  data-ecg-phase="Esfuerzo">+ ESV</button>
+                <button type="button" class="btn btn-secondary btn-sm" data-ecg-add="TVNS" data-ecg-phase="Esfuerzo">+ TVNS</button>
+                <button type="button" class="btn btn-secondary btn-sm" data-ecg-add="TVS"  data-ecg-phase="Esfuerzo">+ TV sostenida</button>
+                <button type="button" class="btn btn-secondary btn-sm" data-ecg-add="FA"   data-ecg-phase="Esfuerzo">+ FA / aleteo</button>
+                <button type="button" class="btn btn-secondary btn-sm" data-ecg-add="TSV"  data-ecg-phase="Esfuerzo">+ TSV</button>
+                <button type="button" class="btn btn-secondary btn-sm" data-ecg-add="BCRI" data-ecg-phase="Esfuerzo">+ BCRI inducido</button>
+            </div>
+            <div id="ecgx_eventos" class="ecg-eventos"></div>
+            <span class="firma-nota">Si no hay arritmias, no toques nada.</span>
         </div>
         <div class="grid" style="margin-top:0.75rem">
             <div class="form-group">
-                <label for="arr_momento">Momento de aparición</label>
-                <select autocomplete="off" id="arr_momento">
-                    <option value="">—</option>
-                    <option value="esfuerzo">En esfuerzo</option>
-                    <option value="recuperacion">En recuperación</option>
-                    <option value="ambos">En esfuerzo y recuperación</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label for="arr_sintomas">Tolerancia</label>
+                <label for="arr_sintomas">Tolerancia de las arritmias</label>
                 <select autocomplete="off" id="arr_sintomas">
                     <option value="asintomatica">Asintomática</option>
                     <option value="sintomatica">Sintomática</option>
                 </select>
             </div>
-            <div class="form-group" style="grid-column: 1 / -1">
-                <label for="ecg_arritmias">Descripción libre (si la cargás, es la que va al informe)</label>
-                <input autocomplete="off" type="text" id="ecg_arritmias" placeholder="Ej: EV polimorfas con episodios de bigeminia ventricular durante el esfuerzo, asintomática">
+            <div class="form-group">
+                <label for="ecg_arritmias">Descripción libre de arritmias <span class="firma-nota">(si la cargás, es la que va al informe)</span></label>
+                <input autocomplete="off" type="text" id="ecg_arritmias" placeholder="Ej: EV polimorfas con episodios de bigeminia durante el esfuerzo">
             </div>
         </div>
         <div id="aviso-arritmias" class="aviso-adquisicion" style="display:none"></div>
+
+        <!-- ══════════════════════════════════════════════
+             Campos del modelo anterior del ECG de esfuerzo. El bloque visible de arriba
+             los escribe; siguen existiendo para el autosave, para abrir estudios
+             guardados con el diseño viejo, para H.stIsquemico / hal_st_dep / hal_st_ele
+             y para avisarArritmias. 'ecg_st_tipo/mm/morfología/deriv' reciben el hallazgo
+             principal (infra, si no supra); las casillas arr_* reciben las arritmias de
+             esfuerzo mapeadas a sus categorías.
+             ══════════════════════════════════════════════ -->
+        <div class="hidden-ecg" aria-hidden="true">
+            <select autocomplete="off" id="ecg_st_tipo">
+                <option value="">Sin cambios</option>
+                <option value="infra">Infradesnivel del ST</option>
+                <option value="supra">Supradesnivel del ST</option>
+            </select>
+            <select autocomplete="off" id="ecg_st_morfologia" onchange="calcEjercicio()">
+                <option value="">—</option>
+                <option value="horizontal">Horizontal</option>
+                <option value="descendente">Descendente</option>
+                <option value="ascendente_lento">Ascendente lento</option>
+                <option value="ascendente_rapido">Ascendente rápido</option>
+            </select>
+            <input autocomplete="off" type="number" id="ecg_st_mm" min="0" max="10" step="0.5">
+            <input autocomplete="off" type="text" id="ecg_st_deriv">
+            <input type="text" id="ecg_st_aparicion">
+            <input type="text" id="ecg_st_resolucion">
+            <input autocomplete="off" type="checkbox" class="chk-arr" id="arr_esv">
+            <input autocomplete="off" type="checkbox" class="chk-arr" id="arr_ev_mono">
+            <input autocomplete="off" type="checkbox" class="chk-arr" id="arr_ev_poli">
+            <input autocomplete="off" type="checkbox" class="chk-arr" id="arr_bigeminia">
+            <input autocomplete="off" type="checkbox" class="chk-arr" id="arr_dupletas">
+            <input autocomplete="off" type="checkbox" class="chk-arr" id="arr_tvns">
+            <input autocomplete="off" type="checkbox" class="chk-arr" id="arr_fa_tsv">
+            <input autocomplete="off" type="checkbox" class="chk-arr" id="arr_aumenta">
+            <select autocomplete="off" id="arr_momento">
+                <option value="">—</option>
+                <option value="esfuerzo">En esfuerzo</option>
+                <option value="recuperacion">En recuperación</option>
+                <option value="ambos">En esfuerzo y recuperación</option>
+            </select>
+        </div>
         </details>
     </section>
 
@@ -1574,9 +1605,10 @@
         <div id="osecac-salida" class="osecac-salida" style="display:none">
             <h3 class="subsection-title">Informe para OSECAC</h3>
             <p class="firma-nota" style="margin-bottom:0.6rem">
-                Los tres cuadros del formulario, en texto plano. El ECG y las arritmias
-                no van en ninguno: si el ECG cambia lo que el estudio puede afirmar, se
-                dice una vez en la conclusión.
+                Los tres cuadros del formulario, en texto plano. El ECG basal va al final
+                del cuadro de Reposo y el de esfuerzo al final del de Esfuerzo. Su
+                interpretación —no interpretable, discordancia o, con motilidad negativa,
+                no concluyente— se dice una sola vez en la conclusión.
             </p>
             <div class="report-controls" style="margin-bottom:0.75rem">
                 <button type="button" class="btn btn-primary" onclick="copiarOsecacTodo()">📋 Copiar todo</button>

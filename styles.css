@@ -1770,3 +1770,88 @@ textarea.auto-alto { resize: none; overflow: hidden; min-height: 42px; line-heig
     .ant-grupos { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 520px) { .ant-grupos { grid-template-columns: 1fr; } }
+
+/* ══════════════════════════════════════════════
+   MÓDULO ECG — listas de hallazgos, selector de derivaciones y eventos de arritmia.
+   Un desplegable por apartado; "+ Agregar" suma otra fila; el detalle aparece debajo
+   en orden de Tab. Los estilos usan las variables del tema (claro y oscuro).
+   ══════════════════════════════════════════════ */
+.hidden-ecg { display: none !important; }
+
+.ecg-flist { display: block; }
+.ecg-frows { display: grid; gap: 0.5rem; }
+.ecg-frow { display: grid; grid-template-columns: 1fr auto; gap: 0.4rem; align-items: start; }
+.ecg-frow .ecg-fsel { grid-column: 1; grid-row: 1; }
+.ecg-frow .ecg-fdel {
+    grid-column: 2; grid-row: 1; width: 2.3rem; height: 2.35rem; line-height: 1;
+    font-size: 1.1rem; border: 1px solid var(--color-error); color: var(--color-error);
+    background: var(--color-error-bg); border-radius: var(--radius-md); cursor: pointer;
+}
+.ecg-frow .ecg-fdet {
+    grid-column: 1 / -1; grid-row: 2; border: 1px solid var(--color-border);
+    border-left: 3px solid var(--color-primary); border-radius: var(--radius-md);
+    padding: 0.6rem 0.75rem; background: var(--color-bg-sub);
+}
+.ecg-addrow {
+    margin-top: 0.4rem; border: 1px dashed var(--color-primary-light); border-radius: var(--radius-md);
+    color: var(--color-primary-dark); background: var(--color-primary-bg); font-weight: 600;
+    padding: 0.3rem 0.7rem; font-size: var(--font-size-xs); cursor: pointer;
+}
+.ecg-addbar { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.25rem 0 0; }
+
+.ecg-det-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.6rem; }
+.ecg-det-grid .ecg-span2 { grid-column: 1 / -1; }
+.ecg-det-grid label { font-size: var(--font-size-xs); font-weight: 700; color: var(--color-text-secondary); margin-bottom: 0.25rem; display: block; }
+
+.ecg-leads-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.6rem; }
+.ecg-lead-combo { position: relative; min-width: 0; }
+.ecg-lead-trigger {
+    display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; width: 100%;
+    min-height: 2.3rem; padding: 0.45rem 0.6rem; text-align: left; border: 1px solid var(--color-border);
+    border-radius: var(--radius-md); background: var(--color-bg-input); color: var(--color-text-primary);
+    font: inherit; font-size: var(--font-size-sm); cursor: pointer;
+}
+.ecg-lead-trigger .ecg-lead-summary { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ecg-lead-trigger .ecg-caret { font-size: 0.65rem; color: var(--color-text-secondary); flex: none; }
+.ecg-lead-trigger[aria-expanded="true"] { border-color: var(--color-primary); box-shadow: 0 0 0 2px var(--color-primary-bg); }
+.ecg-lead-popup {
+    position: absolute; z-index: 20; left: 0; right: 0; margin-top: 0.25rem; background: var(--color-bg-card);
+    border: 1px solid var(--color-border); box-shadow: 0 12px 24px rgba(23,57,79,0.18);
+    border-radius: var(--radius-md); padding: 0.3rem; max-height: 14rem; overflow-y: auto;
+}
+.ecg-lead-option {
+    display: flex; align-items: center; justify-content: space-between; width: 100%; border: 0;
+    background: transparent; text-align: left; border-radius: var(--radius-sm); padding: 0.35rem 0.5rem;
+    font-size: var(--font-size-sm); color: var(--color-text-primary); cursor: pointer;
+}
+.ecg-lead-option:hover, .ecg-lead-option.is-active { background: var(--color-primary-bg); }
+.ecg-lead-option[aria-selected="true"] { color: var(--color-primary-dark); font-weight: 700; }
+.ecg-lead-option[aria-selected="true"]::after { content: '✓'; font-weight: 700; }
+
+.ecg-arrchips { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.3rem; }
+.ecg-arrchip {
+    padding: 0.35rem 0.55rem; border: 1px solid var(--color-border); background: var(--color-bg-input);
+    border-radius: var(--radius-md); color: var(--color-text-secondary); font: inherit;
+    font-size: var(--font-size-sm); cursor: pointer;
+}
+.ecg-arrchip[aria-pressed="true"] { background: var(--color-primary-bg); color: var(--color-primary-dark); border-color: var(--color-primary); font-weight: 700; }
+
+.ecg-eventos { display: block; }
+.ecg-event {
+    border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 0.6rem 0.75rem;
+    margin-top: 0.6rem; background: var(--color-bg-sub);
+}
+.ecg-event-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.6rem; }
+.ecg-event-title { font-weight: 700; font-size: var(--font-size-sm); }
+.ecg-arr-context {
+    display: inline-flex; color: var(--color-primary-dark); background: var(--color-primary-bg);
+    border-radius: var(--radius-sm); padding: 0.1rem 0.45rem; font-size: var(--font-size-xs); margin-left: 0.4rem;
+}
+.ecg-remove {
+    border: 1px solid var(--color-error); color: var(--color-error); background: var(--color-error-bg);
+    border-radius: var(--radius-sm); font-size: var(--font-size-xs); padding: 0.3rem 0.55rem; cursor: pointer;
+}
+@media (max-width: 520px) {
+    .ecg-det-grid, .ecg-leads-grid { grid-template-columns: 1fr; }
+    .ecg-det-grid .ecg-span2 { grid-column: auto; }
+}

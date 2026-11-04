@@ -116,12 +116,16 @@ const HEADERS_DOPPLER = [
   "ID"
 ];
 
-// ESQUEMA ESTRÉS v4 — 75 columnas. Generado del contrato de la app
+// ESQUEMA ESTRÉS v5 — 82 columnas. Generado del contrato de la app
 // (EstresSheets.HEADERS): no transcribir a mano. Si la app agrega una columna,
 // este bloque, ESQUEMA_ESTRES_V y ESQUEMAS_PREVIOS se actualizan JUNTOS.
-// v4 (04/11/2026): se agregó 'ID' como ÚLTIMA columna, para no duplicar filas al
-// reguardar un estudio. Al ir al final no corre ninguna columna anterior.
-const ESQUEMA_ESTRES_V = 4;
+// v4 (04/11/2026): se agregó 'ID' como última columna.
+// v5 (04/11/2026): rediseño del ECG. Las 8 columnas de ECG (Ritmo … Arritmias)
+// quedan en su lugar y se llenan con los datos nuevos; se agregaron SIETE columnas
+// DESPUÉS de 'ID' (Q/secuela, Arritmias basales, ST aparición, ST recuperación, ECG
+// interpretable, Motivo no interpretable, ECG resultado). Al ir al final no corre
+// ninguna columna anterior: las filas ya guardadas conservan todas sus posiciones.
+const ESQUEMA_ESTRES_V = 5;
 const HEADERS_ESTRES = [
   "Fecha", "HC", "Edad", "Sexo",
   "Peso", "Altura", "SC", "Indicación",
@@ -141,7 +145,9 @@ const HEADERS_ESTRES = [
   "ST tipo", "ST mm", "ST morfología", "ST derivaciones",
   "Arritmias", "E/e' reposo", "E/e' esfuerzo", "VRT reposo",
   "VRT esfuerzo", "Diastólico esfuerzo", "Resultado", "Categorización",
-  "Avisos", "Informe", "ID"
+  "Avisos", "Informe", "ID",
+  "Q/secuela", "Arritmias basales", "ST aparición", "ST recuperación",
+  "ECG interpretable", "Motivo no interpretable", "ECG resultado"
 ];
 
 // Encabezados de los esquemas anteriores, para migrar las filas ya guardadas.
@@ -203,6 +209,27 @@ const ESQUEMAS_PREVIOS = {
     "Arritmias", "E/e' reposo", "E/e' esfuerzo", "VRT reposo",
     "VRT esfuerzo", "Diastólico esfuerzo", "Resultado", "Categorización",
     "Avisos", "Informe"
+  ],
+  75: [
+    "Fecha", "HC", "Edad", "Sexo",
+    "Peso", "Altura", "SC", "Indicación",
+    "Medicación", "Betabloqueo", "Valvulopatía", "Severidad valvular",
+    "Bicúspide", "Fecha estudio previo", "Vmax previa", "Gradiente previo",
+    "AVA previa", "Aorta previa", "Δ Vmax/año", "Δ Gradiente/año",
+    "Δ AVA/año", "Δ Aorta/año", "Otros antecedentes", "Protocolo",
+    "Carga Kgm/min", "Etapa", "Duración", "Causa detención",
+    "FC reposo", "TA basal", "FC pico", "TA pico",
+    "FC rec 1min", "DP máximo", "% FCMT", "Índice cronotrópico",
+    "Reserva FC", "HRR1", "METs", "% METs predicho",
+    "Ventana", "Seg hasta imagen", "FC al adquirir", "% FC pico al adquirir",
+    "FEy reposo", "FEy post", "Delta FEy", "Función VD",
+    "WMSI reposo", "WMSI post", "Delta WMSI", "Escala WMSI",
+    "Motor texto", "Seg isquémicos", "Seg secuela", "Territorio",
+    "Patrón", "Ritmo", "Conducción", "ST basal",
+    "ST tipo", "ST mm", "ST morfología", "ST derivaciones",
+    "Arritmias", "E/e' reposo", "E/e' esfuerzo", "VRT reposo",
+    "VRT esfuerzo", "Diastólico esfuerzo", "Resultado", "Categorización",
+    "Avisos", "Informe", "ID"
   ]
 };
 

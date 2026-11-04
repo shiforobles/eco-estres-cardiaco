@@ -121,6 +121,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // Bloque ECG del rediseño V9: construye las listas de hallazgos y los eventos de
+    // arritmia, y mantiene sincronizados los campos del modelo anterior (ocultos).
+    if (typeof ECGmod !== 'undefined') ECGmod.init();
+
     // Fecha del estudio: por defecto hoy
     setFechaHoy();
     nuevoEstudioId();   // id del estudio en curso; cambia al iniciar uno nuevo
@@ -3218,6 +3222,608 @@ const CONDUCCION_LIMITA_SEPTUM = ['bcri', 'marcapasos', 'preexcitacion'];
 // sobre todo basal y media, y excluirlo perdería isquemia apical de la DA.
 const SEGMENTOS_SEPTALES = [2, 3, 8, 9];
 
+// ══════════════════════════════════════════════
+//  MÓDULO ECG (rediseño V9) — listas de hallazgos, selector de derivaciones, eventos
+//  de arritmia y clasificación del ST según el Documento de posición de Prueba
+//  ergométrica de la SAC 2026.
+//
+//  El bloque visible vive en las dos tarjetas de ECG (reposo y post-esfuerzo). Su
+//  estado se lee en un objeto plano —el "canónico"— y de ahí salen la clasificación,
+//  el texto del informe y las columnas de la planilla.
+//
+//  Compatibilidad: el módulo ESCRIBE los campos del modelo anterior (ecg_st_tipo,
+//  ecg_st_mm, ecg_conduccion, las casillas arr_*, …), que quedaron ocultos. Por eso
+//  recolectarHallazgos() sigue leyendo esos campos para lo de siempre (H.conduccion,
+//  septum, hal_st_dep/ele, avisarArritmias, digoxina), las casillas de antecedentes
+//  siguen mandando, un estudio guardado con el diseño viejo abre bien, y la batería
+//  de tests que puebla esos campos a mano sigue pasando. `ecgCanonico()` prefiere el
+//  modelo nuevo cuando está "tocado" y cae a los campos viejos cuando no.
+// ══════════════════════════════════════════════
+const ECGmod = (function () {
+    const d = document;
+    const $ = id => d.getElementById(id);
+    const ORDER = ['DI', 'DII', 'DIII', 'aVR', 'aVL', 'aVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6'];
+    const LIMB = ['DI', 'DII', 'DIII', 'aVR', 'aVL', 'aVF'], CHEST = ['V1', 'V2', 'V3', 'V4', 'V5', 'V6'];
+    const combos = [];
+    let built = false, sincronizando = false, silencioso = false;
+    let COND, STB, QS, STE;
+
+    const joined = l => l.length < 2 ? l.join('') : l.slice(0, -1).join(', ') + ' y ' + l[l.length - 1];
+    const sentence = s => s ? s.charAt(0).toUpperCase() + s.slice(1) : '';
+    const mmTxt = v => String(v == null ? '' : v).replace('.', ',');
+    const leadsTxt = a => (a && a.length) ? ' en ' + joined(a) : '';
+    const clean = s => s.replace(/\s+/g, ' ').trim();
+    function el(tag, cls, html) { const e = d.createElement(tag); if (cls) e.className = cls; if (html !== undefined) e.innerHTML = html; return e; }
+
+    // ── Diccionarios de texto y opciones ──
+    const RITMOTXT = { sinusal: 'ritmo sinusal', bradi: 'bradicardia sinusal', taqui: 'taquicardia sinusal', fa: 'fibrilación auricular', aleteo: 'aleteo auricular', marcapasos: 'ritmo de marcapasos' };
+    const MORPHTXT = { horizontal: 'horizontal', descendente: 'descendente', lent: 'lentamente ascendente', ascendente_rapido: '' };
+    const MM = [['0.5', '0,5'], ['1', '1'], ['1.5', '1,5'], ['2', '2'], ['2.5', '2,5'], ['3', '3'], ['3.5', '3,5'], ['4', '4'], ['5', '5'], ['6', '6']];
+    const MORPH = [['horizontal', 'Horizontal'], ['descendente', 'Descendente'], ['lent', 'Lentamente ascendente']];
+    const APAR = [['', 'Sin dato'], ['I', 'Etapa I'], ['II', 'Etapa II'], ['III', 'Etapa III'], ['IV', 'Etapa IV'], ['V', 'Etapa V'], ['VI', 'Etapa VI'], ['VII', 'Etapa VII'], ['max', 'Máximo esfuerzo'], ['rec', 'Solo en recuperación']];
+    const RECUP = [['', 'Sin dato'], ['norm', 'Normaliza en la recuperación'], ['1', 'Al minuto 1'], ['2', 'Al minuto 2'], ['3', 'Al minuto 3'], ['4', 'Al minuto 4'], ['5', 'Al minuto 5'], ['6', 'Al minuto 6'], ['gt6', 'Después del minuto 6'], ['persiste', 'Persiste al finalizar'], ['acentua', 'Se acentúa en la recuperación']];
+    const APARL = Object.fromEntries(APAR), RECUPL = Object.fromEntries(RECUP);
+    function aparTxt(v) { if (!v) return ''; if (v === 'max') return ', en el máximo esfuerzo'; if (v === 'rec') return ', de aparición en la recuperación'; return ', desde la etapa ' + v; }
+    function recupTxt(v) { if (!v) return ''; if (v === 'norm') return ', con normalización durante la recuperación'; if (v === 'gt6') return ', con normalización después del minuto 6 de la recuperación'; if (v === 'persiste') return ', que persiste al finalizar la recuperación'; if (v === 'acentua') return ', que se acentúa durante la recuperación'; return ', con normalización al minuto ' + v + ' de la recuperación'; }
+
+    const COND_TXT = { sin: 'sin trastornos de la conducción', bav1: 'bloqueo AV de primer grado', bcrd: 'BCRD', bird: 'BIRD', bcri: 'BCRI', hbai: 'HBAI', hbpi: 'HBPI', wpw: 'preexcitación ventricular', inesp: 'trastorno inespecífico de la conducción intraventricular' };
+    function condTxt(id, E) { return id === 'otra' ? ((E && E.condOtra) || 'otro trastorno de conducción') : (COND_TXT[id] || ''); }
+
+    function stbTxt(x) {
+        const L = leadsTxt(x.leads);
+        switch (x.id) {
+            case 'infra': return 'infradesnivel del ST de ' + mmTxt(x.mm) + ' mm' + L;
+            case 'supra': return 'supradesnivel del ST de ' + mmTxt(x.mm) + ' mm' + L;
+            case 'tneg': return 'ondas T negativas' + L;
+            case 'tbif': return 'ondas T bifásicas' + L;
+            case 'tapl': return 'ondas T aplanadas' + L;
+            case 'rect': return 'rectificación del segmento ST' + L;
+            case 'hvi': return 'signos de hipertrofia ventricular izquierda con sobrecarga sistólica';
+            case 'dig': return 'cambios de repolarización compatibles con efecto digitálico';
+            case 'rp': return 'patrón de repolarización precoz' + L;
+            case 'repol': return 'alteraciones inespecíficas de la repolarización';
+            default: return '';
+        }
+    }
+    function qTxt(x) {
+        const L = leadsTxt(x.leads);
+        return { q: 'ondas Q patológicas', qs: 'complejos QS', sec: 'imagen sugestiva de secuela eléctrica', r: 'pobre progresión de onda R' }[x.id] + L;
+    }
+    function steTxt(x, E) {
+        const L = leadsTxt(x.leads);
+        switch (x.id) {
+            case 'infra': return clean('infradesnivel del ST ' + (MORPHTXT[x.morph] || '') + ' de ' + mmTxt(x.mm) + ' mm') +
+                (E && E.stBasal && E.stBasal.some(b => b.id === 'infra') ? ' adicional respecto del basal' : '') + L + aparTxt(x.apar) + recupTxt(x.recup);
+            case 'supra': return 'supradesnivel del ST de ' + mmTxt(x.mm) + ' mm' + L + aparTxt(x.apar) + recupTxt(x.recup);
+            case 'avr': return 'supradesnivel del ST en aVR de ' + mmTxt(x.mm) + ' mm';
+            case 'pseudo': return 'pseudonormalización de ondas T' + L;
+            case 'basal': return 'persisten las alteraciones basales del ST-T, sin cambios significativos';
+            case 'otro': return (x.texto || 'otros cambios del ST-T') + L;
+            case 'art': return 'segmento ST no interpretable por artefactos';
+            default: return '';
+        }
+    }
+
+    // ── Arritmias ──
+    const PAT = {
+        EV: [['bigeminia', 'Bigeminia', 'bigeminia ventricular'], ['trigeminia', 'Trigeminia', 'trigeminia ventricular'], ['duplas', 'Duplas', 'duplas ventriculares'], ['tripletas', 'Tripletas', 'tripletas ventriculares']],
+        ESV: [['bigeminia', 'Bigeminia', 'bigeminia supraventricular'], ['trigeminia', 'Trigeminia', 'trigeminia supraventricular'], ['pares', 'Pares', 'pares supraventriculares'], ['rachas', 'Rachas de TSV', 'rachas de taquicardia supraventricular']]
+    };
+    const TITLE = { EV: 'Extrasístoles ventriculares', ESV: 'Extrasístoles supraventriculares', TVNS: 'TV no sostenida', TVS: 'TV sostenida', FA: 'FA / aleteo inducido', TSV: 'Taquicardia supraventricular', BCRI: 'BCRI inducido por el esfuerzo' };
+    function evName(ev) { return { EV: 'extrasístoles ventriculares', ESV: 'extrasístoles supraventriculares', TVNS: 'taquicardia ventricular no sostenida', TVS: 'taquicardia ventricular sostenida', FA: ev.fa || 'fibrilación auricular', TSV: 'taquicardia supraventricular paroxística', BCRI: 'bloqueo completo de rama izquierda inducido por el esfuerzo' }[ev.type]; }
+    function evPatsTxt(ev) { const list = PAT[ev.type]; if (!list) return []; return (ev.pats || []).map(id => (list.find(p => p[0] === id) || [])[2]).filter(Boolean); }
+    function evPhrase(ev, phase) {
+        let r = evName(ev);
+        if (ev.type === 'EV' || ev.type === 'TVNS' || ev.type === 'TVS') { if (ev.morf) r += ' ' + ev.morf; }
+        if (ev.type === 'TVNS' && ev.lat) r += ' ' + ev.lat;
+        if (ev.type === 'EV' || ev.type === 'ESV') { const p = evPatsTxt(ev); if (ev.freq === 'frecuentes') r += ' frecuentes'; else if (!p.length) r += ' aisladas'; if (p.length) r += ', con ' + joined(p); }
+        if (ev.type === 'BCRI') return ev.fc ? r + ', con FC de ' + ev.fc + ' lpm' : r;
+        if (phase === 'Reposo') return r;
+        const pl = ev.place || 'esfuerzo', stg = ev.stage || '';
+        if (pl === 'recuperacion') return r + ' durante la recuperación';
+        if (stg === 'max') r += pl === 'ambos' ? ' en el máximo esfuerzo y durante la recuperación' : ' en el máximo esfuerzo';
+        else { r += pl === 'ambos' ? ' durante el esfuerzo y la recuperación' : ' durante el esfuerzo'; if (stg) r += ' (desde la etapa ' + stg + ')'; }
+        return r;
+    }
+    function evolPhrase(ev) { if (!ev.evol) return ''; return 'las ' + evName(ev) + ' basales ' + ({ desaparecen: 'desaparecieron con el esfuerzo', persisten: 'persistieron durante el esfuerzo', aumentan: 'aumentaron con el esfuerzo' })[ev.evol]; }
+    function isComplexVA(ev) { if (ev.type === 'TVNS' || ev.type === 'TVS') return true; if (ev.type === 'EV') return ev.morf === 'polimorfas' || (ev.pats || []).some(p => p === 'duplas' || p === 'tripletas'); return false; }
+
+    // ══ Clasificación SAC 2026 ══
+    const st = (E, id) => E.stEsf.find(x => x.id === id);
+    function qLeadsSet(E) { const s = new Set(); E.q.forEach(x => { if (['q', 'qs', 'sec'].includes(x.id)) (x.leads || []).forEach(l => s.add(l)); }); return s; }
+    function clasificar(E, opts) {
+        opts = opts || {};
+        const A = { red: [], amber: [], info: [] };
+        const reasons = [];
+        if (E.ritmo === 'marcapasos') reasons.push('ritmo de marcapasos');
+        if (E.ritmo === 'fa') reasons.push('fibrilación auricular');
+        if (E.ritmo === 'aleteo') reasons.push('aleteo auricular');
+        if (E.conduccion.includes('bcri')) reasons.push('BCRI');
+        if (E.conduccion.includes('wpw')) reasons.push('preexcitación ventricular');
+        const bInfra = E.stBasal.find(x => x.id === 'infra');
+        if (bInfra && parseFloat(bInfra.mm) >= 1) reasons.push('infradesnivel del ST basal ≥1 mm');
+        if (E.stBasal.some(x => x.id === 'hvi')) reasons.push('HVI con sobrecarga');
+        if (E.stBasal.some(x => x.id === 'dig')) reasons.push('efecto digitálico');
+        if (opts.digoxina) reasons.push('tratamiento con digoxina');
+        if (opts.stBasalNoInterp || E.stBasalNoInterp) reasons.push('alteraciones del ST basal');
+        if (E.arrBasal.some(e => e.type === 'EV' && e.freq === 'frecuentes')) reasons.push('extrasistolia ventricular frecuente en reposo');
+        if (st(E, 'art')) reasons.push('artefactos');
+        if (reasons.length) {
+            A.amber.push('ECG no interpretable para isquemia (' + joined(reasons) + '). Según la SAC, los cambios del ST no tienen valor diagnóstico confiable.');
+            return { res: 'No interpretable', reasons, A };
+        }
+        if (!E.stEsf.length) { avisosArr(E, A); return { res: 'Negativo', reasons, A }; }
+        let pos = false, nc = false;
+        const ql = qLeadsSet(E);
+        const infra = st(E, 'infra');
+        if (infra) {
+            const mm = parseFloat(infra.mm) || 0, m = infra.morph;
+            if (m === 'lent') { nc = true; A.amber.push('Infradesnivel lentamente ascendente: la SAC lo considera dudoso; valorar en el contexto de la prueba.'); }
+            else if (m === 'ascendente_rapido') { /* respuesta fisiológica: no cuenta */ }
+            else if (mm >= 1) pos = true;
+            else { nc = true; A.amber.push('Infradesnivel horizontal/descendente <1 mm: puede ser anormal según probabilidad pretest y angor.'); }
+        }
+        const supra = st(E, 'supra');
+        if (supra) {
+            const mm = parseFloat(supra.mm) || 0, L = supra.leads || [];
+            if (L.length && L.every(l => ql.has(l))) A.info.push('Supradesnivel en derivaciones con ondas Q de secuela: puede atribuirse a disquinesia, no se cuenta como isquemia.');
+            else if (mm >= 1) { pos = true; A.red.push('Supradesnivel del ST en derivaciones sin ondas Q: isquemia severa (transmural). Criterio de detención si ≥2 mm.'); }
+            else nc = true;
+        }
+        if (st(E, 'avr')) { A.amber.push('Supradesnivel en aVR: variable no convencional; valorar en contexto.'); if (E.stEsf.length === 1) nc = true; }
+        if (st(E, 'otro')) nc = true;
+        if (st(E, 'pseudo')) A.info.push('Pseudonormalización de T: según la SAC, los cambios de polaridad de la T no tienen valor diagnóstico específico.');
+        if (pos) {
+            if (infra && infra.morph === 'descendente' && (parseFloat(infra.mm) || 0) > 3) A.red.push('Infradesnivel descendente >3 mm: criterio de alto riesgo ergométrico.');
+            if (infra && (infra.leads || []).length >= 5) A.red.push('Cambios del ST en 5 o más derivaciones: criterio de alto riesgo (criterio propio: la SAC dice «múltiples» sin fijar número).');
+            const rec = ['infra', 'supra'].map(id => st(E, id)).filter(Boolean).map(x => x.recup);
+            if (rec.includes('gt6')) A.red.push('Recuperación del ST después del minuto 6: criterio de alto riesgo.');
+            if (rec.includes('persiste')) A.amber.push('El ST persiste al finalizar: verificar si se superaron los 6 minutos de recuperación (alto riesgo).');
+            if (E.arrEsf.some(isComplexVA)) A.red.push('Arritmia ventricular compleja asociada a isquemia: alto riesgo ergométrico.');
+        }
+        if (['infra', 'supra'].map(id => st(E, id)).filter(Boolean).some(x => x.recup === 'acentua')) A.amber.push('El ST se acentúa en la recuperación: puede corresponder a agravamiento de la isquemia.');
+        if (bInfra && infra) A.info.push('Hay infradesnivel basal: la magnitud de esfuerzo se mide desde la desviación basal (adicional).');
+        avisosArr(E, A);
+        if (pos) return { res: 'Positivo', reasons, A };
+        if (nc) return { res: 'No concluyente', reasons, A };
+        return { res: 'Negativo', reasons, A };
+    }
+    // Avisos propios de las arritmias inducidas (no entran al informe).
+    function avisosArr(E, A) {
+        E.arrEsf.forEach(ev => {
+            if (ev.type === 'TVS') A.red.push('TV sostenida durante la prueba.');
+            if ((ev.type === 'TVNS' || ev.type === 'TVS') && ev.morf === 'polimorfa') A.red.push('TV polimorfa con el esfuerzo: considerar TV polimórfica catecolaminérgica.');
+            if (ev.type === 'TVNS') A.amber.push('TVNS: criterio de detención si se acompaña de síntomas o descompensación hemodinámica.');
+            if (ev.type === 'FA') A.amber.push('FA / aleteo inducido por el esfuerzo (criterio de detención).');
+            if (ev.type === 'TSV') A.amber.push('Taquicardia supraventricular durante la prueba.');
+            if (ev.type === 'BCRI') A.amber.push('BCRI inducido: el ST posterior no es interpretable; puede corresponder a isquemia o a enfermedad de la rama (si aparece a FC alta, puede ser taquicárdico-dependiente).');
+        });
+    }
+
+    // ══ Prosa (cuerpo, sin el rótulo "ECG basal:" / "ECG de esfuerzo:") ══
+    function reposoBody(E) {
+        const ritmoTxt = E.ritmo === 'otro' ? ((E.ritmoOtro || 'otro ritmo').toLowerCase()) : RITMOTXT[E.ritmo];
+        const condAb = E.conduccion.map(id => condTxt(id, E)).filter(Boolean);
+        const stbAb = E.stBasal.map(stbTxt).filter(Boolean);
+        const qq = E.q.map(qTxt).filter(Boolean);
+        const be = E.arrBasal.map(ev => evPhrase(ev, 'Reposo'));
+        const cl = [];
+        if (!condAb.length && !stbAb.length) cl.push(ritmoTxt + ', sin trastornos de la conducción ni alteraciones del ST-T');
+        else { cl.push(ritmoTxt + ', ' + (condAb.length ? 'con ' + joined(condAb) : 'sin trastornos de la conducción')); cl.push(stbAb.length ? joined(stbAb) : 'sin alteraciones del ST-T'); }
+        if (qq.length) cl.push(joined(qq));
+        if (E.otrosBasal) cl.push(E.otrosBasal.replace(/\.*$/, ''));
+        if (be.length) cl.push(be.join('; '));
+        return cl.map(sentence).join('. ') + '.';
+    }
+    function esfuerzoBody(E) {
+        const ste = E.stEsf.map(x => steTxt(x, E)).filter(Boolean);
+        const ee = E.arrEsf.map(ev => evPhrase(ev, 'Esfuerzo'));
+        const evo = E.arrBasal.map(evolPhrase).filter(Boolean);
+        const parts = [];
+        parts.push(ste.length ? ste.join('; ') : 'sin cambios significativos del ST-T respecto del basal');
+        if (ee.length) parts.push(ee.join('; ') + (E.sintomatica ? ', con síntomas asociados' : ', sin síntomas asociados'));
+        else parts.push('sin arritmias durante el esfuerzo ni la recuperación');
+        if (evo.length) parts.push(joined(evo));
+        return parts.map(sentence).join('. ') + '.';
+    }
+    // Sólo la parte de arritmias (para el caso de conducción, que reemplaza el ST).
+    function esfuerzoArritmias(E) {
+        const ee = E.arrEsf.map(ev => evPhrase(ev, 'Esfuerzo'));
+        if (!ee.length) return 'Sin arritmias.';
+        return sentence(ee.join('; ') + (E.sintomatica ? ', con síntomas asociados' : ', sin síntomas asociados')) + '.';
+    }
+
+    // ══ Columnas de la planilla ══
+    function columnas(E) {
+        const main = st(E, 'infra') || st(E, 'supra') || null;
+        return {
+            q: E.q.map(qTxt).join('; '),
+            arrBasal: E.arrBasal.map(ev => evPhrase(ev, 'Reposo')).join('; '),
+            arrEsf: (E.libre || E.arrEsf.map(ev => evPhrase(ev, 'Esfuerzo')).join('; ')),
+            aparicion: (main && main.apar) ? (APARL[main.apar] || '') : '',
+            recuperacion: (main && main.recup) ? (RECUPL[main.recup] || '') : ''
+        };
+    }
+
+    // ══ Lectores del estado canónico ══
+    function estadoVivo() {
+        const ritmo = $('ecg_ritmo') ? $('ecg_ritmo').value : 'sinusal';
+        const condRows = COND.abnormal();
+        const otra = condRows.find(r => r.d.id === 'otra');
+        return {
+            ritmo,
+            ritmoOtro: $('ecg_ritmo_otro') ? $('ecg_ritmo_otro').value.trim() : '',
+            conduccion: condRows.map(r => r.d.id),
+            condOtra: otra && otra.ui ? otra.ui.v('t') : '',
+            stBasal: STB.readState(),
+            stBasalNoInterp: false,
+            q: QS.readState(),
+            arrBasal: readEvents('Reposo'),
+            stEsf: STE.readState(),
+            arrEsf: readEvents('Esfuerzo'),
+            otrosBasal: $('ecg_otros_basal') ? $('ecg_otros_basal').value.trim() : '',
+            sintomatica: $('arr_sintomas') ? $('arr_sintomas').value === 'sintomatica' : false,
+            libre: $('ecg_arritmias') ? $('ecg_arritmias').value.trim() : ''
+        };
+    }
+    function parseDeriv(s) {
+        if (!s) return [];
+        const toks = String(s).toUpperCase().replace(/AVR/g, 'aVR').replace(/AVL/g, 'aVL').replace(/AVF/g, 'aVF').split(/[^A-Za-z0-9]+/);
+        const set = new Set();
+        toks.forEach(t => { const m = ORDER.find(l => l.toUpperCase() === t.toUpperCase()); if (m) set.add(m); });
+        return ORDER.filter(l => set.has(l));
+    }
+    function estadoLegacy() {
+        const g = id => { const e = $(id); return e ? (e.type === 'checkbox' ? e.checked : e.value) : ''; };
+        const condV = g('ecg_conduccion'), conduccion = [];
+        if (condV === 'bcri') conduccion.push('bcri');
+        else if (condV === 'preexcitacion') conduccion.push('wpw');
+        else if (condV === 'bcrd') conduccion.push('bcrd');
+        else if (condV === 'hbai') conduccion.push('hbai');
+        else if (condV === 'hbpi') conduccion.push('hbpi');
+        else if (condV === 'bcrd_hbai') { conduccion.push('bcrd'); conduccion.push('hbai'); }
+        const sb = g('ecg_st_basal'), stBasal = []; let stBasalNoInterp = false;
+        if (sb === 'hvi') stBasal.push({ id: 'hvi' });
+        else if (sb === 'infra_basal') stBasal.push({ id: 'infra', mm: '1', leads: [] });
+        else if (sb === 'repol') stBasal.push({ id: 'repol', leads: [] });
+        else if (sb === 'no_interpretable') stBasalNoInterp = true;
+        const tipo = g('ecg_st_tipo'), stEsf = [];
+        if (tipo === 'infra') stEsf.push({ id: 'infra', morph: g('ecg_st_morfologia') || 'horizontal', mm: g('ecg_st_mm'), leads: parseDeriv(g('ecg_st_deriv')), apar: '', recup: '' });
+        else if (tipo === 'supra') stEsf.push({ id: 'supra', mm: g('ecg_st_mm'), leads: parseDeriv(g('ecg_st_deriv')), apar: '', recup: '' });
+        const arrEsf = [];
+        if (g('arr_esv')) arrEsf.push({ type: 'ESV', freq: 'aisladas', pats: [] });
+        if (g('arr_ev_mono')) arrEsf.push({ type: 'EV', freq: 'aisladas', morf: 'monomorfas', pats: [] });
+        if (g('arr_ev_poli')) arrEsf.push({ type: 'EV', freq: 'aisladas', morf: 'polimorfas', pats: [] });
+        if (g('arr_bigeminia')) arrEsf.push({ type: 'EV', freq: 'aisladas', morf: 'monomorfas', pats: ['bigeminia'] });
+        if (g('arr_dupletas')) arrEsf.push({ type: 'EV', freq: 'aisladas', morf: 'monomorfas', pats: ['duplas'] });
+        if (g('arr_tvns')) arrEsf.push({ type: 'TVNS', morf: 'monomorfa' });
+        if (g('arr_fa_tsv')) arrEsf.push({ type: 'FA', fa: 'fibrilación auricular' });
+        return {
+            ritmo: g('ecg_ritmo') || 'sinusal', ritmoOtro: g('ecg_ritmo_otro'),
+            conduccion, condOtra: '', stBasal, stBasalNoInterp, q: [], arrBasal: [], stEsf,
+            arrEsf, otrosBasal: g('ecg_otros_basal'), sintomatica: g('arr_sintomas') === 'sintomatica', libre: g('ecg_arritmias')
+        };
+    }
+    function tocado() {
+        if (!built) return false;
+        const ritmo = $('ecg_ritmo');
+        if (ritmo && ritmo.value !== 'sinusal') return true;
+        return !!(COND.abnormal().length || STB.abnormal().length || QS.abnormal().length || STE.abnormal().length ||
+            readEvents('Reposo').length || readEvents('Esfuerzo').length);
+    }
+    function canonico() { return tocado() ? estadoVivo() : estadoLegacy(); }
+
+    // ══ Selector de derivaciones (teclado + ratón) ══
+    function makeCombo(label, leads, sel) {
+        const w = el('div', '', `<label>${label}</label><div class="ecg-lead-combo"><button type="button" class="ecg-lead-trigger" aria-haspopup="listbox" aria-expanded="false" aria-label="${label}"><span class="ecg-lead-summary">Seleccionar…</span><span class="ecg-caret">▾</span></button><div class="ecg-lead-popup hidden-ecg" role="listbox" aria-multiselectable="true">${leads.map(l => `<button type="button" class="ecg-lead-option" role="option" aria-selected="false" tabindex="-1">${l}</button>`).join('')}</div></div>`);
+        const box = w.querySelector('.ecg-lead-combo'), trig = w.querySelector('.ecg-lead-trigger'), pop = w.querySelector('.ecg-lead-popup'), sum = w.querySelector('.ecg-lead-summary'), opts = [...w.querySelectorAll('.ecg-lead-option')];
+        const stt = { open: false, active: 0 };
+        function paint() { pop.classList.toggle('hidden-ecg', !stt.open); trig.setAttribute('aria-expanded', String(stt.open)); const ch = leads.filter(l => sel.has(l)); sum.textContent = ch.length ? ch.join(' · ') : 'Seleccionar…'; opts.forEach((o, i) => { o.classList.toggle('is-active', stt.open && i === stt.active); o.setAttribute('aria-selected', String(sel.has(leads[i]))); }); if (stt.open) try { opts[stt.active].scrollIntoView({ block: 'nearest' }); } catch (e) { } }
+        function setOpen(v) { if (v) combos.forEach(c => c !== api && c.close()); stt.open = v; paint(); }
+        function toggle(i) { const l = leads[i]; sel.has(l) ? sel.delete(l) : sel.add(l); paint(); onChange(); }
+        trig.addEventListener('click', () => setOpen(!stt.open));
+        trig.addEventListener('keydown', ev => {
+            if (ev.key === 'ArrowDown' || ev.key === 'ArrowUp') { ev.preventDefault(); if (!stt.open) { setOpen(true); stt.active = ev.key === 'ArrowDown' ? 0 : leads.length - 1; } else stt.active = (stt.active + (ev.key === 'ArrowDown' ? 1 : -1) + leads.length) % leads.length; paint(); return; }
+            if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); if (!stt.open) setOpen(true); else toggle(stt.active); return; }
+            if (ev.key === 'Escape' && stt.open) { ev.preventDefault(); setOpen(false); }
+            if (ev.key === 'Tab' && stt.open) setOpen(false);
+        });
+        opts.forEach((o, i) => o.addEventListener('click', ev => { ev.preventDefault(); stt.active = i; toggle(i); trig.focus(); }));
+        const api = { box, close() { if (stt.open) { stt.open = false; paint(); } }, paint, gone: () => !d.body.contains(box) };
+        combos.push(api); paint(); return { w, api };
+    }
+    function leadPicker(host) {
+        const sel = new Set(), g = el('div', 'ecg-leads-grid');
+        const a = makeCombo('Derivaciones de miembros', LIMB, sel), b = makeCombo('Derivaciones precordiales', CHEST, sel);
+        g.append(a.w, b.w); host.append(g);
+        return { get: () => ORDER.filter(l => sel.has(l)), set: arr => { sel.clear(); (arr || []).forEach(l => sel.add(l)); a.api.paint(); b.api.paint(); } };
+    }
+
+    // ══ Campos de detalle de cada hallazgo ══
+    function fieldSel(label, opts, def) { const w = el('div', '', `<label>${label}</label><select>${opts.map(([v, t]) => `<option value="${v}">${t}</option>`).join('')}</select>`); const s = w.querySelector('select'); if (def !== undefined) s.value = def; return { w, s, lab: w.querySelector('label') }; }
+    function fieldTxt(label, ph) { const w = el('div', 'ecg-span2', `<label>${label}</label><input type="text" placeholder="${ph || ''}"></div>`); return { w, i: w.querySelector('input') }; }
+    function builder(cfg) {
+        return box => {
+            const g = el('div', 'ecg-det-grid'); box.append(g); const ui = { _f: {} };
+            if (cfg.text) { const f = fieldTxt(cfg.text, cfg.ph); g.append(f.w); ui._f.t = f; }
+            if (cfg.morph) { const f = fieldSel('Morfología', MORPH, 'horizontal'); g.append(f.w); ui._f.morph = f; }
+            if (cfg.mm) { const f = fieldSel('Magnitud (mm)', MM, cfg.mm); g.append(f.w); ui._f.mm = f; }
+            if (cfg.apar) { const f = fieldSel('Aparición', APAR, ''); g.append(f.w); ui._f.apar = f; }
+            if (cfg.recup) { const f = fieldSel('Recuperación del ST', RECUP, ''); g.append(f.w); ui._f.recup = f; }
+            if (cfg.leads) { const h = el('div', 'ecg-span2'); g.append(h); ui.lp = leadPicker(h); }
+            ui.has = k => k === 'leads' ? !!ui.lp : !!ui._f[k];
+            ui.v = k => ui._f[k] ? (ui._f[k].s ? ui._f[k].s.value : ui._f[k].i.value.trim()) : '';
+            ui.set = (k, val) => { const f = ui._f[k]; if (!f) return; if (f.s) f.s.value = String(val); else f.i.value = val; };
+            ui.leads = () => ui.lp ? ui.lp.get() : [];
+            ui.mmLabel = () => ui._f.mm ? ui._f.mm.lab : null;
+            return ui;
+        };
+    }
+
+    // ══ Lista de hallazgos: un desplegable por fila + «Agregar» ══
+    function findingList(host, defs) {
+        const byId = Object.fromEntries(defs.map(dd => [dd.id, dd])), def0 = defs.find(dd => dd.isDefault);
+        const rowsBox = el('div', 'ecg-frows'), addBtn = el('button', 'ecg-addrow', '+ Agregar'); addBtn.type = 'button';
+        host.append(rowsBox, addBtn);
+        const rows = [];
+        const optsHTML = '<option value="">— elegir —</option>' + defs.map(dd => `<option value="${dd.id}">${dd.label}</option>`).join('');
+        function makeRow(val) {
+            const r = { el: el('div', 'ecg-frow') };
+            r.sel = el('select', 'ecg-fsel', optsHTML); r.det = el('div', 'ecg-fdet hidden-ecg');
+            r.del = el('button', 'ecg-fdel', '×'); r.del.type = 'button'; r.del.tabIndex = -1; r.del.title = 'Quitar'; r.del.setAttribute('aria-label', 'Quitar hallazgo');
+            r.el.append(r.sel, r.det, r.del); rowsBox.append(r.el); rows.push(r);
+            r.sel.value = val; apply(r);
+            r.sel.addEventListener('change', () => { apply(r); onChange(); });
+            r.del.addEventListener('click', () => { remove(r); onChange(); });
+            return r;
+        }
+        function apply(r) {
+            const dd = byId[r.sel.value] || null; r.d = dd; r.det.replaceChildren(); r.ui = null;
+            if (dd && dd.build) r.ui = dd.build(r.det);
+            r.det.classList.toggle('hidden-ecg', !r.ui);
+            if (dd) rows.filter(o => o !== r && o.d && (dd.exclusive || o.d.exclusive)).forEach(o => remove(o));
+            paintDel();
+        }
+        function remove(r) { if (rows.length === 1) { r.sel.value = def0 ? def0.id : ''; apply(r); return; } r.el.remove(); rows.splice(rows.indexOf(r), 1); paintDel(); }
+        function paintDel() { rows.forEach(r => r.del.classList.toggle('hidden-ecg', rows.length === 1 && (!r.d || r.d === def0))); }
+        addBtn.addEventListener('click', () => { const r = makeRow(''); r.sel.focus(); onChange(); });
+        makeRow(def0 ? def0.id : '');
+        const active = () => rows.filter(r => r.d);
+        function readOne(r) {
+            const o = { id: r.d.id };
+            if (r.ui) { ['mm', 'morph', 'apar', 'recup'].forEach(k => { if (r.ui.has(k)) o[k] = r.ui.v(k); }); if (r.ui.has('t')) o.texto = r.ui.v('t'); if (r.ui.lp) o.leads = r.ui.leads(); }
+            return o;
+        }
+        return {
+            host, active,
+            abnormal: () => active().filter(r => !r.d.isDefault),
+            readState() { return this.abnormal().map(readOne); },
+            setState(items) {
+                while (rows.length > 1) { rows[rows.length - 1].el.remove(); rows.pop(); }
+                rows[0].sel.value = def0 ? def0.id : ''; apply(rows[0]);
+                (items || []).forEach((it, i) => {
+                    const r = i === 0 ? rows[0] : makeRow('');
+                    r.sel.value = it.id; apply(r);
+                    if (r.ui) {
+                        ['mm', 'morph', 'apar', 'recup'].forEach(k => { if (it[k] != null) r.ui.set(k, it[k]); });
+                        if (it.texto != null) r.ui.set('t', it.texto);
+                        if (it.leads && r.ui.lp) r.ui.lp.set(it.leads);
+                    }
+                });
+                paintDel();
+            },
+            reset() { this.setState([]); }
+        };
+    }
+
+    // ══ Eventos de arritmia ══
+    function selHTML(cls, label, opts) { return `<div><label>${label}</label><select class="${cls}">${opts.map(([v, t]) => `<option value="${v}">${t}</option>`).join('')}</select></div>`; }
+    function addEvent(type, phase, data) {
+        const host = $(phase === 'Reposo' ? 'ecgx_eventosBasal' : 'ecgx_eventos');
+        if (!host) return null;
+        const e = el('div', 'ecg-event'); e.dataset.type = type; e.dataset.phase = phase;
+        let f = '';
+        if (type === 'EV' || type === 'ESV') f += selHTML('arrfreq', 'Frecuencia', [['aisladas', 'Aisladas'], ['frecuentes', 'Frecuentes']]);
+        if (type === 'EV' || type === 'TVNS' || type === 'TVS') f += selHTML('arrmorf', 'Morfología', type === 'EV' ? [['monomorfas', 'Monomorfas'], ['polimorfas', 'Polimorfas']] : [['monomorfa', 'Monomorfa'], ['polimorfa', 'Polimorfa']]);
+        if (type === 'TVNS') f += selHTML('arrlat', 'Duración', [['', 'Sin dato'], ['de 3 a 5 latidos', '3 a 5 latidos'], ['de 6 a 10 latidos', '6 a 10 latidos'], ['de más de 10 latidos', 'Más de 10 latidos']]);
+        if (type === 'FA') f += selHTML('arrfa', 'Tipo', [['fibrilación auricular', 'Fibrilación auricular'], ['aleteo auricular', 'Aleteo auricular']]);
+        if (type === 'BCRI') f += `<div><label>FC de aparición (lpm, opcional)</label><input type="number" class="arrfc" min="40" max="250" placeholder="Ej.: 140"></div>`;
+        if (PAT[type]) f += `<div class="ecg-span2"><label>Patrones asociados (combinables; flechas ← →, Enter)</label><div class="ecg-arrchips pats">${PAT[type].map(([id, l]) => `<button type="button" class="ecg-arrchip" data-p="${id}" aria-pressed="false">${l}</button>`).join('')}</div></div>`;
+        if (phase === 'Reposo') f += selHTML('arrevol', 'Con el esfuerzo', [['', 'Sin dato'], ['desaparecen', 'Desaparecen'], ['persisten', 'Persisten'], ['aumentan', 'Aumentan']]);
+        else if (type !== 'BCRI') f += selHTML('arrplace', 'Momento', [['esfuerzo', 'Solo esfuerzo'], ['ambos', 'Esfuerzo y recuperación'], ['recuperacion', 'Solo recuperación']]) + selHTML('arrstage', 'Etapa (opcional)', [['', 'Sin dato'], ['I', 'I'], ['II', 'II'], ['III', 'III'], ['IV', 'IV'], ['V', 'V'], ['VI', 'VI'], ['VII', 'VII'], ['max', 'Máximo esfuerzo']]);
+        e.innerHTML = `<div class="ecg-event-row"><span class="ecg-event-title">${TITLE[type]}<span class="ecg-arr-context">${phase === 'Reposo' ? 'Basal' : 'Esfuerzo / recuperación'}</span></span><button type="button" class="ecg-remove" tabindex="-1">Quitar</button></div><div class="ecg-det-grid" style="margin-top:0.6rem">${f}</div>`;
+        e.querySelector('.ecg-remove').addEventListener('click', () => { e.remove(); onChange(); });
+        const chips = e.querySelector('.pats');
+        if (chips) {
+            chips.addEventListener('click', ev => { const b = ev.target.closest('.ecg-arrchip'); if (!b) return; b.setAttribute('aria-pressed', String(b.getAttribute('aria-pressed') !== 'true')); onChange(); });
+            chips.addEventListener('keydown', ev => { if (!['ArrowLeft', 'ArrowRight'].includes(ev.key)) return; const b = [...chips.querySelectorAll('.ecg-arrchip')], i = b.indexOf(d.activeElement); if (i < 0) return; ev.preventDefault(); b[(i + (ev.key === 'ArrowLeft' ? -1 : 1) + b.length) % b.length].focus(); });
+        }
+        host.append(e);
+        if (data) {
+            const set = (cls, val) => { const x = e.querySelector('.' + cls); if (x && val != null) x.value = val; };
+            set('arrfreq', data.freq); set('arrmorf', data.morf); set('arrlat', data.lat); set('arrfa', data.fa);
+            set('arrfc', data.fc); set('arrevol', data.evol); set('arrplace', data.place); set('arrstage', data.stage);
+            (data.pats || []).forEach(p => { const b = e.querySelector('.pats .ecg-arrchip[data-p="' + p + '"]'); if (b) b.setAttribute('aria-pressed', 'true'); });
+        }
+        return e;
+    }
+    function readEvents(phase) {
+        const host = $(phase === 'Reposo' ? 'ecgx_eventosBasal' : 'ecgx_eventos');
+        if (!host) return [];
+        const q = (e, c) => { const x = e.querySelector('.' + c); return x ? x.value.trim() : ''; };
+        return [...host.querySelectorAll('.ecg-event')].map(e => {
+            const t = e.dataset.type;
+            const ev = { type: t };
+            if (t === 'EV' || t === 'ESV') ev.freq = q(e, 'arrfreq');
+            if (t === 'EV' || t === 'TVNS' || t === 'TVS') ev.morf = q(e, 'arrmorf');
+            if (t === 'TVNS') ev.lat = q(e, 'arrlat');
+            if (t === 'FA') ev.fa = q(e, 'arrfa');
+            if (t === 'BCRI') ev.fc = q(e, 'arrfc');
+            if (PAT[t]) ev.pats = [...e.querySelectorAll('.pats .ecg-arrchip[aria-pressed="true"]')].map(b => b.dataset.p);
+            if (phase === 'Reposo') ev.evol = q(e, 'arrevol');
+            else if (t !== 'BCRI') { ev.place = q(e, 'arrplace'); ev.stage = q(e, 'arrstage'); }
+            return ev;
+        });
+    }
+
+    // ══ Definiciones de los apartados ══
+    function defineLists() {
+        COND = findingList($('ecgx_condList'), [
+            { id: 'sin', label: 'Sin trastornos de conducción', isDefault: true, exclusive: true },
+            { id: 'bav1', label: 'BAV 1° grado' }, { id: 'bcrd', label: 'BCRD' }, { id: 'bird', label: 'BIRD' },
+            { id: 'bcri', label: 'BCRI' }, { id: 'hbai', label: 'HBAI' }, { id: 'hbpi', label: 'HBPI' },
+            { id: 'wpw', label: 'Preexcitación (WPW)' }, { id: 'inesp', label: 'Trastorno inespecífico' },
+            { id: 'otra', label: 'Otra', build: builder({ text: '¿Cuál?', ph: 'Ej.: bloqueo AV 2° grado Mobitz I' }) }
+        ]);
+        STB = findingList($('ecgx_stbList'), [
+            { id: 'sinalt', label: 'Sin alteraciones significativas', isDefault: true, exclusive: true },
+            { id: 'infra', label: 'Infradesnivel del ST', build: builder({ mm: '1', leads: true }), needLeads: true },
+            { id: 'supra', label: 'Supradesnivel del ST', build: builder({ mm: '1', leads: true }), needLeads: true },
+            { id: 'tneg', label: 'Ondas T negativas', build: builder({ leads: true }), needLeads: true },
+            { id: 'tbif', label: 'Ondas T bifásicas (+/−)', build: builder({ leads: true }), needLeads: true },
+            { id: 'tapl', label: 'Ondas T aplanadas', build: builder({ leads: true }), needLeads: true },
+            { id: 'rect', label: 'Rectificación del ST', build: builder({ leads: true }), needLeads: true },
+            { id: 'repol', label: 'Alteraciones inespecíficas de la repolarización' },
+            { id: 'hvi', label: 'HVI con sobrecarga sistólica' },
+            { id: 'dig', label: 'Efecto digitálico' },
+            { id: 'rp', label: 'Repolarización precoz', build: builder({ leads: true }) }
+        ]);
+        QS = findingList($('ecgx_qList'), [
+            { id: 'none', label: 'Sin hallazgos', isDefault: true, exclusive: true },
+            { id: 'q', label: 'Ondas Q patológicas', build: builder({ leads: true }), needLeads: true },
+            { id: 'qs', label: 'Complejos QS', build: builder({ leads: true }), needLeads: true },
+            { id: 'sec', label: 'Imagen sugestiva de secuela eléctrica', build: builder({ leads: true }), needLeads: true },
+            { id: 'r', label: 'Pobre progresión de onda R', build: builder({ leads: true }) }
+        ]);
+        STE = findingList($('ecgx_steList'), [
+            { id: 'sin', label: 'Sin cambios significativos respecto del basal', isDefault: true, exclusive: true },
+            { id: 'infra', label: 'Infradesnivel del ST', build: builder({ morph: true, mm: '2', apar: true, recup: true, leads: true }), needLeads: true },
+            { id: 'supra', label: 'Supradesnivel del ST', build: builder({ mm: '2', apar: true, recup: true, leads: true }), needLeads: true },
+            { id: 'avr', label: 'Supradesnivel en aVR', build: builder({ mm: '1' }) },
+            { id: 'pseudo', label: 'Pseudonormalización de ondas T', build: builder({ leads: true }), needLeads: true },
+            { id: 'basal', label: 'Persisten cambios basales sin modificación', exclusive: true },
+            { id: 'otro', label: 'Otros cambios', build: builder({ text: 'Describir', ph: 'Ej.: ondas T picudas en precordiales', leads: true }) },
+            { id: 'art', label: 'No interpretable por artefactos', exclusive: true }
+        ]);
+    }
+
+    // ══ Espejo hacia los campos del modelo anterior ══
+    function setV(id, val) {
+        const e = $(id); if (!e) return;
+        if (e.type === 'checkbox') { e.checked = !!val; }
+        else if (e.value !== String(val)) { e.value = String(val); }
+    }
+    function syncLegacy() {
+        if (!built) return;
+        sincronizando = true;
+        const E = estadoVivo();
+        let cond = 'ninguno';
+        if ($('ecg_ritmo') && $('ecg_ritmo').value === 'marcapasos') cond = 'marcapasos';
+        else if (E.conduccion.includes('bcri')) cond = 'bcri';
+        else if (E.conduccion.includes('wpw')) cond = 'preexcitacion';
+        else if (E.conduccion.includes('bcrd') && E.conduccion.includes('hbai')) cond = 'bcrd_hbai';
+        else if (E.conduccion.includes('bcrd')) cond = 'bcrd';
+        else if (E.conduccion.includes('hbai')) cond = 'hbai';
+        else if (E.conduccion.includes('hbpi')) cond = 'hbpi';
+        const condEl = $('ecg_conduccion');
+        if (condEl && condEl.value !== cond) { condEl.value = cond; condEl.dispatchEvent(new Event('change', { bubbles: true })); }
+        let sb = 'normal';
+        if (E.stBasalNoInterp) sb = 'no_interpretable';
+        else if (E.stBasal.some(x => x.id === 'hvi')) sb = 'hvi';
+        else if (E.stBasal.some(x => x.id === 'infra')) sb = 'infra_basal';
+        else if (E.stBasal.length) sb = 'repol';
+        setV('ecg_st_basal', sb);
+        const main = E.stEsf.find(x => x.id === 'infra') || E.stEsf.find(x => x.id === 'supra') || null;
+        if (main && main.id === 'infra') { setV('ecg_st_tipo', 'infra'); setV('ecg_st_morfologia', main.morph || 'horizontal'); setV('ecg_st_mm', main.mm || ''); setV('ecg_st_deriv', (main.leads || []).join(', ')); }
+        else if (main && main.id === 'supra') { setV('ecg_st_tipo', 'supra'); setV('ecg_st_morfologia', ''); setV('ecg_st_mm', main.mm || ''); setV('ecg_st_deriv', (main.leads || []).join(', ')); }
+        else { setV('ecg_st_tipo', ''); setV('ecg_st_morfologia', ''); setV('ecg_st_mm', ''); setV('ecg_st_deriv', ''); }
+        setV('ecg_st_aparicion', main ? (APARL[main.apar] || '') : '');
+        setV('ecg_st_resolucion', main ? (RECUPL[main.recup] || '') : '');
+        const flags = { arr_esv: false, arr_ev_mono: false, arr_ev_poli: false, arr_bigeminia: false, arr_dupletas: false, arr_tvns: false, arr_fa_tsv: false, arr_aumenta: false };
+        E.arrEsf.forEach(ev => {
+            if (ev.type === 'ESV') flags.arr_esv = true;
+            if (ev.type === 'EV') { if (ev.morf === 'polimorfas') flags.arr_ev_poli = true; else flags.arr_ev_mono = true; if ((ev.pats || []).some(p => p === 'bigeminia' || p === 'trigeminia')) flags.arr_bigeminia = true; if ((ev.pats || []).some(p => p === 'duplas' || p === 'tripletas')) flags.arr_dupletas = true; }
+            if (ev.type === 'TVNS' || ev.type === 'TVS') flags.arr_tvns = true;
+            if (ev.type === 'FA' || ev.type === 'TSV') flags.arr_fa_tsv = true;
+        });
+        E.arrBasal.forEach(ev => { if (ev.evol === 'aumentan') flags.arr_aumenta = true; });
+        Object.entries(flags).forEach(([id, val]) => setV(id, val));
+        const place = (E.arrEsf.find(ev => ev.place) || {}).place || '';
+        setV('arr_momento', place === 'recuperacion' ? 'recuperacion' : place === 'ambos' ? 'ambos' : place ? 'esfuerzo' : '');
+        sincronizando = false;
+    }
+
+    function onChange() {
+        if (!built) return;
+        const ritmo = $('ecg_ritmo');
+        if (ritmo) { const box = $('ecg_ritmo_otro_box'); if (box) box.classList.toggle('hidden-ecg', ritmo.value !== 'otro'); }
+        const stbInfra = STB.abnormal().some(r => r.d.id === 'infra');
+        STE.active().forEach(r => { if (r.d && r.d.id === 'infra' && r.ui && r.ui.mmLabel && r.ui.mmLabel()) r.ui.mmLabel().textContent = stbInfra ? 'Magnitud adicional respecto del basal (mm)' : 'Magnitud (mm)'; });
+        if (silencioso) return;
+        syncLegacy();
+        if (typeof avisarArritmias === 'function') avisarArritmias();
+        if (typeof refrescarDeducidos === 'function') refrescarDeducidos();
+        if (typeof scheduleSave === 'function') scheduleSave();
+    }
+
+    // ══ Serialización para el borrador ══
+    function serialize() { return built ? estadoVivo() : null; }
+    function aplicar(E) {
+        if (!built || !E) return;
+        silencioso = true;
+        setV('ecg_ritmo', E.ritmo || 'sinusal'); setV('ecg_ritmo_otro', E.ritmoOtro || '');
+        COND.setState((E.conduccion || []).map(id => id === 'otra' ? { id, texto: E.condOtra } : { id }));
+        STB.setState(E.stBasal || []); QS.setState(E.q || []); STE.setState(E.stEsf || []);
+        const eb = $('ecgx_eventosBasal'); if (eb) eb.replaceChildren();
+        const ee = $('ecgx_eventos'); if (ee) ee.replaceChildren();
+        (E.arrBasal || []).forEach(ev => addEvent(ev.type, 'Reposo', ev));
+        (E.arrEsf || []).forEach(ev => addEvent(ev.type, 'Esfuerzo', ev));
+        setV('ecg_otros_basal', E.otrosBasal || ''); setV('ecg_arritmias', E.libre || '');
+        setV('arr_sintomas', E.sintomatica ? 'sintomatica' : 'asintomatica');
+        silencioso = false;
+        onChange();
+    }
+    function reset() {
+        if (!built) return;
+        silencioso = true;
+        setV('ecg_ritmo', 'sinusal'); setV('ecg_ritmo_otro', '');
+        COND.reset(); STB.reset(); QS.reset(); STE.reset();
+        const eb = $('ecgx_eventosBasal'); if (eb) eb.replaceChildren();
+        const ee = $('ecgx_eventos'); if (ee) ee.replaceChildren();
+        silencioso = false;
+        onChange();
+    }
+
+    // Cuando una casilla de antecedente cambia ecg_conduccion/ecg_ritmo, el bloque
+    // visible lo adopta para no quedar desfasado. Guardado contra bucles con el espejo.
+    function adoptarConduccion() {
+        if (!built || sincronizando) return;
+        const v = ($('ecg_conduccion') || {}).value || 'ninguno';
+        const map = { bcri: ['bcri'], preexcitacion: ['wpw'], bcrd: ['bcrd'], hbai: ['hbai'], hbpi: ['hbpi'], bcrd_hbai: ['bcrd', 'hbai'], marcapasos: [], ninguno: [] };
+        silencioso = true;
+        COND.setState((map[v] || []).map(id => ({ id })));
+        silencioso = false;
+    }
+
+    function init() {
+        if (built || !$('ecgx_condList')) return;
+        defineLists();
+        built = true;
+        d.querySelectorAll('[data-ecg-add]').forEach(b => b.addEventListener('click', () => { const e = addEvent(b.dataset.ecgAdd, b.dataset.ecgPhase); onChange(); if (e) { const first = e.querySelector('select,input') || e.querySelector('.ecg-remove'); if (first) try { first.focus(); } catch (x) { } } }));
+        ['ecg_ritmo', 'ecg_ritmo_otro', 'arr_sintomas', 'ecg_arritmias', 'ecg_otros_basal'].forEach(id => { const e = $(id); if (e) ['change', 'input'].forEach(ev => e.addEventListener(ev, onChange)); });
+        const condEl = $('ecg_conduccion'); if (condEl) condEl.addEventListener('change', adoptarConduccion);
+        d.addEventListener('click', e => combos.forEach(c => { if (!c.box.contains(e.target)) c.close(); }));
+        onChange();
+    }
+
+    return {
+        init, canonico, tocado, clasificar, reposoBody, esfuerzoBody, esfuerzoArritmias,
+        columnas, serialize, aplicar, reset, estadoVivo, estadoLegacy,
+        avisos: E => { const c = clasificar(E, {}); return c.A; }
+    };
+})();
+if (typeof window !== 'undefined') window.ECGmod = ECGmod;
+
 // ── Capa 1: recolector de hechos ──────────────
 // Devuelve un objeto plano, sin una sola palabra de informe.
 function recolectarHallazgos() {
@@ -3431,17 +4037,45 @@ function recolectarHallazgos() {
     H.stBasal = document.getElementById('ecg_st_basal').value;
     H.stBasalTxt = textoSelect('ecg_st_basal');
 
-    // Si el ST es INTERPRETABLE es otra pregunta, y se responde con el basal y la
-    // conducción. Antes `stIsquemico` las mezclaba: con BCRI un ST que la propia app
-    // declara ilegible seguía valiendo como respuesta eléctrica positiva, evitaba la
-    // rama de estímulo insuficiente y podía abrir la de discordancia.
-    // La cirugía previa no invalida el ST: lo que lo invalida es la activación
-    // eléctrica anómala. Por eso mira `conduccionLimita` y no `hayConduccion`.
-    // La digoxina da infradesnivel del ST sin isquemia: el trazado deja de servir.
-    H.stInterpretable = !H.conduccionLimita && H.stBasal !== 'no_interpretable' && !H.digoxina;
-    // Isquémico = hubo cambio Y el trazado permitía leerlo.
-    H.stIsquemico = H.stCambio && H.stInterpretable;
+    // ── Clasificación del ECG según el Documento de posición SAC 2026 ──
+    // El estado canónico sale del bloque visible nuevo; cae a los campos del modelo
+    // anterior cuando el bloque no se tocó (estudios guardados con el diseño viejo y
+    // tests que pueblan esos campos a mano).
+    H.ecgEstado = ECGmod.canonico();
+    // Causas de no-interpretabilidad que viven FUERA del bloque de ECG y se le pasan al
+    // clasificador: la digoxina y el ST basal declarado ilegible.
+    H.ecgCls = ECGmod.clasificar(H.ecgEstado, {
+        digoxina: H.digoxina,
+        stBasalNoInterp: H.stBasal === 'no_interpretable'
+    });
+    H.ecgResultado = H.ecgCls.res;   // Positivo · Negativo · No concluyente · No interpretable
+
+    // Un trazado interpretable es el que no tiene NINGUNA causa de no-interpretabilidad.
+    // Se conservan las de siempre —conducción que limita el septum, ST basal ilegible y
+    // digoxina— y se suman las de la SAC que trae el clasificador (FA, aleteo, HVI con
+    // sobrecarga, infra basal ≥1 mm, extrasistolia ventricular frecuente en reposo,
+    // artefactos). Que esas últimas invaliden el ST NO cambia el manejo del septum ni de
+    // la motilidad: eso sigue mirando sólo `conduccionLimita`.
+    // La cirugía previa no invalida el ST (mira `conduccionLimita`, no `hayConduccion`).
+    H.stInterpretable = !H.conduccionLimita && H.stBasal !== 'no_interpretable' && !H.digoxina &&
+        H.ecgResultado !== 'No interpretable';
+    // Isquémico = la clasificación dio POSITIVO y el trazado era legible. El infradesnivel
+    // lentamente ascendente ya no cuenta como isquémico (queda no concluyente); el rápido
+    // sigue siendo respuesta fisiológica.
+    H.stIsquemico = H.ecgResultado === 'Positivo' && H.stInterpretable;
     H.otrosBasal = v('ecg_otros_basal');
+
+    // Campos del rediseño para la planilla y el informe.
+    const ecgCols = ECGmod.columnas(H.ecgEstado);
+    H.ecgInterpretable = H.ecgCls.reasons.length ? 'No' : 'Sí';
+    H.ecgNoInterpretableMotivo = H.ecgCls.reasons.join(', ');
+    H.ecgQSecuela = ecgCols.q;
+    H.ecgArritmiasBasales = ecgCols.arrBasal;
+    H.ecgArritmiasEsfuerzoTxt = ecgCols.arrEsf;
+    H.ecgStAparicionTxt = ecgCols.aparicion;
+    H.ecgStRecuperacionTxt = ecgCols.recuperacion;
+    H.ecgTextoReposo = ECGmod.reposoBody(H.ecgEstado);
+    H.ecgTextoEsfuerzo = ECGmod.esfuerzoBody(H.ecgEstado);
 
     // Arritmias
     H.arritmias = ARRITMIAS.filter(a => document.getElementById(a.id).checked);
@@ -3779,44 +4413,24 @@ function acompanamientoEnProsa(H) {
     return rellenar(T.acompanamiento, { lista: H.sintomasEsfuerzo.toLowerCase() });
 }
 
-// Frase de arritmias: si hay descripción libre, manda esa; si no, se arma de los campos.
-function arritmiasEnProsa(H) {
-    if (H.arrLibre) return H.arrLibre;
-    if (!H.arritmias.length) return '';
-    const lista = listarEnProsa(H.arritmias.map(a => a.txt));
-    const momento = H.arrMomentoTxt && H.arrMomentoTxt !== '—' ? ' ' + H.arrMomentoTxt : '';
-    const sintomas = H.arrSintomatica ? ', con síntomas asociados' : ', sin síntomas asociados';
-    return lista.charAt(0).toUpperCase() + lista.slice(1) + momento + sintomas + '.';
-}
-
-// Línea "ECG reposo:" — ritmo, conducción, ST basal y otros hallazgos
+// Línea "ECG reposo:" — ritmo, conducción, ST-T basal, ondas Q, otros hallazgos y
+// arritmias basales, redactados por el módulo ECG (modelo canónico del rediseño V9).
 function ecgReposoEnProsa(H) {
-    const partes = [];
-    let ritmo = H.ritmoTxt;
-    if (H.conduccionTxt) ritmo += ' con ' + H.conduccionTxt;
-    partes.push(ritmo + '.');
-    if (H.stBasal && H.stBasal !== 'normal') partes.push(H.stBasalTxt + '.');
-    if (H.otrosBasal) partes.push(H.otrosBasal.replace(/\.*$/, '') + '.');
-    return partes.join(' ');
+    return ECGmod.reposoBody(H.ecgEstado);
 }
 
-// Línea "ECG post-esfuerzo:" — cambios del ST y arritmias
+// Línea "ECG post-esfuerzo:" — cambios del ST y arritmias inducidas.
+// Con un trastorno de conducción que limita el septum, el ST no es valorable y se dice
+// así, en lugar de describir cambios que el trazado no permite leer. La digoxina agrega
+// su propia aclaración.
 function ecgEsfuerzoEnProsa(H) {
-    const partes = [];
-    if (H.stTipo) {
-        const tipo = H.stTipo === 'supra' ? 'Supradesnivel del ST' : 'Infradesnivel del ST';
-        partes.push(tipo + (H.stMm ? ` de ${nProsa(H.stMm)} mm` : '') + (H.stDeriv ? ` en ${H.stDeriv}` : '') +
-            (H.stAparicion ? `, desde ${H.stAparicion}` : '') +
-            (H.stResolucion ? `, con resolución en ${H.stResolucion}` : '') + '.');
-        if (H.digoxina && !H.conduccionLimita) partes.push('No valorable para isquemia por el tratamiento con digoxina.');
-    } else if (H.hayConduccion) {
-        partes.push('Análisis del ST no valorable por el trastorno de conducción.');
-    } else {
-        partes.push('Sin cambios del ST-T.');
+    const E = H.ecgEstado;
+    if (H.conduccionLimita) {
+        return 'Análisis del ST no valorable por el trastorno de conducción. ' + ECGmod.esfuerzoArritmias(E);
     }
-    const arr = arritmiasEnProsa(H);
-    partes.push(arr || 'Sin arritmias.');
-    return partes.join(' ');
+    let body = ECGmod.esfuerzoBody(E);
+    if (H.digoxina) body += ' No valorable para isquemia por el tratamiento con digoxina.';
+    return body;
 }
 
 // Los textos libres vienen de otra app o de un teclado con la tilde invertida.
@@ -4960,6 +5574,11 @@ function construirNarrativa(H) {
     const pronostico = oracionPronostica(H, rama);
     if (pronostico) oracionesFinales.push(pronostico);
 
+    // ECG de esfuerzo no concluyente para isquemia: se dice en la conclusión SÓLO si la
+    // motilidad es negativa, y sin interpretarlo más. (El bloque de ECG ya lo describe.)
+    if (H.ecgResultado === 'No concluyente' && rama === 'negativa')
+        oracionesFinales.push(' El ECG de esfuerzo resultó no concluyente para isquemia.');
+
     // El veredicto de la EAo asintomática va DESPUÉS: mueve la indicación quirúrgica,
     // que es lo más accionable que puede llevar este informe.
     if (H.eaoEjEnUso) {
@@ -5012,14 +5631,17 @@ function construirNarrativa(H) {
 //  tiempo y terminan diciendo cosas distintas del mismo estudio.
 //
 //  Qué va en cada cuadro:
-//    REPOSO      sólo el eco basal: medidas, FEy, motilidad, diastólica,
-//                valvulopatía y presión pulmonar.
-//    ESFUERZO    primero la hemodinamia, después el eco post-esfuerzo.
+//    REPOSO      el eco basal (medidas, FEy, motilidad, diastólica, valvulopatía y
+//                presión pulmonar) y, al final, el ECG basal.
+//    ESFUERZO    primero la hemodinamia, después el eco post-esfuerzo y, al final, el
+//                ECG de esfuerzo y recuperación.
 //    CONCLUSIÓN  toda la interpretación, y nada de interpretación fuera de acá.
 //
-//  El ECG y las arritmias no van en ningún cuadro. Única excepción: cuando el ECG
-//  cambia lo que el estudio puede afirmar —el ST ilegible por bloqueo de rama o
-//  marcapasos—, y entonces se dice una sola vez, en la conclusión.
+//  El ECG descriptivo (reposo y esfuerzo) va en los cuadros desde el rediseño V9. La
+//  INTERPRETACIÓN del ECG sigue siendo de la conclusión y una sola vez: cuando el ST
+//  no es interpretable (bloqueo de rama, marcapasos, digoxina…), cuando hay
+//  discordancia con la motilidad, o —si la motilidad es negativa— cuando el ECG quedó
+//  no concluyente.
 // ══════════════════════════════════════════════
 
 const OSECAC_BLOQUES = [
@@ -5059,9 +5681,9 @@ function valvulopatiaReposoEnProsa(H) {
     return partes.length ? unirOraciones([listarEnProsa(partes)]) : 'Sin valvulopatías significativas.';
 }
 
-// El ECG fuera de los cuadros, salvo cuando cambia lo que el estudio puede afirmar.
+// La INTERPRETACIÓN del ECG en la conclusión (el ECG descriptivo ya va en los cuadros).
 // Se agrega sólo si la conclusión no lo dijo ya por su cuenta: una mención, no dos.
-function ecgEnConclusionOsecac(H, conclusion) {
+function ecgEnConclusionOsecac(H, conclusion, rama) {
     const frases = [];
     const yaLoDice = txt => conclusion.toLowerCase().includes(txt);
     if (!H.stInterpretable && !yaLoDice('segmento st')) {
@@ -5070,13 +5692,18 @@ function ecgEnConclusionOsecac(H, conclusion) {
             : (H.digoxina ? 'el tratamiento con digoxina' : 'las alteraciones del ST basal');
         frases.push(`El análisis del segmento ST no resultó interpretable por ${causa}.`);
     }
-    // Cambios isquémicos del ST sin correlato en la motilidad: en el informe largo
-    // esto vive en la línea de ECG, que acá no existe. Si se callara, el cuadro de
-    // conclusión afirmaría un estudio negativo sin decir que el ECG fue positivo.
+    // Cambios isquémicos del ST sin correlato en la motilidad: la discordancia es
+    // interpretación y va en la conclusión. Si se callara, el cuadro de conclusión
+    // afirmaría un estudio negativo sin decir que el ECG fue positivo.
     if (H.stIsquemico && !H.isquemicos.length && !yaLoDice('discordancia')) {
         frases.push(`Presentó cambios isquémicos del segmento ST (${descripcionSTEnProsa(H)}) sin ` +
             `correlato en la motilidad parietal, discordancia en la que la respuesta contráctil ` +
             `tiene mayor especificidad para isquemia miocárdica.`);
+    }
+    // ECG no concluyente para isquemia: se dice en la conclusión SÓLO si la motilidad
+    // es negativa, y sin interpretarlo más allá de eso.
+    if (H.ecgResultado === 'No concluyente' && rama === 'negativa' && !yaLoDice('no concluyente para isquemia')) {
+        frases.push('El ECG de esfuerzo resultó no concluyente para isquemia.');
     }
     return frases.join(' ');
 }
@@ -5086,15 +5713,16 @@ function ecgEnConclusionOsecac(H, conclusion) {
  * @returns {{reposo: string, esfuerzo: string, conclusion: string, texto: string}}
  */
 function informeOsecac(H) {
-    const { piezas } = construirNarrativa(H);
+    const { piezas, rama } = construirNarrativa(H);
 
-    // ── REPOSO: sólo el eco basal ──
+    // ── REPOSO: el eco basal y, al final, el ECG basal ──
     const reposo = [
         medidasReposoEnProsa(H),
         piezas.reposoEco,
         mayuscula(piezas.reposoDiastolica.replace(/\.*$/, '')) + '.',
         valvulopatiaReposoEnProsa(H),
-        psapEnProsa(H)
+        psapEnProsa(H),
+        'ECG basal: ' + ecgReposoEnProsa(H)
     ].filter(Boolean).join(' ');
 
     // ── ESFUERZO: la hemodinamia primero, después el eco post-esfuerzo ──
@@ -5134,9 +5762,10 @@ function informeOsecac(H) {
         hemodinamia,
         [textoEsfuerzo, piezas.motilidad].filter(Boolean).join(' '),
         diastolico,
-        ...piezas.modulos
+        ...piezas.modulos,
+        'ECG de esfuerzo y recuperación: ' + ecgEsfuerzoEnProsa(H)
     ].filter(Boolean).join('\n');
-    const ecg = ecgEnConclusionOsecac(H, conclusion);
+    const ecg = ecgEnConclusionOsecac(H, conclusion, rama);
     // El agregado del ECG entra antes del cierre: la fórmula tiene que seguir siendo
     // la última oración.
     if (ecg) conclusion = cerrarConFormula(conclusion).replace(CIERRE_INFORME, ecg + ' ' + CIERRE_INFORME);
@@ -5570,6 +6199,18 @@ function abrirConfigPlanilla() {
             <label for="cfg_sheet">URL del Sheet (opcional, para abrirlo rápido)</label>
             <input type="text" id="cfg_sheet" placeholder="https://docs.google.com/spreadsheets/..." value="${EstresSheets.getSheetUrl()}">
         </div>
+        ${EstresSheets.migrada() ? '' : `
+        <div class="info-banner info-banner-warning" style="margin-top:0.75rem">
+            <strong>La planilla pasó al esquema v5 (ECG).</strong> Se agregaron 7 columnas de ECG al
+            final de la hoja de Estrés. El envío usa <code>no-cors</code> y no puede leer la respuesta,
+            así que si la hoja no está migrada el guardado se rechaza en silencio. Pasos, una sola vez:
+            <ol style="margin:0.4rem 0 0.2rem 1.1rem; padding:0">
+                <li>En el Sheet: Extensiones → Apps Script. Pegá <strong>apps-script-unificado.gs</strong> (reemplazá todo) y volvé a <em>Implementar → Administrar implementaciones → editar → Nueva versión</em>.</li>
+                <li>Corré <strong>migrarEstres_simular()</strong> y leé el registro (no toca nada).</li>
+                <li>Hacé una copia de la hoja y corré <strong>migrarEstres()</strong>.</li>
+            </ol>
+            <button class="btn btn-secondary btn-sm" style="margin-top:0.5rem" onclick="marcarPlanillaMigrada()">Ya migré la planilla a v5</button>
+        </div>`}
         <div class="report-controls" style="margin-top:1rem">
             <button class="btn btn-primary btn-sm" onclick="guardarConfigPlanilla()">Guardar</button>
             <button class="btn btn-secondary btn-sm" onclick="verCodigoScript()">Ver código del script</button>
@@ -5579,6 +6220,12 @@ function abrirConfigPlanilla() {
       </div>`;
     document.body.appendChild(m);
     m.addEventListener('click', ev => { if (ev.target === m) m.remove(); });
+}
+
+function marcarPlanillaMigrada() {
+    EstresSheets.marcarMigrada();
+    document.getElementById('modal-planilla')?.remove();
+    showNotice('Anotado: la planilla está en el esquema v5. El guardado deja de avisar por la migración.', 'ok');
 }
 
 function guardarConfigPlanilla() {
@@ -5820,6 +6467,10 @@ function resetFormulario() {
     document.querySelectorAll('input[type="checkbox"]').forEach(el => el.checked = false);
     document.querySelectorAll('select').forEach(el => el.selectedIndex = 0);
 
+    // Bloque ECG: borrar las filas y eventos creados al vuelo. Sin esto, los hallazgos
+    // y las arritmias del paciente anterior quedaban en pantalla (fuga entre pacientes).
+    if (typeof ECGmod !== 'undefined') ECGmod.reset();
+
     SEGMENTS.forEach(s => { WM.reposo[s.id] = 0; WM.estres[s.id] = 0; });
     renderBullsEye('svg-reposo', 'reposo');
     renderBullsEye('svg-estres', 'estres');
@@ -6027,6 +6678,11 @@ function construirBorrador() {
             protocol: currentProtocol,
             specialTab: currentSpecialTab,
             dobStages: captureDobStages(),
+            // Estado del bloque ECG (listas de hallazgos y eventos de arritmia): sus
+            // controles se crean al vuelo y no tienen id, así que captureFields() no los
+            // ve. Se guardan aparte, como las etapas de dobutamina. Un borrador viejo sin
+            // esta clave se reconstruye desde los campos del modelo anterior.
+            ecg: (typeof ECGmod !== 'undefined') ? ECGmod.serialize() : null,
             medicacion: medicacionActual.map(m => ({ ...m })),
             // Qué campos deducidos corrigió el operador. Sin esto el valor corregido
             // se restaura y el primer recálculo lo pisa: la corrección se pierde sola.
@@ -6148,6 +6804,9 @@ function aplicarEstudio(d) {
     // El "Resumen de HC" de los estudios viejos pasa a "Otros antecedentes
     // relevantes", que sí sale en el informe.
     migrarResumenHC();
+    // El bloque ECG se reconstruye desde su estado guardado; un estudio del diseño viejo
+    // (sin `ecg`) se arma desde los campos del modelo anterior que acaban de restaurarse.
+    if (typeof ECGmod !== 'undefined') ECGmod.aplicar(d.ecg || ECGmod.estadoLegacy());
     sincronizarCasillasConduccion();
     pintarBloqueValvulopatia();
     renderAntecedentesHeredados();
@@ -6501,7 +7160,17 @@ async function guardarEstudio() {
     if (btn) btn.disabled = true;
     try {
         await EstresSheets.enviar(fila);
-        showNotice(`✅ Guardado en Google Sheets — ${hc}. Si lo volvés a guardar, reemplaza la fila.`, 'ok');
+        if (EstresSheets.migrada()) {
+            showNotice(`✅ Guardado en Google Sheets — ${hc}. Si lo volvés a guardar, reemplaza la fila.`, 'ok');
+        } else {
+            // El POST usa no-cors y no puede leer la respuesta. La planilla cambió al
+            // esquema v5 (7 columnas de ECG nuevas): si la hoja todavía tiene el
+            // encabezado viejo, el Apps Script RECHAZA la fila (HOJA_SIN_MIGRAR) y la app
+            // no se entera. Se avisa claro en vez de dar un falso "guardado".
+            showNotice(`Se envió — ${hc}. ⚠ La planilla cambió al esquema v5 (columnas de ECG nuevas). ` +
+                `Si todavía no migraste la hoja, el guardado se rechaza EN SILENCIO. Abrí “⚙ Planilla” para los pasos ` +
+                `(pegar el script, reimplementarlo, correr migrarEstres_simular() y migrarEstres()) y confirmá ahí que ya migraste.`, 'warn');
+        }
     } catch (e) {
         showNotice(`⚠️ Error al guardar: ${e.message}`, 'warn');
     } finally {

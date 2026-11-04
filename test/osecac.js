@@ -136,9 +136,9 @@ CASOS.forEach(({ nombre, w }) => {
     exigir(!/se recomienda|debe realizarse|indicar|derivar a|iniciar tratamiento/i.test(O.conclusion),
         `${rot} la conclusión no indica conducta`);
 
-    // ── 6 · El ECG no va en ningún cuadro ──
-    exigir(!/arritmia|extrasístole|ECG reposo|ECG post-esfuerzo/i.test(O.reposo + O.esfuerzo),
-        `${rot} las arritmias y el ECG no entran en reposo ni en esfuerzo`);
+    // ── 6 · El ECG descriptivo va en los cuadros (rediseño V9) ──
+    exigir(/ECG basal:/i.test(O.reposo), `${rot} el ECG basal va al final del cuadro de reposo`);
+    exigir(/ECG de esfuerzo y recuperación:/i.test(O.esfuerzo), `${rot} el ECG de esfuerzo va al final del cuadro de esfuerzo`);
 });
 
 // El dato en Esfuerzo, la interpretación en Conclusión: una vez cada cosa.
@@ -197,8 +197,10 @@ CASOS.forEach(({ nombre, w }) => {
     const O = w.informeOsecac(w.recolectarHallazgos());
     exigir(/discordancia/i.test(O.conclusion),
         'un ST isquémico sin correlato de motilidad se informa en la conclusión');
-    exigir(!/infradesnivel/i.test(O.reposo + O.esfuerzo),
-        'y no en los otros cuadros');
+    exigir(/infradesnivel/i.test(O.esfuerzo),
+        'el infradesnivel se describe en el cuadro de esfuerzo (línea de ECG)');
+    exigir(!/discordancia/i.test(O.reposo + O.esfuerzo),
+        'pero la discordancia, que es interpretación, va sólo en la conclusión');
 }
 
 // ── EAo moderada: la valvulopatía sale en el cuadro de reposo ────

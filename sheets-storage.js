@@ -40,6 +40,17 @@ const EstresSheets = {
     setSheetUrl(u)    { localStorage.setItem(this.SHEET_KEY, (u || '').trim()); },
     estaConfigurado() { return !!this.getUrl(); },
 
+    // Versión del contrato de columnas de la hoja de Estrés. Tiene que coincidir con
+    // ESQUEMA_ESTRES_V del Apps Script. Al subir de versión (columnas nuevas), hay que
+    // migrar la hoja ANTES de volver a enviar.
+    ESQUEMA: 5,
+    MIGRADO_KEY: 'ecoestres_esquema_migrado',
+    // El POST usa no-cors y no puede leer la respuesta: si la hoja quedó en el esquema
+    // viejo, el script rechaza la fila (HOJA_SIN_MIGRAR) y la app no se entera. Por eso
+    // se avisa hasta que el operador confirme que migró, en vez de dar un falso "guardado".
+    migrada()       { return localStorage.getItem(this.MIGRADO_KEY) === String(this.ESQUEMA); },
+    marcarMigrada() { try { localStorage.setItem(this.MIGRADO_KEY, String(this.ESQUEMA)); } catch (e) { /* noop */ } },
+
     // ── Columnas: filiación → antecedentes → hemodinamia → dominios → informe ──
     HEADERS: [
         // Filiación (sin nombre: sólo el identificador)
@@ -82,10 +93,16 @@ const EstresSheets = {
         // Texto completo
         'Informe',
         // Identificador propio del estudio, para no duplicar filas al reguardar.
-        // Última columna: así agregarlo no corre ninguna de las anteriores ni cambia
-        // los índices de formato numérico. En el Apps Script, si el ID ya está en la
-        // hoja se reemplaza esa fila; si no, se agrega.
-        'ID'
+        // En el Apps Script, si el ID ya está en la hoja se reemplaza esa fila; si no,
+        // se agrega.
+        'ID',
+        // ── ECG (rediseño V9) ──
+        // Las 8 columnas de ECG de arriba (Ritmo … Arritmias) quedan en su lugar y con
+        // su nombre, llenas con los datos nuevos. Estas SIETE van al final, después de
+        // 'ID', para no correr ninguna columna anterior: las filas ya guardadas
+        // conservan todas sus posiciones y estas quedan vacías hasta migrar la hoja.
+        'Q/secuela', 'Arritmias basales', 'ST aparición', 'ST recuperación',
+        'ECG interpretable', 'Motivo no interpretable', 'ECG resultado'
     ],
 
     // Columnas que Sheets puede confundir con fechas si van como texto.
@@ -201,7 +218,7 @@ const EstresSheets = {
             H.ritmoTxt || nada, H.conduccionTxt || 'Ninguno', H.stBasalTxt || nada,
             H.stTipo ? textoSelect('ecg_st_tipo') : 'Sin cambios',
             num_(v('ecg_st_mm')), H.stMorfologiaTxt || nada, v('ecg_st_deriv') || nada,
-            (H.arrLibre || H.arritmias.map(a => a.txt).join(', ')) || 'Sin arritmias',
+            H.ecgArritmiasEsfuerzoTxt || 'Sin arritmias',
 
             num_(H.eeReposo), num_(H.eeEstres), num_(H.vrtReposo), num_(H.vrtEstres),
             textoSelect('diast_resultado'),
@@ -212,7 +229,16 @@ const EstresSheets = {
 
             this.limpiarInforme(informe) || nada,
 
-            idEstudio
+            idEstudio,
+
+            // ── ECG (rediseño V9): columnas nuevas al final ──
+            H.ecgQSecuela || nada,
+            H.ecgArritmiasBasales || nada,
+            H.ecgStAparicionTxt || nada,
+            H.ecgStRecuperacionTxt || nada,
+            H.ecgInterpretable,
+            H.ecgNoInterpretableMotivo || nada,
+            H.ecgResultado
         ];
     },
 

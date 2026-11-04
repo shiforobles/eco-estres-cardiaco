@@ -112,10 +112,11 @@ w.guardarEstudio().then(() => {
 }).then(() => {
     exigir(enviados.length === 1, 'con planilla configurada se envía una fila');
     const fila = enviados[0];
-    exigir(fila && fila.length === w.eval('EstresSheets').HEADERS.length,
+    const HDRS = w.eval('EstresSheets').HEADERS;
+    exigir(fila && fila.length === HDRS.length,
         'la fila respeta el contrato de columnas');
-    exigir(fila && fila[fila.length - 1] === w.eval('estudioId'),
-        'la fila lleva el id del estudio en la última columna');
+    exigir(fila && fila[HDRS.indexOf('ID')] === w.eval('estudioId'),
+        'la fila lleva el id del estudio en su columna ID (ya no es la última: siguen las de ECG)');
     exigir(w.localStorage.getItem('eco-estres-historial') === null, 'no escribe el historial');
     exigir(w.localStorage.getItem('ecoestres_cola_envio') === null, 'ni la cola local');
     if (fallas) { console.log(`\n${fallas} falla(s)`); process.exit(1); }
