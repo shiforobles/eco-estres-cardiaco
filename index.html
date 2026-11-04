@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=2.3-estetica-1">
+    <link rel="stylesheet" href="styles.css?v=2.4-antecedentes-1">
 </head>
 <body>
 <div class="container">
@@ -17,7 +17,7 @@
     <header class="app-header">
         <div>
             <h1>Eco Estrés Cardíaco</h1>
-            <p class="version">v2.3 — Misma botonera que eco Doppler</p>
+            <p class="version">v2.4 — Antecedentes por grupos</p>
         </div>
         <div class="header-controls">
             <button type="button" class="btn btn-header" onclick="abrirPanel('perlas')" title="Perlas clínicas de los cursos, por tema">
@@ -61,19 +61,23 @@
          ══════════════════════════════════════ -->
     <section class="card">
         <h2 class="section-title">Datos del Paciente</h2>
-        <div class="grid">
+        <!-- HC y nombre en el mismo renglón, pero en dos campos: a la planilla va
+             sólo la HC, nunca el nombre. -->
+        <div class="grid-paciente">
             <div class="form-group">
-                <label for="paciente_id">HC / ID Paciente</label>
+                <label for="paciente_id">HC / ID</label>
                 <input autocomplete="off" type="text" id="paciente_id" placeholder="Ej: JP-1234">
             </div>
             <div class="form-group">
-                <label for="paciente_nombre">Nombre (opcional)</label>
+                <label for="paciente_nombre">Apellido y nombre <span class="firma-nota">(no va a la planilla)</span></label>
                 <input autocomplete="off" type="text" id="paciente_nombre" placeholder="Apellido, Nombre">
             </div>
             <div class="form-group">
-                <label for="fecha_estudio">Fecha del estudio</label>
+                <label for="fecha_estudio">Fecha</label>
                 <input autocomplete="off" type="date" id="fecha_estudio">
             </div>
+        </div>
+        <div class="grid-antropometria">
             <div class="form-group">
                 <label for="edad">Edad (años)</label>
                 <input autocomplete="off" type="number" id="edad" placeholder="65" min="0" max="120" oninput="onEdadChange()">
@@ -94,7 +98,7 @@
                 <input autocomplete="off" type="number" id="altura" placeholder="cm" min="100" max="250" step="1" oninput="calcBSA()">
             </div>
             <div class="form-group">
-                <label>Superficie Corporal (m²)</label>
+                <label>Superficie corporal (m²)</label>
                 <input autocomplete="off" type="text" id="sc_display" class="calculated-value" placeholder="—" disabled>
             </div>
         </div>
@@ -106,12 +110,11 @@
     <section class="card card-blue">
         <h2 class="section-title">Indicación y Antecedentes</h2>
 
-        <!-- La aclaración se guarda con el estudio. Su incorporación al informe y
-             a Sheets queda pendiente; no reutilizar el campo heredado indicacion_libre. -->
-        <div class="grid grid-2col">
+        <div class="grid-indicacion">
             <div class="form-group">
                 <label for="indicacion">Indicación del estudio</label>
-                <select autocomplete="off" id="indicacion">
+                <div class="select-con-boton">
+                    <select autocomplete="off" id="indicacion">
                     <option value="">Seleccionar...</option>
                     <option value="diagnostico_isquemia">Diagnóstico de Isquemia</option>
                     <option value="estratificacion_riesgo">Estratificación de Riesgo Preoperatorio</option>
@@ -126,77 +129,56 @@
                     <option value="coronarias_normales">Coronarias Normales / Angina Microvascular</option>
                     <option value="chagas">Enfermedad de Chagas</option>
                 </select>
-                <button type="button" class="btn btn-secondary btn-sm" style="margin-top:0.4rem"
-                    onclick="agregarIndicacion()">+ Agregar indicación a la lista</button>
-                <span class="firma-nota">Las que agregues quedan guardadas en esta computadora.</span>
+                    <button type="button" class="btn-mas" onclick="agregarIndicacion()"
+                        title="Agregar una indicación nueva a la lista (queda guardada en esta computadora)"
+                        aria-label="Agregar indicación a la lista">＋</button>
+                </div>
             </div>
             <div class="form-group">
-                <label for="indicacion_aclaracion">Aclaración de la indicación (opcional)</label>
-                <input autocomplete="off" type="text" id="indicacion_aclaracion"
-                    placeholder="Ej: Infradesnivel del ST en PEG previa"
-                    aria-describedby="indicacion-aclaracion-nota">
-                <span class="firma-nota" id="indicacion-aclaracion-nota">Se guarda con el estudio; por ahora no sale en el informe ni en Sheets.</span>
+                <label for="indicacion_aclaracion">Aclaración de la indicación <span class="firma-nota">(opcional · sale en el informe)</span></label>
+                <textarea autocomplete="off" id="indicacion_aclaracion" rows="1" class="auto-alto"
+                    placeholder="Ej: CRM 2019 (AMI-DA, safena a CD); angioplastia a Cx 2023; infradesnivel del ST en PEG previa"></textarea>
             </div>
         </div>
 
-        <!-- ── 2 · ANTECEDENTES QUE CAMBIAN EL INFORME ───────────────
-             Cada casilla de acá dispara algo: una exclusión, una frase, un módulo.
-             Las que sólo se listaban en la línea de antecedentes están más abajo. -->
-        <h3 class="subsection-title" style="margin-top:1.25rem">Antecedentes que cambian el estudio</h3>
-        <div class="grid grid-2col antecedentes-compactos">
-            <div class="checkbox-group">
-                <input autocomplete="off" type="checkbox" id="ant_bcri" onchange="sincronizarConduccion()">
-                <label for="ant_bcri">Bloqueo de rama izquierda</label>
+        <!-- ── ANTECEDENTES QUE CAMBIAN EL INFORME ──────────────────
+             Sólo casillas que modifican lo que el informe puede afirmar. Qué hace cada
+             una está en el panel 📚 Perlas, no acá. -->
+        <h3 class="subsection-title">Antecedentes que cambian el estudio</h3>
+        <div class="ant-grupos">
+            <div class="ant-grupo">
+                <span class="ant-grupo__titulo">Conducción</span>
+                <label class="ant-chip" for="ant_bcri"><input autocomplete="off" type="checkbox" id="ant_bcri" onchange="sincronizarConduccion()"><span class="ant-chip__txt">Bloqueo de rama izquierda</span><span class="ant-chip__hint">septum fuera · ST no interpretable</span></label>
+                <label class="ant-chip" for="ant_marcapasos"><input autocomplete="off" type="checkbox" id="ant_marcapasos" onchange="sincronizarConduccion()"><span class="ant-chip__txt">Marcapasos</span><span class="ant-chip__hint">septum fuera · ST no interpretable</span></label>
+                <label class="ant-chip" for="ant_preexcitacion"><input autocomplete="off" type="checkbox" id="ant_preexcitacion" onchange="sincronizarConduccion()"><span class="ant-chip__txt">Preexcitación (WPW)</span><span class="ant-chip__hint">septum fuera · ST no interpretable</span></label>
             </div>
-            <div class="checkbox-group">
-                <input autocomplete="off" type="checkbox" id="ant_marcapasos" onchange="sincronizarConduccion()">
-                <label for="ant_marcapasos">Marcapasos</label>
+            <div class="ant-grupo">
+                <span class="ant-grupo__titulo">Cirugía previa</span>
+                <label class="ant-chip" for="ant_crm"><input autocomplete="off" type="checkbox" id="ant_crm" onchange="marcarCrmResuelto()"><span class="ant-chip__txt">CRM</span><span class="ant-chip__hint">septum post-quirúrgico</span></label>
+                <label class="ant-chip" for="ant_rva"><input autocomplete="off" type="checkbox" id="ant_rva" onchange="refrescarDeducidos()"><span class="ant-chip__txt">Reemplazo valvular aórtico</span><span class="ant-chip__hint">septum post-quirúrgico</span></label>
+                <label class="ant-chip" for="ant_rvm"><input autocomplete="off" type="checkbox" id="ant_rvm" onchange="refrescarDeducidos()"><span class="ant-chip__txt">Reemplazo valvular mitral</span><span class="ant-chip__hint">septum post-quirúrgico</span></label>
             </div>
-            <div class="checkbox-group">
-                <input autocomplete="off" type="checkbox" id="ant_crm" onchange="marcarCrmResuelto()">
-                <label for="ant_crm">Cirugía de revascularización (CRM)</label>
+            <div class="ant-grupo">
+                <span class="ant-grupo__titulo">Fármacos y ritmo</span>
+                <label class="ant-chip" for="ant_betabloq"><input autocomplete="off" type="checkbox" id="ant_betabloq"><span class="ant-chip__txt">Betabloqueado</span><span class="ant-chip__hint">aclara la FC submáxima</span></label>
+                <label class="ant-chip" for="ant_crononeg"><input autocomplete="off" type="checkbox" id="ant_crononeg"><span class="ant-chip__txt">Cronotrópico negativo</span><span class="ant-chip__hint">diltiazem, verapamilo o ivabradina</span></label>
+                <label class="ant-chip" for="ant_digoxina"><input autocomplete="off" type="checkbox" id="ant_digoxina" onchange="refrescarDeducidos()"><span class="ant-chip__txt">Digoxina</span><span class="ant-chip__hint">ST no interpretable</span></label>
+                <label class="ant-chip" for="ant_fa_ritmo"><input autocomplete="off" type="checkbox" id="ant_fa_ritmo" onchange="sincronizarRitmoFA()"><span class="ant-chip__txt">En fibrilación auricular</span><span class="ant-chip__hint">sin algoritmo diastólico estándar</span></label>
             </div>
-            <div class="checkbox-group">
-                <input autocomplete="off" type="checkbox" id="ant_rva" onchange="refrescarDeducidos()">
-                <label for="ant_rva">Reemplazo valvular aórtico</label>
-            </div>
-            <div class="checkbox-group">
-                <input autocomplete="off" type="checkbox" id="ant_rvm" onchange="refrescarDeducidos()">
-                <label for="ant_rvm">Reemplazo valvular mitral</label>
-            </div>
-            <div class="checkbox-group">
-                <input autocomplete="off" type="checkbox" id="ant_bicuspide" onchange="refrescarDeducidos()">
-                <label for="ant_bicuspide">Válvula aórtica bicúspide</label>
-            </div>
-            <div class="checkbox-group">
-                <input autocomplete="off" type="checkbox" id="ant_betabloq">
-                <label for="ant_betabloq">Betabloqueado</label>
-            </div>
-            <div class="checkbox-group">
-                <input autocomplete="off" type="checkbox" id="ant_hta">
-                <label for="ant_hta">Hipertensión arterial</label>
+            <div class="ant-grupo">
+                <span class="ant-grupo__titulo">Otros</span>
+                <label class="ant-chip" for="ant_hta"><input autocomplete="off" type="checkbox" id="ant_hta"><span class="ant-chip__txt">Hipertensión arterial</span><span class="ant-chip__hint">cambia la lectura de la TA</span></label>
+                <label class="ant-chip" for="ant_eao"><input autocomplete="off" type="checkbox" id="ant_eao" onchange="toggleValvulopatia(this)"><span class="ant-chip__txt">Estenosis aórtica</span><span class="ant-chip__hint">abre severidad y estudio previo</span></label>
+                <label class="ant-chip" for="ant_bicuspide"><input autocomplete="off" type="checkbox" id="ant_bicuspide" onchange="toggleValvulopatia(this); refrescarDeducidos()"><span class="ant-chip__txt">Válvula aórtica bicúspide</span><span class="ant-chip__hint">abre el módulo de EAo y la aorta</span></label>
             </div>
         </div>
-        <details class="ayuda-carga" id="ayuda-antecedentes">
-            <summary>Qué cambia cada antecedente</summary>
-            <p>Cada casilla modifica el informe al tildarla: excluye segmentos,
-                invalida el ST, agrega una frase o abre un módulo.</p>
-            <dl>
-                <dt>Bloqueo de rama izquierda</dt><dd>Septum no valorable, fuera del WMSI y del territorio. ST no interpretable.</dd>
-                <dt>Marcapasos</dt><dd>Misma exclusión septal y ST no interpretable.</dd>
-                <dt>Cirugía de revascularización (CRM)</dt><dd>Movimiento septal anómalo post-quirúrgico: septum no valorable.</dd>
-                <dt>Reemplazo valvular aórtico y mitral</dt><dd>Septum no valorable por la cirugía.</dd>
-                <dt>Válvula aórtica bicúspide</dt><dd>Abre el módulo de EAo y sale en la línea de antecedentes.</dd>
-                <dt>Betabloqueado</dt><dd>El objetivo sigue siendo el 85 %. Si no se alcanza, la conclusión lo aclara.</dd>
-                <dt>Hipertensión arterial</dt><dd>Cambia cómo se lee una respuesta tensional exagerada con basal normal.</dd>
-            </dl>
-        </details>
 
-        <!-- Valvulopatía estructurada y estudio previo: alimentan el módulo de EAo y
-             el cálculo de progresión. -->
-        <div class="grid grid-3col" style="margin-top:1rem">
-            <div class="form-group">
-                <label for="valv_tipo">Valvulopatía de base</label>
+        <!-- Valvulopatía estructurada y estudio previo: sólo se ven con Estenosis
+             aórtica o bicúspide tildadas (o si el estudio ya trae esos datos). -->
+        <div id="bloque-valvulopatia" class="bloque-valvulopatia" hidden>
+            <div class="grid grid-3col">
+                <div class="form-group">
+                    <label for="valv_tipo">Valvulopatía de base</label>
                 <select autocomplete="off" id="valv_tipo">
                     <option value="">Ninguna / no corresponde</option>
                     <option value="eao">Estenosis aórtica</option>
@@ -204,20 +186,18 @@
                     <option value="em">Estenosis mitral</option>
                     <option value="im">Insuficiencia mitral</option>
                 </select>
-            </div>
-            <div class="form-group">
-                <label for="valv_severidad">Severidad</label>
+                </div>
+                <div class="form-group">
+                    <label for="valv_severidad">Severidad</label>
                 <select autocomplete="off" id="valv_severidad">
                     <option value="">—</option>
                     <option value="leve">Leve</option>
                     <option value="moderada">Moderada</option>
                     <option value="severa">Severa</option>
                 </select>
+                </div>
             </div>
-        </div>
-
-        <div class="form-group" style="margin-top:0.5rem">
-            <details class="carga-territorio">
+            <details class="carga-territorio" open>
                 <summary class="tc-title" style="cursor:pointer; list-style:none">
                     📈 Estudio previo (para calcular progresión)
                 </summary>
@@ -1651,11 +1631,8 @@
         <button type="button" id="btn_copy" class="btn btn-success" onclick="copiarReporte()">
             <span>📄</span> COPIAR INFORME
         </button>
-        <button type="button" id="btn_save_study" class="btn btn-success" onclick="guardarEstudio()" title="Guarda en el historial de esta computadora y, si está configurada, envía a la planilla">
+        <button type="button" id="btn_save_study" class="btn btn-success" onclick="guardarEstudio()" title="Envía el estudio a la planilla de Google Sheets, como en eco Doppler">
             <span>💾</span> GUARDAR ESTUDIO
-        </button>
-        <button type="button" id="btn_historial" class="btn btn-secondary" onclick="abrirPanel('historial')" title="Historial de la jornada y casuística">
-            <span>🗂️</span> HISTORIAL <span class="badge-dock" id="historial-badge-dock"></span>
         </button>
         <button type="button" id="btn_sync_setup" class="btn btn-secondary" onclick="abrirPanel('sync')" title="Planilla de Google Sheets y firma del informe">
             <span>⚙️</span> SINCRONIZAR
@@ -1810,6 +1787,7 @@
             <section class="card">
                 <h2 class="section-title">Otras salidas</h2>
                 <div class="historial-acciones">
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="abrirPanel('historial')">🗂️ Historial y casuística (estudios guardados antes)</button>
                     <button type="button" class="btn btn-secondary btn-sm" onclick="imprimirReporte()">🖨️ Imprimir informe</button>
                     <button type="button" class="btn btn-secondary btn-sm" onclick="generarReporte()">📊 Planilla de datos (dobutamina / dipiridamol)</button>
                 </div>
@@ -1825,6 +1803,28 @@
                 <button type="button" class="panel-lateral__cerrar" onclick="cerrarPanel()" aria-label="Cerrar">✕</button>
             </div>
             <p class="firma-nota" style="margin-bottom:0.75rem">De los cursos, por tema. No alimentan el informe: están para consultar.</p>
+            <section class="card">
+                <h2 class="section-title">Qué cambia cada antecedente</h2>
+                <details class="ayuda-carga" id="ayuda-antecedentes">
+            <summary>Qué cambia cada antecedente</summary>
+            <p>Cada casilla modifica el informe al tildarla: excluye segmentos,
+                invalida el ST, agrega una frase o abre un módulo.</p>
+            <dl>
+                <dt>Bloqueo de rama izquierda</dt><dd>Septum no valorable, fuera del WMSI y del territorio. ST no interpretable.</dd>
+                <dt>Marcapasos</dt><dd>Misma exclusión septal y ST no interpretable.</dd>
+                <dt>Cirugía de revascularización (CRM)</dt><dd>Movimiento septal anómalo post-quirúrgico: septum no valorable.</dd>
+                <dt>Reemplazo valvular aórtico y mitral</dt><dd>Septum no valorable por la cirugía.</dd>
+                <dt>Válvula aórtica bicúspide</dt><dd>Abre el módulo de EAo y el estudio previo; en la bicúspide importa sobre todo la aorta ascendente y su crecimiento.</dd>
+                <dt>Betabloqueado</dt><dd>El objetivo sigue siendo el 85 %. Si no se alcanza, la conclusión lo aclara.</dd>
+                <dt>Hipertensión arterial</dt><dd>Cambia cómo se lee una respuesta tensional exagerada con basal normal.</dd>
+                <dt>Preexcitación (WPW)</dt><dd>Igual que el bloqueo de rama izquierda: septum fuera del análisis y ST no interpretable.</dd>
+                <dt>Cronotrópico negativo</dt><dd>Diltiazem, verapamilo o ivabradina. Como el betabloqueo: el objetivo sigue en 85 % y, si no se alcanza, la conclusión lo aclara.</dd>
+                <dt>Digoxina</dt><dd>Produce infradesnivel del ST sin isquemia: el ST queda no interpretable y un cambio del ST no cuenta como respuesta isquémica.</dd>
+                <dt>Fibrilación auricular</dt><dd>El algoritmo diastólico estándar no se aplica: la función diastólica sale como no clasificable por FA, en reposo y con esfuerzo. El objetivo de FC no cambia.</dd>
+                <dt>Estenosis aórtica</dt><dd>Muestra severidad y estudio previo para calcular la progresión.</dd>
+            </dl>
+        </details>
+            </section>
             <div id="perlas-lista"></div>
         </div>
     </div>
@@ -1838,12 +1838,12 @@
 <script src="motility-groups.js?v=2.2"></script>
 <script src="report-templates.js?v=2.2-grados-1"></script>
 <script src="sheets-storage.js?v=2.2"></script>
-<script src="app.js?v=2.3-estetica-1"></script>
+<script src="app.js?v=2.4-antecedentes-1"></script>
 <script>
 // Control de versión: si el navegador sirvió una mezcla de archivos viejos y nuevos,
 // los botones fallan en silencio. Esto lo convierte en un aviso visible.
 (function () {
-    var APP_VERSION = '2.3';
+    var APP_VERSION = '2.4';
     var faltan = ['generarInforme', 'recolectarHallazgos', 'calcEjercicio'].filter(function (f) {
         return typeof window[f] !== 'function';
     });

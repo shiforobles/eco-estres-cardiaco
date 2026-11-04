@@ -82,7 +82,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     document.getElementById('sexo').addEventListener('change', calcGeometria);
 
-    ['sexo', 'ant_betabloq', 'fevi_reposo', 'fevi_pico'].forEach(id => {
+    ['sexo', 'ant_betabloq', 'ant_crononeg', 'fevi_reposo', 'fevi_pico'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.addEventListener('change', calcEjercicio);
     });
@@ -105,6 +105,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Si sólo se marca en el primero, la exclusión septal no se aplicaba y los segmentos
     // septales salían atribuidos a un territorio coronario. Se mantienen sincronizados.
     document.getElementById('ecg_ritmo').addEventListener('change', () => {
+        sincronizarCasillasConduccion();
+        calcDiastolico();
         const cond = document.getElementById('ecg_conduccion');
         if (document.getElementById('ecg_ritmo').value === 'marcapasos' && cond.value !== 'marcapasos') {
             cond.value = 'marcapasos';
@@ -479,6 +481,9 @@ function criteriosPresionLlenado(D) {
 
 function clasificarDiastolica() {
     const D = datosDiastolicos();
+    // En fibrilación auricular el algoritmo estándar no se aplica (sin onda A, ciclos
+    // irregulares): no se arriesga un grado. Lo pidió Lucas el 03/11/2026.
+    if (enFibrilacionAuricular()) return { grado: null, fa: true, criterios: [], faltan: [] };
     const feyReducida = D.fey !== null && D.fey < 50;
 
     // ── Algoritmo 1: ¿hay disfunción? (sólo con FEy conservada)
@@ -568,6 +573,7 @@ function autocompletarDiastolicaReposo() {
 }
 
 function notaDiastolica(R) {
+    if (R.fa) return 'Fibrilación auricular: el algoritmo diastólico estándar no se aplica.';
     if (R.grado === null)
         return R.faltan && R.faltan.length
             ? `Falta ${listarEnProsa(R.faltan)} para clasificar por ASE.`
@@ -758,6 +764,7 @@ function evaluarDiastolicoEsfuerzo() {
     const rep = ee('rep'), est = ee('est');
     const vrt = num('vrt_est');
     const eprimaSep = num('e_prima_rep');
+    if (enFibrilacionAuricular()) return { clave: 'fa', falta: [], detalle: [] };
 
     // Sin E/e' post o sin VRT no se puede concluir nada.
     const falta = [];
@@ -796,6 +803,7 @@ const DIAST_ETIQUETA = {
     negativo:      'Normal',
     indeterminado: 'Indeterminado',
     insuficiente:  'Datos insuficientes',
+    fa:            'No aplicable en fibrilación auricular',
 };
 
 function autocompletarDiastolico(veredicto) {
@@ -1007,10 +1015,11 @@ function calcEjercicio() {
             const pct = Math.round((fcPico / fcMax) * 100);
             const ok = pct >= 85;
             set('pct_fc', pct + ' %', ok ? 'var(--color-success)' : 'var(--color-error)');
-            const bb = document.getElementById('ant_betabloq').checked;
+            const bb = document.getElementById('ant_betabloq').checked ||
+                !!(document.getElementById('ant_crononeg') || {}).checked;
             set('resp_cronotrop',
                 ok ? '✓ Adecuada (≥85%)'
-                   : '✗ Sub-máxima — reduce la sensibilidad del estudio' + (bb ? ' (bajo betabloqueante)' : ''),
+                   : '✗ Sub-máxima — reduce la sensibilidad del estudio' + (bb ? ' (bajo tratamiento que frena la FC)' : ''),
                 ok ? 'var(--color-success)' : 'var(--color-error)');
             // En cicloergómetro la FC pico es ~10 lpm menor que en cinta a igual esfuerzo:
             // el %FCMT crudo da falsos positivos. El índice cronotrópico y la reserva
@@ -1289,7 +1298,7 @@ function evaluarAvisosClinicos() {
     // Se exigen AMBOS por debajo del corte, no cualquiera: con "o" alcanza un índice
     // apenas bajo para disparar en alguien que pedaleó bien, que es el falso positivo
     // que se quería evitar.
-    if (!H.betabloqueante && H.indiceCronotropico !== null && H.reservaFC !== null &&
+    if (!H.frenoFC && H.indiceCronotropico !== null && H.reservaFC !== null &&
         H.indiceCronotropico < 0.80 && H.reservaFC < 1.85) {
         atencion(`Índice cronotrópico ${H.indiceCronotropico.toFixed(2)} · reserva de FC ${H.reservaFC.toFixed(2)}`,
             'Sin betabloqueo, un índice <0,80 o una reserva <1,85 sugieren incompetencia cronotrópica, ' +
@@ -2134,6 +2143,16 @@ function pintarDiastolicoEsfuerzo() {
         return;
     }
 
+    if (r.clave === 'fa') {
+        set('diast_respuesta', DIAST_ETIQUETA.fa);
+        autocompletarDiastolico('no_evaluado');
+        if (box) {
+            box.style.display = 'block';
+            box.innerHTML = '<div class="criterio-ase criterio-normal">En fibrilación auricular el algoritmo ' +
+                'diastólico estándar no se aplica: el test no se interpreta.</div>';
+        }
+        return;
+    }
     const icono = { positivo: '⚠ ', negativo: '✓ ', indeterminado: '' }[r.clave] || '';
     set('diast_respuesta', icono + DIAST_ETIQUETA[r.clave]);
     autocompletarDiastolico(r.clave === 'indeterminado' ? 'no_evaluado' : r.clave);
@@ -2435,9 +2454,11 @@ function sincronizarConduccion() {
     if (!sel) return;
     const bcri = (document.getElementById('ant_bcri') || {}).checked;
     const mcp  = (document.getElementById('ant_marcapasos') || {}).checked;
+    const wpw  = (document.getElementById('ant_preexcitacion') || {}).checked;
     if (bcri) sel.value = 'bcri';
     else if (mcp) sel.value = 'marcapasos';
-    else if (sel.value === 'bcri' || sel.value === 'marcapasos') sel.value = 'ninguno';
+    else if (wpw) sel.value = 'preexcitacion';
+    else if (['bcri', 'marcapasos', 'preexcitacion'].includes(sel.value)) sel.value = 'ninguno';
     refrescarDeducidos();
 }
 
@@ -2449,6 +2470,58 @@ function sincronizarCasillasConduccion() {
     const mcp = document.getElementById('ant_marcapasos');
     if (bcri) bcri.checked = sel.value === 'bcri';
     if (mcp) mcp.checked = sel.value === 'marcapasos';
+    const faR = document.getElementById('ant_fa_ritmo'), ritmoSel = document.getElementById('ecg_ritmo');
+    if (faR && ritmoSel) faR.checked = ritmoSel.value === 'fa';
+    const wpw = document.getElementById('ant_preexcitacion');
+    if (wpw) wpw.checked = sel.value === 'preexcitacion';
+}
+
+// Fibrilación auricular: la casilla y el ritmo de base del ECG dicen lo mismo.
+function sincronizarRitmoFA() {
+    const fa = (document.getElementById('ant_fa_ritmo') || {}).checked;
+    const ritmo = document.getElementById('ecg_ritmo');
+    if (ritmo) {
+        if (fa) ritmo.value = 'fa';
+        else if (ritmo.value === 'fa') ritmo.value = 'sinusal';
+    }
+    calcDiastolico();
+    refrescarDeducidos();
+}
+
+// ¿El estudio está en FA? Vale la casilla o el ritmo de base del ECG.
+function enFibrilacionAuricular() {
+    // FA en el momento del estudio. `ant_fa` (oculta) era el antecedente de FA previa
+    // y no dice en qué ritmo estaba el paciente: no se usa para esto.
+    const fa = (document.getElementById('ant_fa_ritmo') || {}).checked;
+    const ritmo = (document.getElementById('ecg_ritmo') || {}).value;
+    return !!fa || ritmo === 'fa';
+}
+
+// Estenosis aórtica / bicúspide: recién ahí se ven valvulopatía y estudio previo.
+// Si el estudio ya trae esos datos, el bloque se muestra igual: no se esconde nada
+// que esté alimentando el informe.
+function toggleValvulopatia(origen) {
+    const eao = document.getElementById('ant_eao');
+    const tipo = document.getElementById('valv_tipo');
+    if (eao && tipo && origen === eao) {
+        if (eao.checked && !tipo.value) tipo.value = 'eao';
+        if (!eao.checked && tipo.value === 'eao') tipo.value = '';
+    }
+    pintarBloqueValvulopatia();
+    if (typeof abrirModuloValvular === 'function') abrirModuloValvular();
+    refrescarDeducidos();
+}
+function pintarBloqueValvulopatia() {
+    const bloque = document.getElementById('bloque-valvulopatia');
+    if (!bloque) return;
+    const tipo = (document.getElementById('valv_tipo') || {}).value;
+    const eao = document.getElementById('ant_eao');
+    if (eao) eao.checked = tipo === 'eao';
+    const bic = (document.getElementById('ant_bicuspide') || {}).checked;
+    const hayPrevio = ['prev_fecha', 'prev_vmax', 'prev_grad', 'prev_ava', 'prev_aorta']
+        .some(id => (document.getElementById(id) || {}).value);
+    const sev = (document.getElementById('valv_severidad') || {}).value;
+    bloque.hidden = !(tipo || bic || hayPrevio || sev);
 }
 
 // ══════════════════════════════════════════════
@@ -3115,6 +3188,7 @@ const ANTECEDENTES_PROSA = [
     { id: 'ant_isquemia',   txt: 'cardiopatía isquémica' },
     { id: 'ant_iam',        txt: 'infarto de miocardio previo' },
     { id: 'ant_fa',         txt: 'fibrilación auricular' },
+    { id: 'ant_digoxina',   txt: 'tratamiento con digoxina' },
     { id: 'ant_mcd',        txt: 'miocardiopatía dilatada' },
     { id: 'ant_valv',       txt: 'valvulopatía' },
     { id: 'ant_epoc',       txt: 'EPOC o asma' }
@@ -3154,6 +3228,14 @@ function recolectarHallazgos() {
     H.ventana = document.getElementById('ventana').value;
     H.ventanaTxt = textoSelect('ventana').toLowerCase();
     H.betabloqueante = document.getElementById('ant_betabloq').checked;
+    // Diltiazem, verapamilo o ivabradina: frenan la FC igual que el betabloqueo. La
+    // planilla sigue leyendo sólo el betabloqueo; la lógica mira `frenoFC`.
+    H.cronoNegativo = !!(document.getElementById('ant_crononeg') || {}).checked;
+    H.frenoFC = H.betabloqueante || H.cronoNegativo;
+    H.frenoFCTxt = H.betabloqueante && H.cronoNegativo ? 'betabloqueante y cronotrópico negativo'
+        : H.cronoNegativo ? 'cronotrópico negativo' : 'betabloqueante';
+    H.digoxina = !!(document.getElementById('ant_digoxina') || {}).checked;
+    H.fibrilacionAuricular = enFibrilacionAuricular();
 
     // ── Antecedentes ──
     // No llegaban al informe: se cargaban y el que lee no sabía en qué contexto estaba
@@ -3173,6 +3255,7 @@ function recolectarHallazgos() {
 
     H.indicacion = document.getElementById('indicacion').value;
     H.indicacionTxt = H.indicacion ? textoSelect('indicacion') : '';
+    H.indicacionAclaracion = normalizarTexto((v('indicacion_aclaracion') || '').replace(/\s+/g, ' ').trim());
     H.indicacionLibre = normalizarTexto(v('indicacion_libre'));
     H.contraste = document.getElementById('contraste_usado').value;
     H.conclusionLibre = normalizarTexto(v('conclusion_libre'));
@@ -3349,7 +3432,8 @@ function recolectarHallazgos() {
     // rama de estímulo insuficiente y podía abrir la de discordancia.
     // La cirugía previa no invalida el ST: lo que lo invalida es la activación
     // eléctrica anómala. Por eso mira `conduccionLimita` y no `hayConduccion`.
-    H.stInterpretable = !H.conduccionLimita && H.stBasal !== 'no_interpretable';
+    // La digoxina da infradesnivel del ST sin isquemia: el trazado deja de servir.
+    H.stInterpretable = !H.conduccionLimita && H.stBasal !== 'no_interpretable' && !H.digoxina;
     // Isquémico = hubo cambio Y el trazado permitía leerlo.
     H.stIsquemico = H.stCambio && H.stInterpretable;
     H.otrosBasal = v('ecg_otros_basal');
@@ -3719,6 +3803,7 @@ function ecgEsfuerzoEnProsa(H) {
         partes.push(tipo + (H.stMm ? ` de ${nProsa(H.stMm)} mm` : '') + (H.stDeriv ? ` en ${H.stDeriv}` : '') +
             (H.stAparicion ? `, desde ${H.stAparicion}` : '') +
             (H.stResolucion ? `, con resolución en ${H.stResolucion}` : '') + '.');
+        if (H.digoxina && !H.conduccionLimita) partes.push('No valorable para isquemia por el tratamiento con digoxina.');
     } else if (H.hayConduccion) {
         partes.push('Análisis del ST no valorable por el trastorno de conducción.');
     } else {
@@ -4005,7 +4090,7 @@ const HALLAZGOS = [
         // crudo —que en bici da falsos positivos, y por eso el panel no lo usa— y el
         // panel miraba el índice cronotrópico: dos reglas distintas para el mismo
         // hallazgo, en la misma app.
-        activo: H => !H.betabloqueante && H.indiceCronotropico !== null && H.reservaFC !== null &&
+        activo: H => !H.frenoFC && H.indiceCronotropico !== null && H.reservaFC !== null &&
                      H.indiceCronotropico < 0.80 && H.reservaFC < 1.85,
         informe: H => rellenar(NARRATIVA.pronostico.incompetenciaCronotropica, {
             indice: nProsa(H.indiceCronotropico, 2), reserva: nProsa(H.reservaFC, 2) }),
@@ -4304,7 +4389,7 @@ function antecedentesEnProsa(H) {
         const libre = H.antOtros.trim().replace(/\s*\.+\s*$/, '');
         if (libre) txt += ' ' + mayuscula(libre) + '.';
     }
-    if (H.betabloqueante) txt += ' ' + T.antecedentesBB;
+    if (H.frenoFC) txt += ' ' + textoFrenoFC(H, T.antecedentesBB);
     const prog = progresionEnProsa(H);
     if (prog) txt += ' ' + prog;
     return txt;
@@ -4352,7 +4437,7 @@ function metodoEnProsa(H) {
         fcBasal: H.fcBasal || ND,
         fcPico: H.fcPico || ND,
         pctFCmax: H.pctFCmax || ND,
-        betabloqueo: H.betabloqueante ? T.metodoBetabloqueo : '',
+        betabloqueo: H.frenoFC ? textoFrenoFC(H, T.metodoBetabloqueo) : '',
         taBasal: H.taBasal || ND,
         taPico: H.taPico || ND,
         dobleProducto: H.dobleProducto ? H.dobleProducto.toLocaleString('es-AR') : ND,
@@ -4368,7 +4453,7 @@ function metodoEnProsa(H) {
         partes.push(H.basalElevada ? T.respuestaHipertensivaBasalAlta : T.respuestaHipertensiva);
     else if (H.fcSuboptima)
         partes.push(rellenar(T.respuestaFCSuboptima, {
-            betabloqueante: H.betabloqueante ? ', bajo tratamiento betabloqueante' : ''
+            betabloqueante: H.frenoFC ? `, bajo tratamiento ${H.frenoFCTxt}` : ''
         }));
     else if (H.pctFCmax >= 85) partes.push(T.respuestaNormal);
 
@@ -4491,6 +4576,9 @@ function bloqueDiastolicaReposo(H) {
     // datos de aumento de las presiones de llenado" leía como una conclusión negativa
     // sobre un dato que no se midió.
     const hayEE = !!nProsa(H.eeReposo);
+    if (H.fibrilacionAuricular)
+        return unirOraciones([`relación E/e' ${hayEE ? nProsa(H.eeReposo) : NARRATIVA.sinDatoF}; ` +
+            'en fibrilación auricular el algoritmo diastólico estándar no se aplica']);
     const partes = [hayEE
         ? `relación E/e' ${nProsa(H.eeReposo)}${presionesLlenadoEnProsa(H.diastGrado)}`
         : `relación E/e' ${NARRATIVA.sinDatoF}`];
@@ -4600,7 +4688,10 @@ function construirNarrativa(H) {
     const linea = (plantilla, contenido) => parrafos.push(rellenar(plantilla, { contenido }));
 
     // ── INDICACIÓN ──
-    const indic = [H.indicacionTxt, H.indicacionLibre].filter(Boolean).join('. ');
+    let indic = [H.indicacionTxt, H.indicacionLibre].filter(Boolean).join('. ');
+    if (H.indicacionAclaracion) indic = indic
+        ? `${indic.replace(/\.*$/, '')} (${H.indicacionAclaracion.replace(/\.*$/, '')})`
+        : H.indicacionAclaracion;
     linea(T.lineaIndicacion, indic || NDF);
 
     // ── ANTECEDENTES ──
@@ -4770,6 +4861,8 @@ function construirNarrativa(H) {
         negativo: T.diastolicoNegativo,
         positivo: T.diastolicoPositivo
     }[H.diastResultado] || T.diastolicoNoEvaluado;
+    if (H.fibrilacionAuricular) piezas.diastolicoEsfuerzo =
+        'Estudio diastólico de esfuerzo: no aplicable en fibrilación auricular.';
     parrafos.push(piezas.diastolicoEsfuerzo);
 
     // ── MÓDULOS OPCIONALES ──
@@ -4880,7 +4973,7 @@ function construirNarrativa(H) {
     const suf = rellenar(T.suficiencia, {
         suficiencia: H.pctFCmax >= 85 ? 'suficiente' : 'insuficiente',
         pctFCmax: H.pctFCmax || nada,
-        betabloqueo: H.betabloqueante ? T.suficienciaBetabloqueo : ''
+        betabloqueo: H.frenoFC ? textoFrenoFC(H, T.suficienciaBetabloqueo) : ''
     });
     // El veredicto abre con punto propio, así que lo que sigue arranca oración nueva.
     conclusion = conclusion.replace(/^Conclusión: (.)/,
@@ -4969,7 +5062,7 @@ function ecgEnConclusionOsecac(H, conclusion) {
     if (!H.stInterpretable && !yaLoDice('segmento st')) {
         const causa = H.conduccionLimita
             ? (H.conduccionProsa && H.conduccionProsa.alTrastorno ? H.conduccionProsa.alTrastorno : 'el trastorno de conducción')
-            : 'las alteraciones del ST basal';
+            : (H.digoxina ? 'el tratamiento con digoxina' : 'las alteraciones del ST basal');
         frases.push(`El análisis del segmento ST no resultó interpretable por ${causa}.`);
     }
     // Cambios isquémicos del ST sin correlato en la motilidad: en el informe largo
@@ -5087,7 +5180,7 @@ function motivoNoConcluyente(H) {
     if (H.ventana === 'limitada') m.push('ventana acústica limitada');
     if (H.estimuloInsuficiente)
         m.push(`estímulo insuficiente (doble producto ${H.dobleProducto.toLocaleString('es-AR')})` +
-               (H.betabloqueante ? ', bajo tratamiento betabloqueante' : ''));
+               (H.frenoFC ? `, bajo tratamiento ${H.frenoFCTxt}` : ''));
     if (H.adquisicionTardia) m.push('adquisición post-esfuerzo tardía');
     if (H.fcSuboptima) m.push('no haberse alcanzado la FC objetivo');
     return listarEnProsa(m) || 'limitaciones técnicas del estudio';
@@ -5106,7 +5199,8 @@ function motivoNoConcluyente(H) {
 let HUELLA_INFORME = null;
 
 // Campos que NO alimentan el informe: cambiarlos no lo desactualiza.
-const CAMPOS_AJENOS_AL_INFORME = ['categorizacion', 'firma_medico', 'paciente_nombre', 'indicacion_aclaracion'];
+// La aclaración de la indicación sí sale en el informe desde v2.3: cambiarla lo desactualiza.
+const CAMPOS_AJENOS_AL_INFORME = ['categorizacion', 'firma_medico', 'paciente_nombre'];
 
 function huellaDelEstudio() {
     const campos = {};
@@ -5152,9 +5246,6 @@ function marcarInformeDesactualizado() {
 // Antes de guardar en cualquier lado: el texto tiene que ser de esta versión.
 // Devuelve el informe a guardar, o '' si no hay nada que guardar.
 function informeParaGuardar() {
-    // GUARDAR ESTUDIO guarda en el historial y en la planilla en un mismo acto: la
-    // decisión sobre una edición a mano se toma una sola vez, no dos.
-    if (INFORME_DECIDIDO !== null) return INFORME_DECIDIDO;
     const out = document.getElementById('reporte-output');
     let texto = out ? out.textContent.trim() : '';
     if (!texto) { generarInforme(); return out ? out.textContent.trim() : ''; }
@@ -6229,7 +6320,9 @@ function limpiarFormulario() {
 }
 
 function resetFormulario() {
-    document.querySelectorAll('input[type="text"], input[type="number"], textarea').forEach(el => {
+    // Las fechas también: la del estudio previo sobrevivía y calculaba la progresión
+    // del paciente anterior. La del estudio vuelve a hoy más abajo (setFechaHoy).
+    document.querySelectorAll('input[type="text"], input[type="number"], input[type="date"], textarea').forEach(el => {
         if (CAMPOS_NO_ESTUDIO.includes(el.id)) return;   // la firma sobrevive al cambio de paciente
         el.value = '';
     });
@@ -6255,6 +6348,8 @@ function resetFormulario() {
     renderMedicacion();
     camposCorregidos = {};   // paciente nuevo: la app vuelve a proponer todo
     calcGeometria(); calcDiastolico(); mostrarDatosBasalesHeredados();
+    pintarBloqueValvulopatia();
+    ajustarAltos();
     setProtocol('ejercicio');
     setSpecialTab('eao_ejercicio');
     updateChecklistBadge();
@@ -6554,6 +6649,7 @@ function aplicarEstudio(d) {
     // relevantes", que sí sale en el informe.
     migrarResumenHC();
     sincronizarCasillasConduccion();
+    pintarBloqueValvulopatia();
     renderAntecedentesHeredados();
 
     // Pestañas activas
@@ -6872,9 +6968,6 @@ const PRESETS = {
 //  Sólo presentación: no cambia cálculos, criterios ni texto del informe.
 // ══════════════════════════════════════════════
 
-// Lo decidido sobre una edición a mano mientras dura GUARDAR ESTUDIO (ver
-// informeParaGuardar). Fuera de ese acto vale null.
-let INFORME_DECIDIDO = null;
 
 // GENERAR INFORME: el narrativo es de ejercicio; con dobutamina o dipiridamol el
 // mismo botón arma la planilla de datos, que es lo que esos protocolos tienen.
@@ -6886,18 +6979,31 @@ function generarDesdeBotonera() {
         out.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-// GUARDAR ESTUDIO: historial de esta computadora y, si está configurada, la
-// planilla. Es lo mismo que antes hacían los dos botones por separado.
+// GUARDAR ESTUDIO: exactamente como en la app de eco Doppler (pedido de Lucas,
+// 03/11/2026). Manda la fila al Sheet y avisa con un cartel; sin copia local, sin
+// historial y sin "Confirmar recepción". Sin la planilla configurada no envía nada
+// y lo dice. El historial y la cola viejos siguen en ⚙ Sincronizar.
 async function guardarEstudio() {
-    const texto = informeParaGuardar();
-    if (!texto) { alert('No se pudo generar el informe: revisá los datos del estudio.'); return; }
-    INFORME_DECIDIDO = texto;
+    const informe = informeParaGuardar();
+    if (!informe) { alert('No se pudo generar el informe: revisá los datos del estudio.'); return; }
+    const hc = v('paciente_id') || '(sin ID)';
+    if (!window.EstresSheets || !EstresSheets.estaConfigurado()) {
+        showNotice('⚠️ No se envió el estudio: falta la URL de Apps Script. Cargala en ⚙ Sincronizar. ' +
+                   'El informe sigue disponible para copiar.', 'warn');
+        return;
+    }
+    let fila;
+    try { fila = EstresSheets.construirFila(informe); }
+    catch (e) { showNotice('❌ Error: ' + e.message, 'warn'); return; }
+    const btn = document.getElementById('btn_save_study');
+    if (btn) btn.disabled = true;
     try {
-        if (!guardarEnHistorial()) return;
-        if (window.EstresSheets && EstresSheets.estaConfigurado()) await guardarEnPlanilla();
-        else showNotice('Guardado en el historial. La planilla no está configurada (⚙ Sincronizar).', 'ok');
+        await EstresSheets.enviar(fila);
+        showNotice(`✅ Guardado en Google Sheets — ${hc}`, 'ok');
+    } catch (e) {
+        showNotice(`⚠️ Error al guardar: ${e.message}`, 'warn');
     } finally {
-        INFORME_DECIDIDO = null;
+        if (btn) btn.disabled = false;
     }
 }
 
@@ -7017,4 +7123,26 @@ document.addEventListener('DOMContentLoaded', () => {
         const el = document.getElementById(id);
         if (el) el.addEventListener('change', abrirModuloValvular);
     });
+});
+
+
+// Betabloqueo, cronotrópico negativo o los dos: misma frase, con el fármaco que
+// corresponda. Sólo con betabloqueo el texto queda idéntico al de antes.
+function textoFrenoFC(H, base) {
+    if (!H.cronoNegativo) return base;
+    return base.replace('betabloqueante', H.frenoFCTxt);
+}
+
+
+// La aclaración de la indicación crece con el texto: se lee entera sin barra.
+function ajustarAltos() {
+    document.querySelectorAll('textarea.auto-alto').forEach(t => {
+        t.style.height = 'auto';
+        t.style.height = (t.scrollHeight + 2) + 'px';
+    });
+}
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('textarea.auto-alto').forEach(t => t.addEventListener('input', ajustarAltos));
+    // Un borrador o estudio restaurado trae valvulopatía o aclaración: se ajusta la vista.
+    setTimeout(() => { pintarBloqueValvulopatia(); ajustarAltos(); }, 0);
 });

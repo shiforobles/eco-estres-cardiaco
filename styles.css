@@ -1677,3 +1677,96 @@ body.con-panel { overflow: hidden; }
 .wm-dot.wm-4, .seg-score-btn.wm-4, .seg-score-btn[data-score="4"] { background: #B91C1C; color: #FFFFFF; }
 .wm-dot.wm-5, .seg-score-btn.wm-5, .seg-score-btn[data-score="5"] { background: #7E22CE; color: #FFFFFF; }
 [data-theme="dark"] .card-blue { border-left-color: var(--color-border); }
+
+/* ── Paciente: HC y nombre en un renglón, antropometría en otro ── */
+.grid-paciente {
+    display: grid;
+    gap: var(--spacing-md);
+    grid-template-columns: minmax(140px, 1fr) minmax(220px, 2.2fr) minmax(150px, 1fr);
+    margin-bottom: var(--spacing-md);
+}
+.grid-antropometria {
+    display: grid;
+    gap: var(--spacing-md);
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+/* ── Indicación: lista con un ＋ chico, aclaración ancha ── */
+.grid-indicacion {
+    display: grid;
+    gap: var(--spacing-md);
+    grid-template-columns: minmax(260px, 1fr) minmax(0, 1.6fr);
+    align-items: start;
+}
+.select-con-boton { display: flex; gap: 0.4rem; align-items: stretch; }
+.select-con-boton select { flex: 1; min-width: 0; }
+.btn-mas {
+    flex: 0 0 42px;
+    min-height: 42px;
+    border-radius: var(--radius-md);
+    border: 1.5px solid var(--color-border);
+    background: var(--color-bg-input);
+    color: var(--color-primary-dark);
+    font-size: 1.25rem;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+}
+.btn-mas:hover, .btn-mas:focus-visible { background: var(--color-primary); color: var(--on-solid); border-color: var(--color-primary); }
+textarea.auto-alto { resize: none; overflow: hidden; min-height: 42px; line-height: 1.45; }
+
+/* ── Antecedentes: casillas como fichas, en cuatro grupos ── */
+.ant-grupos {
+    display: grid;
+    gap: var(--spacing-md);
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.ant-grupo { display: flex; flex-direction: column; gap: 0.45rem; }
+.ant-grupo__titulo {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--color-text-muted);
+    margin-bottom: 0.1rem;
+}
+.ant-chip {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    column-gap: 0.55rem;
+    align-items: center;
+    padding: 0.55rem 0.7rem;
+    border: 1.5px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-bg-input);
+    cursor: pointer;
+    margin: 0;
+    transition: border-color var(--transition-fast), background var(--transition-fast);
+}
+.ant-chip input { width: 1.05rem; height: 1.05rem; margin: 0; grid-row: span 2; accent-color: var(--color-primary); }
+.ant-chip__txt { font-size: 0.9rem; font-weight: 600; color: var(--color-text-primary); line-height: 1.25; }
+.ant-chip__hint { font-size: 0.74rem; font-weight: 400; color: var(--color-text-muted); line-height: 1.25; }
+.ant-chip:hover { border-color: var(--color-primary-light); }
+.ant-chip:has(input:checked) {
+    border-color: var(--color-primary);
+    background: var(--color-primary-bg);
+    box-shadow: inset 3px 0 0 var(--color-primary);
+}
+.ant-chip:has(input:focus-visible) { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+
+/* Valvulopatía y estudio previo: sólo con EAo o bicúspide tildadas */
+.bloque-valvulopatia {
+    margin-top: var(--spacing-md);
+    padding: 1rem;
+    border-radius: var(--radius-md);
+    background: var(--color-bg-sub);
+}
+.bloque-valvulopatia[hidden] { display: none; }
+.bloque-valvulopatia .carga-territorio > summary { font-weight: 600; color: var(--color-primary-dark); margin-top: 0.5rem; }
+
+@media (max-width: 900px) {
+    .grid-paciente, .grid-indicacion { grid-template-columns: 1fr; }
+    .grid-antropometria { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .ant-grupos { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 520px) { .ant-grupos { grid-template-columns: 1fr; } }

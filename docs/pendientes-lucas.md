@@ -182,6 +182,35 @@ Estado: pendiente de investigación/propuestas y validación clínica de Lucas.
   regional y coherencia entre motores. No cambiar exclusiones/evaluabilidad de forma
   incidental.
 
+## Tanda v2.4 — Indicación y antecedentes
+
+Estado: terminada el 03/11/2026 (Claude, chat de coordinación). Decisiones de Lucas
+en ese chat: HC y nombre en un renglón pero en dos campos; guardado exactamente
+igual a eco Doppler; sumar digoxina, FA, cronotrópicos negativos y WPW; aclaración
+en el informe ahora y en la planilla después.
+
+- [x] HC / ID y Apellido y nombre en el mismo renglón; la planilla sigue sin nombres.
+- [x] Indicación con ＋ chico al lado; aclaración ancha que crece con el texto y
+  sale en la línea de Indicación del informe: "Indicación: X (aclaración)".
+- [ ] Aclaración en la planilla: sumar la columna en la próxima migración del Sheet.
+- [x] Antecedentes como fichas en cuatro grupos (conducción, cirugía, fármacos y
+  ritmo, otros). "Qué cambia cada antecedente" pasó al panel 📚 Perlas.
+- [x] Nuevos: Preexcitación (sincroniza el ECG; septum fuera, ST no interpretable);
+  Digoxina (ST no interpretable; un infradesnivel no cuenta como isquémico);
+  Cronotrópico negativo (diltiazem, verapamilo o ivabradina: misma lógica que el
+  betabloqueo, con su nombre en el informe; la planilla sigue leyendo sólo el
+  betabloqueo); En fibrilación auricular (pone el ritmo de base en FA; el algoritmo
+  diastólico estándar no se aplica en reposo ni con esfuerzo; el objetivo de FC no
+  cambia). `ant_fa` oculta sigue siendo "FA previa" y no apaga el algoritmo.
+- [x] Valvulopatía y estudio previo ocultos hasta tildar Estenosis aórtica o
+  bicúspide; se ven igual si el estudio ya trae esos datos.
+- [x] GUARDAR ESTUDIO igual a eco Doppler: sólo envía al Sheet con un cartel; sin
+  historial, sin cola local, sin "Confirmar recepción". El botón HISTORIAL salió de
+  la botonera; los estudios guardados antes se abren desde ⚙ Sincronizar.
+- [x] Arreglo de paso: BORRAR TODO no limpiaba la fecha del estudio previo.
+
+Informes de los 10 presets idénticos a v2.3 (hash). Contraste 0 bajo 4,5:1.
+
 ## Tanda estética v2.3 — botonera y orden de eco Doppler
 
 Estado: terminada el 03/11/2026 (Claude, chat de coordinación). Sólo presentación:

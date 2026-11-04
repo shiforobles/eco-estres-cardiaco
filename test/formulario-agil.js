@@ -18,10 +18,16 @@ const aclaracion = 'ACLARACION_FICTICIA: Infradesnivel del ST en PEG previa';
 set(w, 'indicacion_aclaracion', aclaracion);
 w.autocompletarInterpretacion();
 assert.equal(w.captureFields().indicacion_aclaracion, aclaracion);
-assert.equal(w.huellaDelEstudio(), huella, 'la aclaración aún no alimenta el informe');
-assert.equal(w.construirNarrativa(w.recolectarHallazgos()).texto, antes);
+// Desde v2.4 (pedido de Lucas, 03/11/2026) la aclaración sale en la línea de
+// Indicación del informe. A la planilla todavía no: el contrato no cambia.
+assert.notEqual(w.huellaDelEstudio(), huella, 'cambiar la aclaración desactualiza el informe');
+const conAclaracion = w.construirNarrativa(w.recolectarHallazgos()).texto;
+assert.match(conAclaracion, /Indicación: Diagnóstico de Isquemia \(ACLARACION_FICTICIA: Infradesnivel del ST en PEG previa\)/);
+assert.equal(conAclaracion.replace(' (' + aclaracion + ')', ''), antes,
+    'fuera de la línea de Indicación el informe no cambia');
 assert.deepEqual(sheets.construirFila(cabecera + antes), filaAntes,
-    'no debe añadirse al contrato ni al contenido enviado a Sheets');
+    'no se añade al contrato de Sheets');
+assert.equal(sheets.HEADERS.length, w.eval('EstresSheets').HEADERS.length);
 assert.equal(d.querySelectorAll('#indicacion_aclaracion').length, 1);
 assert.ok(d.getElementById('indicacion_libre'), 'el campo heredado se conserva');
 
@@ -40,7 +46,7 @@ w.generarInforme();
 w.guardarEnHistorial();
 const historial = w.leerHistorial();
 assert.equal(historial[0].estudio.fields.indicacion_aclaracion, aclaracion);
-assert.ok(!historial[0].reporte.includes('ACLARACION_FICTICIA'));
+assert.ok(historial[0].reporte.includes('ACLARACION_FICTICIA'), 'el informe guardado lleva la aclaración');
 set(w, 'indicacion_aclaracion', 'Una tercera aclaración ficticia');
 w.aplicarEstudio(historial[0].estudio);
 assert.equal(d.getElementById('indicacion_aclaracion').value, aclaracion);

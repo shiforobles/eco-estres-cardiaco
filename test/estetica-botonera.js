@@ -15,9 +15,11 @@ const dock = d.querySelector('section.action-buttons');
 exigir(dock, 'hay botonera anclada');
 const acciones = dock ? [...dock.querySelectorAll('button')].map(b => b.getAttribute('onclick')) : [];
 ['borrarTodo()', 'generarDesdeBotonera()', 'copiarReporte()', 'guardarEstudio()',
- "abrirPanel('historial')", "abrirPanel('sync')"].forEach(a =>
+ "abrirPanel('sync')"].forEach(a =>
     exigir(acciones.includes(a), `la botonera tiene ${a}`));
-exigir(acciones.length === 6, 'y sólo esos seis botones');
+exigir(acciones.length === 5, 'y sólo esos cinco botones, como en eco Doppler');
+exigir(d.querySelector("#panel-sync button[onclick=\"abrirPanel('historial')\"]"),
+    'el historial viejo se abre desde Sincronizar');
 
 // Los botones viejos del informe ya no están en pantalla...
 ['limpiarFormulario()', 'guardarEnHistorial()', 'guardarEnPlanilla()'].forEach(a =>
@@ -98,26 +100,24 @@ exigir(w.eval('WM.estres[1]') === 3 && w.eval('WM.estres[7]') === 3, 'y la motil
 exigir(w.eval('MOTILIDAD_TOCADA') === true, 'con la motilidad como leída, igual que antes');
 exigir(informe(w).texto === antes, 'el informe vuelve a ser idéntico al de antes de borrar');
 
-// ── GUARDAR ESTUDIO: una sola decisión sobre la edición, historial + planilla ──
+// ── GUARDAR ESTUDIO: exactamente como eco Doppler — sólo el Sheet ──
 casoBase(w); todoNormal(w);
 d.getElementById('paciente_id').value = 'HC-100';
 w.generarInforme();
-const out = d.getElementById('reporte-output');
-out.textContent = out.textContent + ' Texto agregado a mano.';
-w.marcarInformeEditado();
-let preguntas = 0;
-w.confirm = () => { preguntas++; return false; };   // conservar la edición
-w.eval('EstresSheets.estaConfigurado = () => true');
-let enviado = null;
-w.eval('EstresSheets.construirFila = (inf) => { window.__fila = inf; return ["x"]; }');
-w.eval('EstresSheets.encolar = () => ({ ok: true })');
+const histAntes = w.localStorage.getItem('eco-estres-historial');
+const colaAntes = JSON.stringify(w.eval('EstresSheets').leerCola());
+let enviados = [];
+w.eval('EstresSheets.estaConfigurado = () => false');
 w.guardarEstudio().then(() => {
-    enviado = w.__fila;
-    exigir(preguntas === 1, `la edición a mano se pregunta una sola vez (fueron ${preguntas})`);
-    const hist = JSON.parse(w.localStorage.getItem('eco-estres-historial') || '[]');
-    exigir(hist[0] && hist[0].reporte.includes('Texto agregado a mano.'), 'el historial guarda la edición');
-    exigir(enviado && enviado.includes('Texto agregado a mano.'), 'y la planilla recibe el mismo texto');
-    exigir(w.eval('INFORME_DECIDIDO') === null, 'la decisión no queda pegada para el próximo guardado');
+    exigir(!enviados.length, 'sin planilla configurada no se envía nada');
+    w.eval('EstresSheets.estaConfigurado = () => true');
+    w.__enviados = enviados;
+    w.eval('EstresSheets.enviar = async (f) => { window.__enviados.push(f); }');
+    return w.guardarEstudio();
+}).then(() => {
+    exigir(enviados.length === 1, 'con planilla configurada se envía una fila');
+    exigir(w.localStorage.getItem('eco-estres-historial') === histAntes, 'no escribe el historial');
+    exigir(JSON.stringify(w.eval('EstresSheets').leerCola()) === colaAntes, 'ni la cola local');
     if (fallas) { console.log(`\n${fallas} falla(s)`); process.exit(1); }
-    console.log('Sin fallas — estética v2.3: botonera, paneles, perlas, orden y deshacer');
+    console.log('Sin fallas — estética: botonera de eco Doppler, paneles, perlas, orden y deshacer');
 });

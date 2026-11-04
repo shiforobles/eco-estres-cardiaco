@@ -28,6 +28,7 @@ npm test
 | `medidas-vi.js` | Que una medida implausible del VI no produzca un RWT o una masa con cara de resultado |
 | `parrafo-pronostico.js` | Niveles, fusión de extensión, tope y exentos del párrafo pronóstico |
 | `estetica-botonera.js` | Botonera de eco Doppler, paneles de historial/sincronizar/perlas, motilidad antes del eco post, BORRAR TODO con Deshacer y una sola pregunta al guardar una edición a mano |
+| `antecedentes-v24.js` | Digoxina (ST no interpretable), cronotrópico negativo, preexcitación, FA en el estudio (sin algoritmo diastólico estándar) y valvulopatía que se abre sólo con EAo o bicúspide |
 | `barrido.js` | 800 casos al azar contra todas las invariantes a la vez |
 | `barra-motilidad.js` | Pincel de grado, grupos por unión, apagado, fase y filtro de vista |
 | `drift-grupos.js` | Que `motility-groups.js` no se separe del `motility-model.js` de la app de Doppler |
