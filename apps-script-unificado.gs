@@ -109,8 +109,6 @@ const HEADERS_DOPPLER = [
   "Recambio Ao",
   "Recambio Mitral",
   "Observaciones",
-  // La app de Doppler ya mandaba esta columna; faltaba acá (04/11/2026).
-  "MCH JSON v1",
   // Identificador del estudio (última): el upsert por 'ID' reemplaza la fila en vez
   // de duplicarla, igual que en la hoja de Estrés.
   "ID"
