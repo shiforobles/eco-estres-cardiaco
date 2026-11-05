@@ -419,8 +419,8 @@
          ECG BASAL
          ══════════════════════════════════════ -->
     <section class="card">
-        <details class="plegable-tecnica">
-            <summary class="section-title" style="cursor:pointer; list-style:none">ECG basal <span class="firma-nota">— lo carga la técnica; se despliega con un clic</span></summary>
+        <details class="plegable-tecnica" open>
+            <summary class="section-title" style="cursor:pointer; list-style:none">ECG basal</summary>
 
         <p class="firma-nota" style="margin:0.25rem 0 0.75rem">Todo arranca en normal: sólo cambiás lo alterado. «+ Agregar» suma otro hallazgo en el mismo apartado (BCRD + HBAI, T negativas + infradesnivel).</p>
 
@@ -455,10 +455,6 @@
             <div id="ecgx_qList" class="ecg-flist"></div>
         </div>
         <div class="form-group" style="margin-top:0.75rem">
-            <label for="ecg_otros_basal">Otros hallazgos del ECG basal</label>
-            <input autocomplete="off" type="text" id="ecg_otros_basal" placeholder="Ej: imagen de secuela inferolateral">
-        </div>
-        <div class="form-group" style="margin-top:0.75rem">
             <label>Arritmias basales</label>
             <div class="ecg-addbar">
                 <button type="button" class="btn btn-secondary btn-sm" data-ecg-add="EV" data-ecg-phase="Reposo">+ EV</button>
@@ -491,6 +487,8 @@
                 <option value="infra_basal">Infradesnivel del ST basal</option>
                 <option value="no_interpretable">No interpretable para isquemia</option>
             </select>
+            <!-- Fuera de pantalla: un estudio viejo con texto acá lo sigue mostrando en el informe. -->
+            <input autocomplete="off" type="text" id="ecg_otros_basal">
         </div>
         </details>
     </section>
@@ -829,8 +827,8 @@
          ECG POST-ESFUERZO Y ARRITMIAS
          ══════════════════════════════════════ -->
     <section class="card">
-        <details class="plegable-tecnica">
-            <summary class="section-title" style="cursor:pointer; list-style:none">ECG post-esfuerzo <span class="firma-nota">— incluye arritmias; se despliega con un clic</span></summary>
+        <details class="plegable-tecnica" open>
+            <summary class="section-title" style="cursor:pointer; list-style:none">ECG post-esfuerzo</summary>
 
         <div class="form-group">
             <label>Cambios del ST-T</label>
@@ -865,10 +863,6 @@
                     <option value="sintomatica">Sintomática</option>
                 </select>
             </div>
-            <div class="form-group">
-                <label for="ecg_arritmias">Descripción libre de arritmias <span class="firma-nota">(si la cargás, es la que va al informe)</span></label>
-                <input autocomplete="off" type="text" id="ecg_arritmias" placeholder="Ej: EV polimorfas con episodios de bigeminia durante el esfuerzo">
-            </div>
         </div>
         <div id="aviso-arritmias" class="aviso-adquisicion" style="display:none"></div>
 
@@ -897,6 +891,8 @@
             <input autocomplete="off" type="text" id="ecg_st_deriv">
             <input type="text" id="ecg_st_aparicion">
             <input type="text" id="ecg_st_resolucion">
+            <!-- Fuera de pantalla: un estudio viejo con descripción libre la sigue mostrando. -->
+            <input autocomplete="off" type="text" id="ecg_arritmias">
             <input autocomplete="off" type="checkbox" class="chk-arr" id="arr_esv">
             <input autocomplete="off" type="checkbox" class="chk-arr" id="arr_ev_mono">
             <input autocomplete="off" type="checkbox" class="chk-arr" id="arr_ev_poli">
@@ -1808,14 +1804,14 @@
 <script src="motility-estres.js?v=2.2"></script>
 <script src="pearls.js?v=2.3-estetica-1"></script>
 <script src="motility-groups.js?v=2.2"></script>
-<script src="report-templates.js?v=2.2-grados-1"></script>
+<script src="report-templates.js?v=2.6-ecg2"></script>
 <script src="sheets-storage.js?v=2.5-ecg"></script>
-<script src="app.js?v=2.5-ecg"></script>
+<script src="app.js?v=2.6-ecg2"></script>
 <script>
 // Control de versión: si el navegador sirvió una mezcla de archivos viejos y nuevos,
 // los botones fallan en silencio. Esto lo convierte en un aviso visible.
 (function () {
-    var APP_VERSION = '2.5';
+    var APP_VERSION = '2.6';
     var faltan = ['generarInforme', 'recolectarHallazgos', 'calcEjercicio'].filter(function (f) {
         return typeof window[f] !== 'function';
     });

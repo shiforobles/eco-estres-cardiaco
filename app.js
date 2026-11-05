@@ -694,7 +694,8 @@ function autocompletarInterpretacion() {
     //    Angina y disnea quedan afuera: son síntomas que observa el operador.
     const hayEV = H.arritmias.some(a =>
         ['arr_ev_mono', 'arr_ev_poli', 'arr_bigeminia', 'arr_dupletas'].includes(a.id));
-    sugerir('hal_st_dep',        H.stTipo === 'infra');
+    // El rápidamente ascendente es respuesta fisiológica: no marca descenso del ST.
+    sugerir('hal_st_dep',        H.stTipo === 'infra' && H.stMorfologia !== 'ascendente_rapido');
     sugerir('hal_st_ele',        H.stTipo === 'supra');
     sugerir('hal_hipotension',   H.hipotension);
     sugerir('hal_hipertensiva',  H.hipertension);
@@ -3259,7 +3260,7 @@ const ECGmod = (function () {
     const RITMOTXT = { sinusal: 'ritmo sinusal', bradi: 'bradicardia sinusal', taqui: 'taquicardia sinusal', fa: 'fibrilación auricular', aleteo: 'aleteo auricular', marcapasos: 'ritmo de marcapasos' };
     const MORPHTXT = { horizontal: 'horizontal', descendente: 'descendente', lent: 'lentamente ascendente', ascendente_rapido: '' };
     const MM = [['0.5', '0,5'], ['1', '1'], ['1.5', '1,5'], ['2', '2'], ['2.5', '2,5'], ['3', '3'], ['3.5', '3,5'], ['4', '4'], ['5', '5'], ['6', '6']];
-    const MORPH = [['horizontal', 'Horizontal'], ['descendente', 'Descendente'], ['lent', 'Lentamente ascendente']];
+    const MORPH = [['horizontal', 'Horizontal'], ['descendente', 'Descendente'], ['lent', 'Lentamente ascendente'], ['ascendente_rapido', 'Rápidamente ascendente']];
     const APAR = [['', 'Sin dato'], ['I', 'Etapa I'], ['II', 'Etapa II'], ['III', 'Etapa III'], ['IV', 'Etapa IV'], ['V', 'Etapa V'], ['VI', 'Etapa VI'], ['VII', 'Etapa VII'], ['max', 'Máximo esfuerzo'], ['rec', 'Solo en recuperación']];
     const RECUP = [['', 'Sin dato'], ['norm', 'Normaliza en la recuperación'], ['1', 'Al minuto 1'], ['2', 'Al minuto 2'], ['3', 'Al minuto 3'], ['4', 'Al minuto 4'], ['5', 'Al minuto 5'], ['6', 'Al minuto 6'], ['gt6', 'Después del minuto 6'], ['persiste', 'Persiste al finalizar'], ['acentua', 'Se acentúa en la recuperación']];
     const APARL = Object.fromEntries(APAR), RECUPL = Object.fromEntries(RECUP);
@@ -3292,7 +3293,11 @@ const ECGmod = (function () {
     function steTxt(x, E) {
         const L = leadsTxt(x.leads);
         switch (x.id) {
-            case 'infra': return clean('infradesnivel del ST ' + (MORPHTXT[x.morph] || '') + ' de ' + mmTxt(x.mm) + ' mm') +
+            // Rápidamente ascendente: respuesta fisiológica. Se describe, sin magnitud y
+            // sin calificarlo de isquémico (SAC 2026).
+            case 'infra': if (x.morph === 'ascendente_rapido')
+                return 'infradesnivel del punto J con segmento ST rápidamente ascendente, respuesta fisiológica al esfuerzo' + L;
+                return clean('infradesnivel del ST ' + (MORPHTXT[x.morph] || '') + ' de ' + mmTxt(x.mm) + ' mm') +
                 (E && E.stBasal && E.stBasal.some(b => b.id === 'infra') ? ' adicional respecto del basal' : '') + L + aparTxt(x.apar) + recupTxt(x.recup);
             case 'supra': return 'supradesnivel del ST de ' + mmTxt(x.mm) + ' mm' + L + aparTxt(x.apar) + recupTxt(x.recup);
             case 'avr': return 'supradesnivel del ST en aVR de ' + mmTxt(x.mm) + ' mm';
@@ -3421,13 +3426,17 @@ const ECGmod = (function () {
         const evo = E.arrBasal.map(evolPhrase).filter(Boolean);
         const parts = [];
         parts.push(ste.length ? ste.join('; ') : 'sin cambios significativos del ST-T respecto del basal');
-        if (ee.length) parts.push(ee.join('; ') + (E.sintomatica ? ', con síntomas asociados' : ', sin síntomas asociados'));
+        // Un estudio del diseño anterior guardó la descripción de arritmias en texto
+        // libre: si está, manda sobre los eventos (como antes), y así sigue saliendo.
+        if (E.libre) parts.push(E.libre.replace(/\.*$/, ''));
+        else if (ee.length) parts.push(ee.join('; ') + (E.sintomatica ? ', con síntomas asociados' : ', sin síntomas asociados'));
         else parts.push('sin arritmias durante el esfuerzo ni la recuperación');
         if (evo.length) parts.push(joined(evo));
         return parts.map(sentence).join('. ') + '.';
     }
     // Sólo la parte de arritmias (para el caso de conducción, que reemplaza el ST).
     function esfuerzoArritmias(E) {
+        if (E.libre) return sentence(E.libre.replace(/\.*$/, '')) + '.';
         const ee = E.arrEsf.map(ev => evPhrase(ev, 'Esfuerzo'));
         if (!ee.length) return 'Sin arritmias.';
         return sentence(ee.join('; ') + (E.sintomatica ? ', con síntomas asociados' : ', sin síntomas asociados')) + '.';
@@ -3734,7 +3743,7 @@ const ECGmod = (function () {
         else if (E.stBasal.length) sb = 'repol';
         setV('ecg_st_basal', sb);
         const main = E.stEsf.find(x => x.id === 'infra') || E.stEsf.find(x => x.id === 'supra') || null;
-        if (main && main.id === 'infra') { setV('ecg_st_tipo', 'infra'); setV('ecg_st_morfologia', main.morph || 'horizontal'); setV('ecg_st_mm', main.mm || ''); setV('ecg_st_deriv', (main.leads || []).join(', ')); }
+        if (main && main.id === 'infra') { setV('ecg_st_tipo', 'infra'); setV('ecg_st_morfologia', main.morph || 'horizontal'); setV('ecg_st_mm', main.morph === 'ascendente_rapido' ? '' : (main.mm || '')); setV('ecg_st_deriv', (main.leads || []).join(', ')); }
         else if (main && main.id === 'supra') { setV('ecg_st_tipo', 'supra'); setV('ecg_st_morfologia', ''); setV('ecg_st_mm', main.mm || ''); setV('ecg_st_deriv', (main.leads || []).join(', ')); }
         else { setV('ecg_st_tipo', ''); setV('ecg_st_morfologia', ''); setV('ecg_st_mm', ''); setV('ecg_st_deriv', ''); }
         setV('ecg_st_aparicion', main ? (APARL[main.apar] || '') : '');
@@ -3758,7 +3767,14 @@ const ECGmod = (function () {
         const ritmo = $('ecg_ritmo');
         if (ritmo) { const box = $('ecg_ritmo_otro_box'); if (box) box.classList.toggle('hidden-ecg', ritmo.value !== 'otro'); }
         const stbInfra = STB.abnormal().some(r => r.d.id === 'infra');
-        STE.active().forEach(r => { if (r.d && r.d.id === 'infra' && r.ui && r.ui.mmLabel && r.ui.mmLabel()) r.ui.mmLabel().textContent = stbInfra ? 'Magnitud adicional respecto del basal (mm)' : 'Magnitud (mm)'; });
+        STE.active().forEach(r => {
+            if (r.d && r.d.id === 'infra' && r.ui && r.ui._f && r.ui._f.mm) {
+                // El rápidamente ascendente no pide magnitud (respuesta fisiológica).
+                const rapido = r.ui.v('morph') === 'ascendente_rapido';
+                r.ui._f.mm.w.classList.toggle('hidden-ecg', rapido);
+                if (r.ui.mmLabel()) r.ui.mmLabel().textContent = stbInfra ? 'Magnitud adicional respecto del basal (mm)' : 'Magnitud (mm)';
+            }
+        });
         if (silencioso) return;
         syncLegacy();
         if (typeof avisarArritmias === 'function') avisarArritmias();
@@ -3790,6 +3806,8 @@ const ECGmod = (function () {
         COND.reset(); STB.reset(); QS.reset(); STE.reset();
         const eb = $('ecgx_eventosBasal'); if (eb) eb.replaceChildren();
         const ee = $('ecgx_eventos'); if (ee) ee.replaceChildren();
+        // Las tarjetas de ECG vuelven a quedar desplegadas (las usa el médico, no la técnica).
+        [$('ecgx_condList'), $('ecgx_steList')].forEach(c => { const dt = c && c.closest('details'); if (dt) dt.open = true; });
         silencioso = false;
         onChange();
     }
@@ -3811,6 +3829,12 @@ const ECGmod = (function () {
         built = true;
         d.querySelectorAll('[data-ecg-add]').forEach(b => b.addEventListener('click', () => { const e = addEvent(b.dataset.ecgAdd, b.dataset.ecgPhase); onChange(); if (e) { const first = e.querySelector('select,input') || e.querySelector('.ecg-remove'); if (first) try { first.focus(); } catch (x) { } } }));
         ['ecg_ritmo', 'ecg_ritmo_otro', 'arr_sintomas', 'ecg_arritmias', 'ecg_otros_basal'].forEach(id => { const e = $(id); if (e) ['change', 'input'].forEach(ev => e.addEventListener(ev, onChange)); });
+        // Listener delegado en cada apartado: los controles de detalle (morfología, mm,
+        // aparición, recuperación, y los selects de cada evento de arritmia) se crean al
+        // vuelo y no tienen listener propio; así cualquier cambio dispara onChange, que
+        // sincroniza los campos del modelo anterior y actualiza la pantalla.
+        ['ecgx_condList', 'ecgx_stbList', 'ecgx_qList', 'ecgx_steList', 'ecgx_eventosBasal', 'ecgx_eventos']
+            .forEach(id => { const host = $(id); if (host) ['change', 'input'].forEach(ev => host.addEventListener(ev, onChange)); });
         const condEl = $('ecg_conduccion'); if (condEl) condEl.addEventListener('change', adoptarConduccion);
         d.addEventListener('click', e => combos.forEach(c => { if (!c.box.contains(e.target)) c.close(); }));
         onChange();
@@ -5692,13 +5716,11 @@ function ecgEnConclusionOsecac(H, conclusion, rama) {
             : (H.digoxina ? 'el tratamiento con digoxina' : 'las alteraciones del ST basal');
         frases.push(`El análisis del segmento ST no resultó interpretable por ${causa}.`);
     }
-    // Cambios isquémicos del ST sin correlato en la motilidad: la discordancia es
-    // interpretación y va en la conclusión. Si se callara, el cuadro de conclusión
-    // afirmaría un estudio negativo sin decir que el ECG fue positivo.
-    if (H.stIsquemico && !H.isquemicos.length && !yaLoDice('discordancia')) {
-        frases.push(`Presentó cambios isquémicos del segmento ST (${descripcionSTEnProsa(H)}) sin ` +
-            `correlato en la motilidad parietal, discordancia en la que la respuesta contráctil ` +
-            `tiene mayor especificidad para isquemia miocárdica.`);
+    // Cambios del ST sin correlato en la motilidad. Los cambios ya se describen en el
+    // cuadro de esfuerzo; acá va una frase neutra —sin "isquémicos", "positiva" ni
+    // "discordancia"— y una sola vez (si la conclusión de la rama ya lo dijo, no se repite).
+    if (H.stIsquemico && !H.isquemicos.length && !yaLoDice('no se acompañaron')) {
+        frases.push('Los cambios del segmento ST descritos no se acompañaron de alteraciones de la motilidad.');
     }
     // ECG no concluyente para isquemia: se dice en la conclusión SÓLO si la motilidad
     // es negativa, y sin interpretarlo más allá de eso.

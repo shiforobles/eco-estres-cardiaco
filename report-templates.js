@@ -260,10 +260,11 @@ const NARRATIVA = {
     esfuerzoHipotensiva: 'Se objetivaron {{hallazgos}}, con caída de la FEy de {{feyReposo}} % a {{feyEstres}} %.',
 
     // ── DISCORDANCIA ELÉCTRICO-ECOGRÁFICA ─────────────────────────────
-    // ECG positivo con eco negativo. La conclusión no puede negar la isquemia
-    // a secas cuando el bloque de ECG describe cambios isquémicos.
+    // Cambios del ST sin correlato en la motilidad. El renglón post-esfuerzo describe
+    // los cambios del ST; acá no se los califica de isquémicos para no sugerir un estudio
+    // positivo cuando el eco es negativo.
     esfuerzoDiscordancia: 'Adecuada respuesta hiperdinámica global, sin nuevas alteraciones ' +
-                       'de la motilidad parietal en ninguno de los territorios evaluados, pese a los cambios eléctricos ' +
+                       'de la motilidad parietal en ninguno de los territorios evaluados, pese a los cambios del segmento ST ' +
                        'descritos.{{acompanamiento}}',
 
     // ── HIPOQUINESIA GLOBAL / MIOCARDIOPATÍA DILATADA ─────────────────
@@ -318,10 +319,12 @@ const NARRATIVA = {
                   'de compromiso no sigue una distribución coronaria, en relación con miocardiopatía dilatada{{vdConcl}}.' +
                   '{{capacidadDilatada}}',
 
-        discordancia: 'Conclusión: prueba de eco estrés con ejercicio con respuesta eléctrica positiva ({{descripcionST}}) y ' +
-                  'respuesta contráctil negativa, sin nuevas alteraciones de la motilidad parietal. Se trata de una ' +
-                  'discordancia eléctrico-ecográfica: la respuesta contráctil tiene mayor especificidad para isquemia ' +
-                  'miocárdica que el análisis del segmento ST. Se sugiere correlación clínica.',
+        // ST con cambios y eco negativo. No se dice "positiva", "isquémicos" ni
+        // "discordancia": al clínico que lo lee le haría creer que el estudio es positivo.
+        // Los cambios del ST ya están descritos en el renglón/cuadro de esfuerzo.
+        discordancia: 'Conclusión: prueba de eco estrés con ejercicio sin evidencia ecocardiográfica de isquemia ' +
+                  'miocárdica inducible, sin nuevas alteraciones de la motilidad parietal. Los cambios del segmento ST ' +
+                  'descritos no se acompañaron de alteraciones de la motilidad. Se sugiere correlación clínica.',
 
         negativaConduccion: 'Conclusión: prueba negativa para isquemia miocárdica inducible en los territorios evaluables. ' +
                   'La presencia de {{trastorno}} limita la valoración de los segmentos septales y reduce la especificidad del ' +
@@ -373,9 +376,9 @@ const NARRATIVA = {
         // y la caída de la FEy pasó al bloque `pronostico`, junto con el resto de lo que
         // le cambia la conducta al clínico que lee el informe.
 
-        // Discordancia sobre una rama que ya dice otra cosa (secuela, dilatada)
-        discordancia: '. Presentó además cambios isquémicos del segmento ST ({{descripcionST}}) sin correlato en la ' +
-                     'motilidad parietal, discordancia en la que la respuesta contráctil tiene mayor especificidad',
+        // Cambios del ST sobre una rama que ya dice otra cosa (secuela, dilatada).
+        // Coletilla neutra, sin "isquémicos" ni "discordancia".
+        discordancia: '. Los cambios del segmento ST descritos no se acompañaron de nuevas alteraciones de la motilidad',
 
         // Un test diastólico positivo es un hallazgo con peso propio: no puede quedarse
         // sólo en la línea descriptiva del bloque post-esfuerzo.

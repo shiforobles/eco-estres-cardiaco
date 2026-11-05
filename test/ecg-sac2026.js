@@ -187,9 +187,10 @@ let fila10 = null, headers10 = null;
     // (b) Motilidad negativa + ECG positivo → discordancia en la conclusión, como hoy.
     const b = base(w => ecg(w, { ritmo: 'sinusal', conduccion: [], stBasal: [], q: [], arrBasal: [],
         stEsf: [{ id: 'infra', morph: 'horizontal', mm: '2', leads: ['V4', 'V5', 'V6'] }], arrEsf: [] }));
-    exigir(b.rama === 'discordancia', '13b · motilidad normal + ST isquémico → rama discordancia');
-    exigir(/discordancia/i.test(b.O.conclusion), '13b · la conclusión OSECAC dice la discordancia');
-    exigir(/discordancia|infradesnivel/i.test(linea(b.texto, 'Conclusión')), '13b · y el informe largo también');
+    exigir(b.rama === 'discordancia', '13b · motilidad normal + ST isquémico → rama discordancia (nombre sin cambios)');
+    exigir(/no se acompañaron de alteraciones de la motilidad/i.test(b.O.conclusion), '13b · la conclusión OSECAC lo dice en frase neutra');
+    exigir(!/\bpositiva\b|isquémic|discordancia/i.test(b.O.conclusion), '13b · sin "positiva"/"isquémico"/"discordancia" en la conclusión');
+    exigir(!/\bpositiva\b|isquémic|discordancia/i.test(linea(b.texto, 'Conclusión')), '13b · ídem en el informe largo');
     registrar('13a · motilidad positiva + ECG negativo', a);
     registrar('13b · motilidad negativa + ECG positivo (discordancia)', b);
 }
@@ -235,6 +236,97 @@ let fila10 = null, headers10 = null;
     exigir(w.recolectarHallazgos().ecgResultado === 'Negativo', '15 · y el resultado vuelve a Negativo');
 }
 
+// ══════════════════════════════════════════════════════════════════
+//  TANDA 2 — ajustes tras usarlo con pacientes.
+// ══════════════════════════════════════════════════════════════════
+const dumps2 = [];
+function registrar2(nombre, r) {
+    dumps2.push({
+        nombre, resultado: r.H.ecgResultado, rama: r.rama || '',
+        esfuerzoLargo: linea(r.texto, 'ECG post-esfuerzo'),
+        conclusionLarga: linea(r.texto, 'Conclusión'),
+        osecacEsfuerzo: r.O.esfuerzo, osecacConclusion: r.O.conclusion
+    });
+}
+
+// ── D1 · Estudio nuevo: campos libres fuera de pantalla y tarjetas abiertas ──
+{
+    const w = cargarApp(); casoBase(w); todoNormal(w);
+    const d = w.document;
+    exigir(d.getElementById('ecg_otros_basal').closest('.hidden-ecg') !== null, 'D1 · "Otros hallazgos" fuera de pantalla');
+    exigir(d.getElementById('ecg_arritmias').closest('.hidden-ecg') !== null, 'D1 · "Descripción libre de arritmias" fuera de pantalla');
+    const cardBasal = d.getElementById('ecgx_condList').closest('details');
+    const cardEsf = d.getElementById('ecgx_steList').closest('details');
+    exigir(cardBasal.open && cardEsf.open, 'D1 · las dos tarjetas de ECG arrancan desplegadas');
+    cardBasal.open = false; cardEsf.open = false;
+    w.resetFormulario();
+    exigir(cardBasal.open && cardEsf.open, 'D1 · "nuevo estudio" las vuelve a dejar abiertas');
+}
+
+// ── D2 · Estudio viejo con texto en los dos campos libres → sale en el informe ──
+{
+    const w = cargarApp(); casoBase(w); todoNormal(w);
+    w.document.getElementById('ecg_otros_basal').value = 'imagen de secuela inferolateral';
+    w.document.getElementById('ecg_arritmias').value = 'EV polimorfas aisladas durante el esfuerzo';
+    const texto = informe(w).texto;
+    exigir(/imagen de secuela inferolateral/i.test(linea(texto, 'ECG reposo')), 'D2 · "otros hallazgos" viejo sale en ECG reposo');
+    exigir(/EV polimorfas aisladas durante el esfuerzo/i.test(linea(texto, 'ECG post-esfuerzo')), 'D2 · descripción libre vieja sale en ECG post-esfuerzo');
+}
+
+// ── D3 · Infra rápidamente ascendente V4-V6 → negativo, sin avisos, texto del punto 5 ──
+{
+    const w = cargarApp(); casoBase(w); todoNormal(w);
+    ecg(w, { ritmo: 'sinusal', conduccion: [], stBasal: [], q: [], arrBasal: [],
+        stEsf: [{ id: 'infra', morph: 'ascendente_rapido', leads: ['V4', 'V5', 'V6'] }], arrEsf: [] });
+    w.autocompletarInterpretacion();
+    const H = w.recolectarHallazgos(), texto = informe(w).texto, O = w.informeOsecac(H);
+    exigir(H.ecgResultado === 'Negativo', 'D3 · rápidamente ascendente → Negativo');
+    exigir(H.stIsquemico === false, 'D3 · no isquémico');
+    exigir(H.ecgCls.A.red.length === 0 && H.ecgCls.A.amber.length === 0 && H.ecgCls.A.info.length === 0, 'D3 · sin avisos');
+    exigir(w.document.getElementById('hal_st_dep').checked === false, 'D3 · no marca hal_st_dep');
+    exigir(/infradesnivel del punto J con segmento ST rápidamente ascendente, respuesta fisiológica al esfuerzo en V4, V5 y V6/i.test(linea(texto, 'ECG post-esfuerzo')), 'D3 · texto del punto 5 con derivaciones');
+    registrar2('D3 · infra rápidamente ascendente V4-V6', { H, texto, rama: '', O });
+}
+
+// ── D4 · Infra horizontal 2 mm + motilidad normal → conclusión neutra (punto 7) ──
+{
+    const r = base(w => ecg(w, { ritmo: 'sinusal', conduccion: [], stBasal: [], q: [], arrBasal: [],
+        stEsf: [{ id: 'infra', morph: 'horizontal', mm: '2', leads: ['V4', 'V5', 'V6'] }], arrEsf: [] }));
+    exigir(r.rama === 'discordancia', 'D4 · rama discordancia (nombre sin cambios)');
+    const cl = linea(r.texto, 'Conclusión');
+    exigir(/sin evidencia ecocardiográfica de isquemia miocárdica inducible/i.test(cl), 'D4 · conclusión largo: frase neutra');
+    exigir(/no se acompañaron de alteraciones de la motilidad/i.test(cl), 'D4 · largo: cambios del ST sin correlato');
+    exigir(!/\bpositiva\b|isquémic|discordancia/i.test(cl), 'D4 · largo sin "positiva"/"isquémico"/"discordancia"');
+    exigir(/no se acompañaron de alteraciones de la motilidad/i.test(r.O.conclusion), 'D4 · OSECAC: frase neutra');
+    exigir(!/\bpositiva\b|isquémic|discordancia/i.test(r.O.conclusion), 'D4 · OSECAC sin esas palabras');
+    registrar2('D4 · infra horizontal 2 mm + motilidad normal', r);
+}
+
+// ── D5 · Secuela DA fija + infra horizontal 1,5 mm → coletilla del punto 7 ──
+{
+    const r = base(w => { puntajes(w, { 1: 3, 7: 3, 13: 3 }, { 1: 3, 7: 3, 13: 3 });
+        ecg(w, { ritmo: 'sinusal', conduccion: [], stBasal: [], q: [], arrBasal: [],
+            stEsf: [{ id: 'infra', morph: 'horizontal', mm: '1.5', leads: ['V4', 'V5', 'V6'] }], arrEsf: [] }); });
+    exigir(r.rama === 'secuela', 'D5 · rama secuela');
+    const cl = linea(r.texto, 'Conclusión');
+    exigir(/no se acompañaron de nuevas alteraciones de la motilidad/i.test(cl), 'D5 · coletilla del punto 7 en el largo');
+    exigir(!/\bpositiva\b|isquémic|discordancia/i.test(cl), 'D5 · sin esas palabras');
+    exigir(/no se acompañaron de nuevas alteraciones de la motilidad/i.test(r.O.conclusion), 'D5 · coletilla en OSECAC');
+    registrar2('D5 · secuela DA fija + infra horizontal 1,5 mm', r);
+}
+
+// ── D6 · Infra horizontal 2 mm + isquemia por motilidad → sin cambios respecto de hoy ──
+{
+    const r = base(w => { puntajes(w, {}, { 1: 3, 7: 3, 13: 3 });
+        ecg(w, { ritmo: 'sinusal', conduccion: [], stBasal: [], q: [], arrBasal: [],
+            stEsf: [{ id: 'infra', morph: 'horizontal', mm: '2', leads: ['V4', 'V5', 'V6'] }], arrEsf: [] }); });
+    exigir(/positiv/i.test(r.rama) || r.H.isquemicos.length > 0, 'D6 · rama positiva por motilidad');
+    const cl = linea(r.texto, 'Conclusión');
+    exigir(/isquemia/i.test(cl), 'D6 · la conclusión informa la isquemia por imagen');
+    exigir(!/no se acompañaron/i.test(cl), 'D6 · no entra la frase de discordancia (hay isquemia por motilidad)');
+    registrar2('D6 · infra horizontal 2 mm + isquemia por motilidad', r);
+}
+
 // ══ Dump para revisar la redacción ══
 console.log('\n════════ TEXTOS DE LOS 15 CASOS ════════');
 dumps.forEach(dd => {
@@ -250,5 +342,14 @@ dumps.forEach(dd => {
 console.log('\n════════ FILA DE PLANILLA · CASO 10 ════════');
 if (fila10) headers10.forEach((h, i) => { if (/ecg|st |ritmo|conduc|arritm|resultado|q\/secuela|interpretable/i.test(h)) console.log('  ' + h.padEnd(26) + ' = ' + fila10[i]); });
 
+console.log('\n════════ TANDA 2 · ESFUERZO + CONCLUSIÓN (casos D3 a D6) ════════');
+dumps2.forEach(dd => {
+    console.log('\n── ' + dd.nombre + '  [' + dd.resultado + (dd.rama ? ' · rama ' + dd.rama : '') + '] ──');
+    console.log('  LARGO ESFUERZO · ' + (dd.esfuerzoLargo || '(sin línea)').replace(/\n+/g, ' '));
+    console.log('  LARGO CONCL    · ' + (dd.conclusionLarga || '').replace(/\n+/g, ' '));
+    console.log('  OSECAC ESFUERZO· ' + dd.osecacEsfuerzo.replace(/\n+/g, ' '));
+    console.log('  OSECAC CONCL   · ' + dd.osecacConclusion.replace(/\n+/g, ' '));
+});
+
 if (fallas) { console.log(`\n${fallas} FALLA(S)`); process.exit(1); }
-console.log('\nSin fallas — módulo ECG SAC 2026: 15 casos');
+console.log('\nSin fallas — módulo ECG SAC 2026: 15 casos + tanda 2 (6 casos)');

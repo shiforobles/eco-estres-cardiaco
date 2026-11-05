@@ -186,21 +186,22 @@ CASOS.forEach(({ nombre, w }) => {
         'sin nada que lo haga relevante, el ST no aparece en ningún cuadro');
 }
 
-// Un ST isquémico con motilidad normal sí cambia la lectura: va una vez, en la
-// conclusión. Si se callara, el cuadro afirmaría un negativo sin decir que el ECG
-// fue positivo, y en el informe largo eso lo cubría la línea de ECG, que acá no está.
+// ST con cambios y motilidad normal: el ST se describe en el cuadro de esfuerzo y la
+// conclusión dice, en frase neutra, que no se acompañaron de alteraciones de la
+// motilidad. No puede sonar a estudio positivo: sin "positiva", "isquémico" ni
+// "discordancia" (tanda 2).
 {
     const w = negativo();
     set(w, 'ecg_st_tipo', 'infra');
     set(w, 'ecg_st_morfologia', 'horizontal');
     set(w, 'ecg_st_mm', 2);
     const O = w.informeOsecac(w.recolectarHallazgos());
-    exigir(/discordancia/i.test(O.conclusion),
-        'un ST isquémico sin correlato de motilidad se informa en la conclusión');
+    exigir(/no se acompañaron de alteraciones de la motilidad/i.test(O.conclusion),
+        'la conclusión lo dice en frase neutra');
+    exigir(!/\bpositiva\b|isquémic|discordancia/i.test(O.conclusion),
+        'sin "positiva", "isquémico" ni "discordancia" en la conclusión');
     exigir(/infradesnivel/i.test(O.esfuerzo),
         'el infradesnivel se describe en el cuadro de esfuerzo (línea de ECG)');
-    exigir(!/discordancia/i.test(O.reposo + O.esfuerzo),
-        'pero la discordancia, que es interpretación, va sólo en la conclusión');
 }
 
 // ── EAo moderada: la valvulopatía sale en el cuadro de reposo ────
