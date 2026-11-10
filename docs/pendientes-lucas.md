@@ -182,6 +182,39 @@ Estado: pendiente de investigación/propuestas y validación clínica de Lucas.
   regional y coherencia entre motores. No cambiar exclusiones/evaluabilidad de forma
   incidental.
 
+## Tanda de motilidad v2.7 — super prompt de Lucas (04/11/2026)
+
+Estado: terminada el 10/11/2026 (Claude, chat de coordinación). Los 17 puntos del
+super prompt (`claude/super-prompt-motilidad.md` en el proyecto), con sus 19 casos
+en `test/motilidad-19-casos.js` y el texto de cada uno en `docs/motilidad-19-casos.md`.
+
+- [x] Territorio con ≥2 segmentos; segmento nuevo único = hallazgo aislado (rama
+  `aislado`, nunca positivo); isquemia sobre segmento alterado sólo con cambio de
+  categoría; disquinesia → aquinesia sin cambio. Declarado en pantalla.
+- [x] Un solo motor de texto (Doppler) para reposo y esfuerzo; `motor_texto` queda
+  oculto y fijo por la columna de la planilla. Se retiró el texto propio y la
+  comparación.
+- [x] Territorio sólo en la conclusión y con sigla; la conclusión siempre nombra la
+  alteración de reposo; progresión en vez de "nueva"; casquete apical; una mención
+  por hallazgo; "1 punto".
+- [x] Frase única: "La ausencia de mejoría con el esfuerzo no descarta miocardio viable."
+- [x] "En relación con evento previo" sólo con Infarto previo, que volvió como casilla.
+- [x] Tabla "Ver detalle por segmentos" retirada; calidad y extensión quedan plegadas.
+- [x] Patrón global recalculado al cambiar la FEy.
+- [x] Avisos de texto libre de reposo que contradice el bull's eye.
+
+Decisiones tomadas sin consulta (revisar):
+- De hipoquinesia moderada a leve tampoco es mejoría (simetría con leve → moderada).
+- Dos o más segmentos nuevos que no juntan dos en ningún territorio: positivo "en
+  segmentos aislados, sin distribución coronaria definida", sin vaso.
+- Los casos extensos se redactan por pared en `motility-estres.js`, sin tocar
+  `vendor/`. **Pendiente en la app de eco Doppler:** corregir el Motor A en la fuente
+  (enumera en casos extensos) y recopiar.
+- Un negativo cuya alteración basal se normaliza conserva la frase de "<1 % anual":
+  no se tocó porque es cifra validada. Decide Lucas si corresponde.
+
+Pendiente para otra tanda: bull's eye de estrés parecido al del eco basal.
+
 ## Tanda v2.4 — Indicación y antecedentes
 
 Estado: terminada el 03/11/2026 (Claude, chat de coordinación). Decisiones de Lucas

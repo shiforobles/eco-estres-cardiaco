@@ -76,17 +76,18 @@ const NARRATIVA = {
     // clasificación de respuesta al esfuerzo: la variante de secuela se usa sólo
     // cuando todos los segmentos basales anormales quedaron sin cambio con el esfuerzo.
     reposoMotilidadNormal:   'motilidad parietal normal',
-    reposoMotilidadAlterada: '{{motilidadReposo}} ({{territorioReposoFrase}})',
-    reposoMotilidadSecuela:  '{{motilidadReposo}} ({{territorioReposoFrase}}), en relación con evento previo',
+    // Sin territorio: el vaso se nombra una sola vez, en la conclusión (criterio de
+    // Lucas, 04/11/2026). "En relación con evento previo" sólo con infarto cargado.
+    reposoMotilidadAlterada: '{{motilidadReposo}}',
+    reposoMotilidadSecuela:  '{{motilidadReposo}}, en relación con evento previo',
     reposoMotilidadGlobal:   'hipoquinesia global, sin distribución en territorio coronario',
 
     // Lo que le pasó con el esfuerzo a un segmento basal anormal. Antes, si mejoraba
     // o si quedaba sin par, no se decía en ninguna línea del informe.
-    parrafoReservaRegional: '{{recuperaronArt}} con alteración de la motilidad en reposo ({{segmentosRecuperaron}}) ' +
-        '{{verboRecuperaron}} su motilidad con el esfuerzo, con reserva contráctil regional conservada, ' +
-        'hallazgo compatible con viabilidad miocárdica.',
-    parrafoSinParReposo: '{{sinParArt}} con alteración de la motilidad en reposo ({{segmentosSinPar}}) ' +
-        '{{sinParValorable}} en el post-esfuerzo, por lo que no puede establecerse su respuesta contráctil.',
+    // Sin "compatible con viabilidad": el eco de esfuerzo describe la mejoría, no la interpreta.
+    parrafoReservaRegional: '{{recuperaronSujeto}} {{verboRecuperaron}} con el esfuerzo.',
+    parrafoSinParReposo: '{{sinParSujeto}} no resultó valorable en el post-esfuerzo, por lo que no puede ' +
+        'establecerse su respuesta contráctil.',
 
     antecedentesATC:   'angioplastia a {{vasos}}{{anio}}',
     antecedentesCRM:   'cirugía de revascularización miocárdica{{anio}}',
@@ -222,24 +223,30 @@ const NARRATIVA = {
     esfuerzoNegativo:  'Adecuada respuesta hiperdinámica global, sin nuevas alteraciones de la motilidad parietal ' +
                        'en ninguno de los territorios evaluados.',
 
-    esfuerzoPositivoUnico: 'Nueva {{motilidadEsfuerzo}}, con caída del engrosamiento sistólico ' +
-                       'respecto del reposo, en {{territorioFrase}}. El WMSI {{frasewmsi}}.' +
+    // Describen sólo lo nuevo o lo que empeora, agrupado por pared (motor de Doppler).
+    // Sin territorio y sin interpretación ("marcador de alto riesgo"): las dos cosas
+    // van una sola vez, en la conclusión.
+    esfuerzoPositivoUnico: '{{nuevas}}. El WMSI {{frasewmsi}}.' +
                        '{{acompanamiento}} El resto de los segmentos mostró adecuada respuesta hiperdinámica.',
 
-    esfuerzoPositivoMulti: 'Nuevas alteraciones de la motilidad: {{motilidadEsfuerzo}}, con compromiso ' +
-                       'de más de un territorio coronario ({{territorios}}). El WMSI {{frasewmsi}}{{caidaFey}}.' +
-                       '{{acompanamiento}} El hallazgo de isquemia extensa y multiterritorial constituye un marcador de alto riesgo.',
+    esfuerzoPositivoMulti: 'Nuevas alteraciones de la motilidad: {{nuevasCuerpo}}. El WMSI {{frasewmsi}}{{caidaFey}}.' +
+                       '{{acompanamiento}} El resto de los segmentos mostró adecuada respuesta hiperdinámica.',
 
-    esfuerzoSecuela:   'Los segmentos comprometidos no modificaron su motilidad, sin reserva contráctil regional ' +
-                       'en dicho territorio. El resto de los segmentos mostró adecuada respuesta hiperdinámica, sin nuevas ' +
-                       'alteraciones.{{reservaGlobal}}{{acompanamiento}}',
+    esfuerzoSecuela:   '{{fijaSujeto}} {{fijaVerbo}} con el esfuerzo, sin reserva contráctil regional. ' +
+                       'El resto de los segmentos mostró adecuada respuesta hiperdinámica{{sinNuevas}}.' +
+                       '{{reservaGlobal}}{{acompanamiento}}',
+
+    // Una única alteración nueva, de un solo segmento: se describe y no se interpreta.
+    esfuerzoAislado:   '{{nuevas}}, como única alteración nueva. El resto de los segmentos mostró ' +
+                       'adecuada respuesta hiperdinámica.',
+    aisladoAgregado:   'Se observó además {{nuevasMin}}, como única alteración nueva.',
 
     // Reserva contráctil GLOBAL: es el ΔFEy, y es un dato pronóstico propio que no
     // se puede dar por perdido porque la respuesta regional haya sido nula.
     reservaGlobalConservada: ' La función sistólica global mostró incremento adecuado con el esfuerzo (FEy {{feyReposo}} % → ' +
-                       '{{feyEstres}} %, Δ +{{deltaFey}} puntos), lo que traduce reserva contráctil global conservada.',
+                       '{{feyEstres}} %, Δ +{{deltaFey}} {{puntos}}), lo que traduce reserva contráctil global conservada.',
     reservaGlobalAusente: ' La función sistólica global no mostró incremento significativo (FEy {{feyReposo}} % → {{feyEstres}} %, ' +
-                       'Δ {{deltaFey}} puntos), sin reserva contráctil global.',
+                       'Δ {{deltaFey}} {{puntos}}), sin reserva contráctil global.',
 
     // ── LÍNEA CUANTITATIVA DE MOTILIDAD ───────────────────────────────
 
@@ -284,7 +291,7 @@ const NARRATIVA = {
                        'conservada, con FEy {{fey}} % y relación E/e\' de {{ee}}.',
 
     // Cuando además hay secuela real en otro territorio, esta frase se suma al párrafo de reposo
-    asincroniaSeptalSuelta: 'Se observó además {{hallazgoSeptal}}, con asincronía de los segmentos {{segmentosSeptales}}, ' +
+    asincroniaSeptalSuelta: 'Se observó además {{hallazgoSeptal}}, con asincronía {{ubicacionSeptal}}, ' +
                        'atribuible {{alTrastorno}} y no a secuela isquémica.',
 
     esfuerzoConduccion: 'Los segmentos no septales mostraron adecuada respuesta hiperdinámica, sin nuevas ' +
@@ -296,8 +303,7 @@ const NARRATIVA = {
                        'que genera alteraciones del movimiento septal no atribuibles a isquemia.',
 
     // Párrafo que se agrega cuando hay secuela previa Y además isquemia nueva en otro territorio
-    parrafoSecuelaAgregado: '{{segmentosSecuelaArt}} con alteración basal ({{segmentosSecuela}}, {{territorioSecuelaFrase}}) {{verboSecuela}} su ' +
-                       'motilidad con el esfuerzo, sin evidencia de reserva contráctil, en relación con secuela.',
+    parrafoSecuelaAgregado: '{{fijaSujeto}} {{fijaVerbo}} con el esfuerzo.',
 
     // ── CONCLUSIONES ──────────────────────────────────────────────────
     conclusiones: {
@@ -331,20 +337,27 @@ const NARRATIVA = {
                   'estudio en territorio de la descendente anterior, además de invalidar el análisis del segmento ST. ' +
                   'Se sugiere correlación clínica.',
 
-        positivaUnico: 'Conclusión: prueba de eco estrés con ejercicio positiva para isquemia miocárdica inducible en {{territorioFrase}}. ' +
+        // El territorio se nombra acá y sólo acá, con sigla (DA, CD, Cx).
+        positivaUnico: 'Conclusión: prueba de eco estrés con ejercicio positiva para isquemia miocárdica inducible en {{territorioFrase}}{{sobreBasal}}. ' +
                   'Se sugiere correlación clínica.',
 
         positivaMulti: 'Conclusión: prueba de eco estrés con ejercicio positiva para isquemia miocárdica inducible extensa, con compromiso de ' +
-                  'múltiples territorios coronarios, sugestiva de enfermedad de múltiples vasos. Hallazgo de alto riesgo. ' +
+                  '{{territorioFrase}}{{sobreBasal}}, sugestiva de enfermedad de múltiples vasos. Hallazgo de alto riesgo. ' +
                   'Se sugiere correlación clínica.',
 
-        secuela: 'Conclusión: prueba de eco estrés con ejercicio sin isquemia inducible adicional a la alteración segmentaria conocida en ' +
-                  '{{territorioSecuelaFrase}}, la cual no mostró reserva contráctil (compatible con secuela).',
+        // Sin "compatible con secuela" ni "conocida": la causa sólo se afirma con el
+        // infarto cargado ({{secuelaCausa}}).
+        secuela: 'Conclusión: prueba de eco estrés con ejercicio sin isquemia miocárdica inducible. La alteración basal en ' +
+                  '{{territorioSecuelaFrase}} {{fijaVerbo}} con el esfuerzo{{secuelaCausa}}.',
+
+        // Un único segmento nuevo: no alcanza para afirmar isquemia ni territorio.
+        aislado: 'Conclusión: prueba de eco estrés con ejercicio sin criterios ecocardiográficos de isquemia miocárdica inducible. ' +
+                  'La única alteración nueva fue {{nuevasMin}}, hallazgo aislado de significado incierto.',
 
         noConcluyente: 'Conclusión: estudio no concluyente por {{motivoNoConcluyente}}: no permite descartar con seguridad isquemia ' +
                   'miocárdica inducible. Se sugiere correlación clínica.',
 
-        hipotensiva: 'Conclusión: prueba de eco estrés con ejercicio positiva para isquemia, con respuesta hipotensiva al esfuerzo. ' +
+        hipotensiva: 'Conclusión: prueba de eco estrés con ejercicio positiva para isquemia miocárdica inducible en {{territorioFrase}}{{sobreBasal}}, con respuesta hipotensiva al esfuerzo. ' +
                   'La caída tensional inducida constituye un marcador de alto riesgo. Se sugiere correlación clínica.',
 
         diastolico: 'Conclusión: prueba de eco estrés con ejercicio negativa para isquemia miocárdica inducible, con test diastólico de esfuerzo ' +
@@ -516,9 +529,9 @@ const NARRATIVA = {
         // ausencia de mejoría no distingue cicatriz de hibernación. Esta frase decía
         // "no cabe esperar recuperación funcional con la revascularización", que en un
         // paciente ya revascularizado puede inclinar mal una decisión quirúrgica.
-        secuelaPron: 'la ausencia de mejoría con el esfuerzo no descarta viabilidad —el ejercicio impone una ' +
-                     'demanda demasiado alta para evaluarla—, de modo que si se plantea revascularización de ese ' +
-                     'territorio no puede darse por descartada sobre la base de este estudio',
+        // Una sola frase (Lucas, 04/11/2026). Va como oración propia de la conclusión
+        // y ya no dentro del párrafo pronóstico (ver `sinMejoriaNoDescarta`).
+        secuelaPron: 'la ausencia de mejoría con el esfuerzo no descarta miocardio viable',
 
         diastolicoPron: 'el aumento de las presiones de llenado inducido por el ejercicio es compatible con ' +
                      'insuficiencia cardíaca con fracción de eyección preservada y puede explicar la disnea de ' +

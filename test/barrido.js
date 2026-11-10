@@ -44,14 +44,15 @@ for (let i = 0; i < N; i++) {
     set(w, 'ventana', rnd(['buena', 'regular', 'limitada']));
     set(w, 'patron_motilidad', rnd(['segmentaria', 'segmentaria', 'segmentaria', 'global']));
     set(w, 'ant_betabloq', Math.random() < 0.3);
-    set(w, 'motor_texto', MOTOR);
+    set(w, 'ant_iam', Math.random() < 0.3);
+    set(w, 'ant_bcri', Math.random() < 0.1);
     const dr = w.document.getElementById('diast_resultado');
     if (dr) set(w, 'diast_resultado', rnd(['', 'negativo', 'positivo', 'no_evaluado']));
 
     for (let k = 0, n = ri(0, 6); k < n; k++) {
         const id = ri(1, 17);
-        w.setScore(id, 'reposo', rnd([0, 1, 2, 3, 4]));
-        w.setScore(id, 'estres', rnd([0, 1, 2, 3, 4]));
+        w.setScore(id, 'reposo', rnd([0, 1, 2, 3, 4, 5]));
+        w.setScore(id, 'estres', rnd([0, 1, 2, 3, 4, 5]));
     }
 
     let r;
@@ -172,6 +173,50 @@ for (let i = 0; i < N; i++) {
         reportar('la aclaración del WMSI aparece ' + aclara + ' veces', 'debe aparecer exactamente una');
     if (H.wmsiEstres !== null && !/Motilidad:[^\n]*calculado sobre/.test(texto))
         reportar('la aclaración del WMSI no está en la línea de Motilidad', linea(texto, 'Motilidad').slice(0, 140));
+
+    // ── Tanda de motilidad (criterios de Lucas, 04/11/2026) ──
+    const lEsf = linea(texto, 'Esfuerzo'), lRepo = linea(texto, 'Reposo');
+    const VASO = /territorios? (DA|CD|Cx)|arteria (descendente|coronaria derecha|circunfleja)/i;
+    // El vaso se nombra sólo en la conclusión.
+    if (!H.reposoLibre && VASO.test(lRepo)) reportar('vaso nombrado en Reposo', (lRepo.match(new RegExp('.{0,60}' + VASO.source + '.{0,40}', 'i')) || [''])[0]);
+    if (VASO.test(lEsf)) reportar('vaso nombrado en Esfuerzo', (lEsf.match(new RegExp('.{0,60}' + VASO.source + '.{0,40}', 'i')) || [''])[0]);
+    // El eco de esfuerzo no interpreta viabilidad.
+    if (/compatible con viabilidad|viabilidad miocárdica/.test(texto) && !H.viabEnUso)
+        reportar('interpreta viabilidad', (texto.match(/.{0,80}viabilidad.{0,40}/) || [''])[0]);
+    if (/en dicho territorio/.test(texto)) reportar('"en dicho territorio"', '');
+    // Por pared, no segmento por segmento.
+    (texto.match(/de los segmentos [^.;]*/g) || []).forEach(m => {
+        const listaSeg = m.replace(/^de los segmentos /, '').split(/, con |, en |, como |, atribuible |(?:,| y| e) (?:hipoquinesia|aquinesia|disquinesia)/)[0];
+        if (listaSeg.split(/, | y | e /).length >= 4) reportar('enumera cuatro o más segmentos', m.slice(0, 200));
+    });
+    // "Evento previo" y "secuela de infarto" sólo con el infarto cargado.
+    if (!H.infartoPrevio && /en relación con evento previo|secuela de infarto/.test(texto))
+        reportar('atribuye a evento previo sin infarto cargado', '');
+    // Un único segmento nuevo nunca es isquemia.
+    if (H.isquemicos.length === 1) reportar('un solo segmento contado como isquemia', '');
+    if (H.aislados.length) {
+        if (['positivaUnico', 'positivaMulti', 'hipotensiva'].includes(rama))
+            reportar('positivo por un segmento aislado', rama);
+        if (!/hallazgo aislado de significado incierto/.test(lConcl))
+            reportar('el segmento aislado no llega a la conclusión', lConcl.slice(0, 200));
+        if (/sin nuevas alteraciones/.test(lEsf) && rama !== 'noConcluyente')
+            reportar('"sin nuevas alteraciones" con un segmento nuevo aislado', lEsf.slice(0, 200));
+    }
+    // Un territorio cuenta con dos o más segmentos.
+    ['isquemicos', 'secuelas'].forEach(lista => {
+        const n = {};
+        H[lista].forEach(x => { if (x.id !== 17) n[x.territory] = (n[x.territory] || 0) + 1; });
+        const esperado = ['DA', 'CD', 'Cx'].filter(t => (n[t] || 0) >= 2).join('+');
+        const dado = (lista === 'isquemicos' ? H.territoriosIsquemia : H.territoriosSecuela).join('+');
+        if (esperado !== dado) reportar('territorio mal contado en ' + lista, `esperado ${esperado} · dado ${dado}`);
+    });
+    // La conclusión siempre nombra la alteración de reposo valorada con el esfuerzo.
+    const basalValorada = H.secuelas.length + H.recuperaron.length;
+    if (basalValorada && !H.patronGlobal && rama !== 'noConcluyente' &&
+        !/alteración basal|Alteración basal/.test(lConcl))
+        reportar('la conclusión no nombra la alteración de reposo', `[${rama}] ` + lConcl.slice(0, 220));
+    if (/Δ [+-]?1 puntos/.test(texto)) reportar('"1 puntos"', '');
+    if (/nueva nueva|Nuevas alteraciones de la motilidad: nueva/i.test(texto)) reportar('"nueva" repetido', lEsf.slice(0, 160));
 
     if (/undefined|NaN|\[object/.test(texto))
         reportar('valor roto en el texto', (texto.match(/.{0,60}(undefined|NaN|\[object).{0,60}/) || [])[0]);

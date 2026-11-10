@@ -13,7 +13,8 @@ const casos = [
     { nombre: 'reposo 3 que mejora + isquemia nueva', rep: { 7: 3 }, est: { 7: 1, 1: 2 } },
     { nombre: 'todo normal', rep: {}, est: {} },
     { nombre: 'isquemia pura seg 1 y 2', rep: {}, est: { 1: 2, 2: 2 } },
-    { nombre: 'isquemia sobre necrosis seg 10 (2→3)', rep: { 10: 2 }, est: { 10: 3 } },
+    { nombre: 'leve → moderada seg 10 (2→3): sin cambio significativo', rep: { 10: 2 }, est: { 10: 3 } },
+    { nombre: 'progresión 10 y 4 (3→4)', rep: { 10: 3, 4: 3 }, est: { 10: 4, 4: 4 } },
 ];
 
 let fallas = 0;
@@ -37,7 +38,9 @@ casos.forEach(c => {
     if ((H.anormalesReposo.length || H.isquemicos.length) && dice(lMot, /sin segmentos comprometidos/)) {
         console.log(`✗ ${c.nombre}: "sin segmentos comprometidos" con alterados`); fallas++;
     }
-    if (H.recuperaron.length && !dice(lEsf, /reserva contráctil regional conservada/)) {
+    // Desde la tanda de motilidad (04/11/2026) la mejoría se describe sin interpretar
+    // viabilidad: "se normalizó" o "mejoró" con el esfuerzo.
+    if (H.recuperaron.length && !dice(lEsf, /(se normalizó|mejoró) con el esfuerzo/)) {
         console.log(`✗ ${c.nombre}: segmento que mejoró no aparece en Esfuerzo`); fallas++;
     }
     if (H.sinParReposo.length && !dice(lEsf, /no puede establecerse su respuesta contráctil/)) {

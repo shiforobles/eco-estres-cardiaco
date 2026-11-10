@@ -29,12 +29,13 @@ npm test
 | `parrafo-pronostico.js` | Niveles, fusión de extensión, tope y exentos del párrafo pronóstico |
 | `estetica-botonera.js` | Botonera de eco Doppler, paneles de historial/sincronizar/perlas, motilidad antes del eco post, BORRAR TODO con Deshacer y una sola pregunta al guardar una edición a mano |
 | `antecedentes-v24.js` | Digoxina (ST no interpretable), cronotrópico negativo, preexcitación, FA en el estudio (sin algoritmo diastólico estándar) y valvulopatía que se abre sólo con EAo o bicúspide |
-| `barrido.js` | 800 casos al azar contra todas las invariantes a la vez |
+| `motilidad-19-casos.js` | Los 19 casos de la tanda de motilidad (04/11/2026): criterio de 2 segmentos por territorio, cambio de categoría, segmento aislado, texto por pared, territorio sólo en la conclusión. Con `--ver` imprime Reposo, Esfuerzo y Conclusión de cada uno |
+| `casos-motilidad-def.js` | La definición de esos 19 casos (no es un test) |
+| `barrido.js` | 1200 casos al azar contra todas las invariantes a la vez, incluidas las de la tanda de motilidad |
 | `barra-motilidad.js` | Pincel de grado, grupos por unión, apagado, fase y filtro de vista |
 | `drift-grupos.js` | Que `motility-groups.js` no se separe del `motility-model.js` de la app de Doppler |
 | `segmentos-uno-a-uno.js` | Que cada segmento 1-17, cargado solo, se nombre exactamente a sí mismo, y que la numeración coincida con la de Doppler |
 | `drift-motores.js` | Que `vendor/doppler/` siga siendo copia byte a byte de los motores originales |
-| `comparar-motores.js` | Tabla de los dos textos lado a lado (`npm run comparar`), no es un test |
 | `escala-wmsi.js` | Herramienta de medición, no test: compara el WMSI en escala ASE contra la cruda |
 
 ## Las invariantes del barrido

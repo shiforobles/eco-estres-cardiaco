@@ -118,6 +118,8 @@ const EstresSheets = {
         if (rama === 'discordancia')  return 'discordante';
         if (rama === 'dilatada')      return 'dilatada';
         if (rama === 'secuela')       return 'secuela';
+        // Un único segmento nuevo: ni positivo ni negativo pleno.
+        if (rama === 'aislado')       return 'hallazgo aislado';
         if (rama === 'positivaMulti') return 'multiterritorial';
         if (rama === 'positivaUnico' || rama === 'hipotensiva') {
             // Un ápex comprometido en bloque toca tres territorios por anatomía: no es
@@ -125,7 +127,8 @@ const EstresSheets = {
             if (H.patronApical) return 'positivo apical';
             if (H.territoriosIsquemia.length > 1) return 'multiterritorial';
             const t = H.territoriosIsquemia[0];
-            return t ? 'positivo ' + t : 'positivo apical';
+            // Segmentos nuevos que no llegan a dos por territorio: positivo sin vaso.
+            return t ? 'positivo ' + t : 'positivo sin territorio';
         }
         // La rama diastólica es negativa para isquemia; el hallazgo diastólico
         // se cruza con la columna "Diastólico esfuerzo".

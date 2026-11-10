@@ -72,9 +72,15 @@ exigir(parseFloat(r.H.wmsiEstres) < 1.7,
 r = correr('secuela: la frase de viabilidad', () => {
     [10, 11].forEach(id => { w.setScore(id, 'reposo', 3); w.setScore(id, 'estres', 3); });
 });
-exigir(/no descarta viabilidad/.test(r.parr), 'falta la salvedad de viabilidad');
-exigir(!/dobutamina|resonancia|realce tardío/.test(r.parr), 'la conducta de viabilidad ya no va al informe');
-exigir(!/no cabe esperar recuperación funcional/.test(r.parr), 'SOBREAFIRMACIÓN: el esfuerzo no evalúa viabilidad');
+// Desde la tanda de motilidad la salvedad es UNA frase fija y va como oración propia
+// de la conclusión, fuera del párrafo pronóstico.
+const conclSecuela = w.construirNarrativa(r.H).piezas.conclusion;
+exigir(/La ausencia de mejoría con el esfuerzo no descarta miocardio viable\./.test(conclSecuela),
+    'falta la salvedad de viabilidad en la conclusión');
+exigir((conclSecuela.match(/no descarta miocardio viable/g) || []).length === 1, 'y va una sola vez');
+exigir(!/no descarta/.test(r.parr), 'la salvedad ya no va en el párrafo pronóstico');
+exigir(!/dobutamina|resonancia|realce tardío|revascularización/.test(conclSecuela), 'la conducta de viabilidad no va al informe');
+exigir(!/no cabe esperar recuperación funcional/.test(conclSecuela), 'SOBREAFIRMACIÓN: el esfuerzo no evalúa viabilidad');
 
 r = correr('HRR₁ 10: sale del informe', () => { set(w, 'esf_rec_fc', 140); set(w, 'esf_max_fc', 150); });
 exigir(r.n === 0, 'el HRR₁ de 10 no debe imprimir');

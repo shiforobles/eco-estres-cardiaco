@@ -70,12 +70,14 @@ for (const id of ['vts_reposo', 'vts_pico']) {
 }
 
 // Ayudas y tabla son nativas, accesibles por teclado y cerradas por defecto.
-for (const id of ['ayuda-antecedentes', 'ayuda-hemodinamia', 'detalle-segmentos', 'completud-detalle']) {
+for (const id of ['ayuda-antecedentes', 'ayuda-hemodinamia', 'completud-detalle']) {
     assert.equal(d.getElementById(id).tagName, 'DETAILS');
     assert.equal(d.getElementById(id).open, false);
     assert.ok(d.getElementById(id).querySelector(':scope > summary'));
 }
-assert.match(d.querySelector('#detalle-segmentos > summary').textContent, /Ver detalle por segmentos/);
+// La tabla "Ver detalle por segmentos" se retiró en la tanda de motilidad.
+assert.equal(d.getElementById('detalle-segmentos'), null);
+assert.equal(d.getElementById('segments-tbody'), null);
 assert.match(d.getElementById('criterios-propios-nota').textContent, /no de guía/);
 assert.ok(d.getElementById('aviso-dp') && d.getElementById('aviso-adquisicion'));
 assert.ok(d.getElementById('ej_mets_origen'), 'la procedencia del resultado permanece fuera de la ayuda');

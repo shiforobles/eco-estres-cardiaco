@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=2.5-ecg">
+    <link rel="stylesheet" href="styles.css?v=2.7-motilidad">
 </head>
 <body>
 <div class="container">
@@ -17,7 +17,7 @@
     <header class="app-header">
         <div>
             <h1>Eco Estrés Cardíaco</h1>
-            <p class="version">v2.4 — Antecedentes por grupos</p>
+            <p class="version">v2.7 — Motilidad por pared</p>
         </div>
         <div class="header-controls">
             <button type="button" class="btn btn-header" onclick="abrirPanel('perlas')" title="Perlas clínicas de los cursos, por tema">
@@ -167,6 +167,7 @@
             </div>
             <div class="ant-grupo">
                 <span class="ant-grupo__titulo">Otros</span>
+                <label class="ant-chip" for="ant_iam"><input autocomplete="off" type="checkbox" id="ant_iam" onchange="refrescarDeducidos()"><span class="ant-chip__txt">Infarto previo</span><span class="ant-chip__hint">atribuye la alteración fija a secuela</span></label>
                 <label class="ant-chip" for="ant_hta"><input autocomplete="off" type="checkbox" id="ant_hta"><span class="ant-chip__txt">Hipertensión arterial</span><span class="ant-chip__hint">cambia la lectura de la TA</span></label>
                 <label class="ant-chip" for="ant_eao"><input autocomplete="off" type="checkbox" id="ant_eao" onchange="toggleValvulopatia(this)"><span class="ant-chip__txt">Estenosis aórtica</span><span class="ant-chip__hint">abre severidad y estudio previo</span></label>
                 <label class="ant-chip" for="ant_bicuspide"><input autocomplete="off" type="checkbox" id="ant_bicuspide" onchange="toggleValvulopatia(this); refrescarDeducidos()"><span class="ant-chip__txt">Válvula aórtica bicúspide</span><span class="ant-chip__hint">abre el módulo de EAo y la aorta</span></label>
@@ -252,7 +253,6 @@
                  id repetido los vaciaba al guardar. captureFields() recorre todo el
                  documento y la segunda copia, vacía, pisaba a la primera. -->
             <textarea id="ant_otros"></textarea>
-            <input type="checkbox" id="ant_iam">
             <input type="checkbox" id="atc_da">
             <input type="checkbox" id="atc_cd">
             <input type="checkbox" id="atc_cx">
@@ -991,15 +991,9 @@
                     <span class="mb-nota">La vista atenúa lo que no se ve en ese corte. No pinta nada.</span>
                 </div>
 
-                <div class="mb-fila" style="border-top:1px dashed var(--color-border); padding-top:0.5rem">
-                    <span class="mb-rotulo">Texto</span>
-                    <select id="motor_texto" class="mb-select" onchange="renderComparacionMotilidad()">
-                        <option value="actual">Texto actual</option>
-                        <option value="doppler">Texto Doppler (Motor A + C)</option>
-                    </select>
-                    <span class="mb-nota">Cuál de los dos va al informe, en ESTE estudio. Se guarda con el borrador.</span>
-                </div>
-                <div id="comparacion-motilidad" class="mb-comparacion"></div>
+                <!-- Quedó un solo motor de texto (el de eco Doppler). El campo se conserva
+                     oculto y fijo: tiene columna en la planilla. -->
+                <input type="hidden" id="motor_texto" value="doppler">
 
                 <div class="mb-fila mb-ayuda">
                     Los grupos se SUMAN: «Anterior» y después «Apicales» deja las dos cosas marcadas.
@@ -1031,32 +1025,24 @@
 
         <div id="aviso-conduccion" class="aviso-adquisicion" style="display:none"></div>
 
-        <details class="tabla-detallada" id="detalle-segmentos">
-            <summary class="subsection-title" style="cursor:pointer; list-style:none; margin-bottom:0">Ver detalle por segmentos</summary>
-        <div class="segments-table-wrap">
-            <table class="segments-table">
-                <thead><tr>
-                    <th>#</th><th>Segmento</th><th>Territorio</th>
-                    <th>Reposo</th><th>Estrés</th><th>Respuesta</th>
-                </tr></thead>
-                <tbody id="segments-tbody"></tbody>
-                <tfoot><tr>
-                    <td colspan="3"><strong>WMSI</strong></td>
-                    <td><strong id="wmsi-rep-tabla">—</strong></td>
-                    <td><strong id="wmsi-est-tabla">—</strong></td>
-                    <td id="wmsi-global-resp"></td>
-                </tr></tfoot>
-            </table>
-        </div>
-
-        <div class="calc-box" style="margin-top:1rem">
-            <div class="calc-row"><span>Segmentos evaluados (calidad del estudio):</span><span id="seg-evaluados" class="calc-value">—</span></div>
-            <div class="calc-row"><span>WMSI Reposo — interpretación:</span><span id="wmsi-rep-interp" class="calc-value">—</span></div>
-            <div class="calc-row"><span>WMSI Estrés — interpretación:</span><span id="wmsi-est-interp" class="calc-value">—</span></div>
-            <div class="calc-row"><span>Segmentos con isquemia inducible:</span><span id="seg-isquemicos" class="calc-value">—</span></div>
-            <div class="calc-row"><span>Territorios comprometidos (sugerido):</span><span id="territorios-sugeridos" class="calc-value">—</span></div>
-        </div>
+        <!-- Calidad y extensión: vivían al pie de la tabla por segmentos, que se retiró. -->
+        <details class="tabla-detallada" id="detalle-extension">
+            <summary class="subsection-title" style="cursor:pointer; list-style:none; margin-bottom:0">Ver calidad y extensión</summary>
+            <div class="calc-box" style="margin-top:1rem">
+                <div class="calc-row"><span>Segmentos evaluados (calidad del estudio):</span><span id="seg-evaluados" class="calc-value">—</span></div>
+                <div class="calc-row"><span>WMSI Reposo — interpretación:</span><span id="wmsi-rep-interp" class="calc-value">—</span></div>
+                <div class="calc-row"><span>WMSI Estrés — interpretación:</span><span id="wmsi-est-interp" class="calc-value">—</span></div>
+                <div class="calc-row"><span>Segmentos con isquemia inducible:</span><span id="seg-isquemicos" class="calc-value">—</span></div>
+                <div class="calc-row"><span>Territorios comprometidos (sugerido):</span><span id="territorios-sugeridos" class="calc-value">—</span></div>
+            </div>
         </details>
+
+        <!-- Criterios propios de la app sobre la motilidad, a la vista (no son de guía). -->
+        <p class="firma-nota criterio-propio">
+            Criterio propio: un territorio (DA, CD, Cx) cuenta con 2 o más segmentos alterados; un único segmento nuevo
+            se describe como hallazgo aislado y no hace positivo el estudio. Sobre un segmento ya alterado, la isquemia
+            exige cambio de categoría (hipoquinesia → aquinesia → disquinesia).
+        </p>
 
         <!-- Patrón de la alteración: lo deduce el bull's eye (≥12 segmentos, tres
              territorios y FEy ≤40 %). Oculto, no borrado: sigue siendo corregible
@@ -1784,6 +1770,7 @@
                 <dt>Reemplazo valvular aórtico y mitral</dt><dd>Septum no valorable por la cirugía.</dd>
                 <dt>Válvula aórtica bicúspide</dt><dd>Abre el módulo de EAo y el estudio previo; en la bicúspide importa sobre todo la aorta ascendente y su crecimiento.</dd>
                 <dt>Betabloqueado</dt><dd>El objetivo sigue siendo el 85 %. Si no se alcanza, la conclusión lo aclara.</dd>
+                <dt>Infarto previo</dt><dd>Sólo con esta casilla una alteración fija se informa "en relación con evento previo" o como secuela de infarto. Sin ella, se describe sin atribuirle causa.</dd>
                 <dt>Hipertensión arterial</dt><dd>Cambia cómo se lee una respuesta tensional exagerada con basal normal.</dd>
                 <dt>Preexcitación (WPW)</dt><dd>Igual que el bloqueo de rama izquierda: septum fuera del análisis y ST no interpretable.</dd>
                 <dt>Cronotrópico negativo</dt><dd>Diltiazem, verapamilo o ivabradina. Como el betabloqueo: el objetivo sigue en 85 % y, si no se alcanza, la conclusión lo aclara.</dd>
@@ -1801,17 +1788,17 @@
 <script src="vendor/doppler/motility-model.js?v=2.2"></script>
 <script src="vendor/doppler/motility-engine.js?v=2.2"></script>
 <script src="vendor/doppler/territory-engine.js?v=2.2"></script>
-<script src="motility-estres.js?v=2.2"></script>
+<script src="motility-estres.js?v=2.7-motilidad"></script>
 <script src="pearls.js?v=2.3-estetica-1"></script>
 <script src="motility-groups.js?v=2.2"></script>
-<script src="report-templates.js?v=2.6-ecg2"></script>
-<script src="sheets-storage.js?v=2.5-ecg"></script>
-<script src="app.js?v=2.6-ecg2"></script>
+<script src="report-templates.js?v=2.7-motilidad"></script>
+<script src="sheets-storage.js?v=2.7-motilidad"></script>
+<script src="app.js?v=2.7-motilidad"></script>
 <script>
 // Control de versión: si el navegador sirvió una mezcla de archivos viejos y nuevos,
 // los botones fallan en silencio. Esto lo convierte en un aviso visible.
 (function () {
-    var APP_VERSION = '2.6';
+    var APP_VERSION = '2.7';
     var faltan = ['generarInforme', 'recolectarHallazgos', 'calcEjercicio'].filter(function (f) {
         return typeof window[f] !== 'function';
     });

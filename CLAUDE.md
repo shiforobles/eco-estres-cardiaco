@@ -42,6 +42,14 @@ Estas no se cambian sin consultar. Cada una está porque el error ya pasó.
   lo repite.
 - **El tono es "se sugiere", nunca directivo**: el clínico que deriva es quien
   prescribe.
+- **Motilidad (criterios de Lucas, 04/11/2026, propios de la app):** un territorio
+  cuenta con ≥2 segmentos alterados; un único segmento nuevo es hallazgo aislado y no
+  hace positivo; sobre un segmento ya alterado la isquemia exige cambio de categoría
+  (hipoquinesia → aquinesia → disquinesia); de disquinesia a aquinesia no es mejoría.
+- **El territorio coronario se nombra una sola vez, en la conclusión, con sigla**
+  (DA, CD, Cx). Reposo y Esfuerzo describen la motilidad por pared, con el motor de
+  eco Doppler, y sólo lo nuevo o lo que empeora en el esfuerzo.
+- **"En relación con evento previo" sólo con la casilla Infarto previo.**
 - **Los criterios propios se declaran como tales** en pantalla: DP <20.000, HRR₁ ≤6
   y el umbral de segmentos sin par por territorio no son cortes de guía.
 

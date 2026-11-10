@@ -87,6 +87,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (el) el.addEventListener('change', calcEjercicio);
     });
 
+    // El patrón global (miocardiopatía dilatada) depende de la FEy: si se la carga
+    // DESPUÉS del bull's eye quedaba "segmentaria" y el informe hablaba de secuela en
+    // tres territorios. Se recalcula también al cambiar la FEy.
+    ['input', 'change'].forEach(ev => document.getElementById('fevi_reposo')
+        .addEventListener(ev, () => { autocompletarPatron(); refrescarDeducidos(); }));
+
     // Sólo la presentación/conexión basal: mismos cálculos y mismos cortes.
     ['peso', 'altura', 'sexo', 'ddvi', 'siv_d', 'pp_d', 'fevi_reposo',
      'e_onda_rep', 'a_onda_rep', 'e_prima_rep', 'e_prima_lat_rep', 'vrt_rep', 'volvi_reposo']
@@ -625,7 +631,7 @@ function resultadoSugerido(H, rama) {
     // estudio mejor que un "negativo" a secas.
     if (rama === 'negativa' && H.hipertension) return 'hta_respuesta';
     return {
-        negativa: 'negativo', secuela: 'negativo', dilatada: 'negativo',
+        negativa: 'negativo', secuela: 'negativo', dilatada: 'negativo', aislado: 'negativo',
         discordancia: 'negativo', positivaUnico: 'positivo', positivaMulti: 'positivo',
         hipotensiva: 'positivo', noConcluyente: 'no_concluyente',
         diastolico: 'diastolico_positivo'
@@ -1324,6 +1330,30 @@ function evaluarAvisosClinicos() {
                 'o enfermedad coronaria significativa, aunque no llegue a ser una caída franca.');
     }
 
+    // Un único segmento nuevo: criterio propio, se avisa para que el operador lo sepa.
+    if ((H.aislados || []).length)
+        atencion(`Una sola alteración nueva: segmento ${segmentosEnProsa(H.aislados)}`,
+            'Criterio propio de la app: un único segmento nuevo se informa como hallazgo aislado de significado ' +
+            'incierto y no hace positivo el estudio. Un territorio cuenta con dos o más segmentos alterados.');
+
+    // Texto libre de reposo (campo heredado) que contradice el bull's eye. No cambia
+    // el informe: avisa.
+    if (H.reposoLibre) {
+        const libre = H.reposoLibre.toLowerCase();
+        if (H.anormalesReposo.length &&
+            /motilidad[^.]*(conservada|normal)|sin (trastornos|alteraciones) de la motilidad/.test(libre))
+            atencion('El texto libre de reposo dice motilidad conservada y hay segmentos alterados',
+                `En el bull's eye hay ${H.anormalesReposo.length} segmento(s) con puntaje anormal en reposo. ` +
+                'El informe sale con el texto libre: revisá cuál de los dos es el correcto.');
+        const peor = H.anormalesReposo.reduce((m, x) => Math.max(m, CATEGORIA_GRADO[x.scoreReposo]), 0);
+        const nombrado = /dis[qc]u?inesia/.test(libre) ? 3 : /a[qc]u?inesia/.test(libre) ? 2
+                       : /hipo[qc]u?inesia/.test(libre) ? 1 : 0;
+        if (nombrado > peor)
+            atencion('El texto libre de reposo nombra un grado más grave que el cargado',
+                `Dice ${['', 'hipoquinesia', 'aquinesia', 'disquinesia'][nombrado]} y el peor grado en el bull's eye de reposo es ` +
+                `${['normal', 'hipoquinesia', 'aquinesia', 'disquinesia'][peor]}.`);
+    }
+
     // 7 · Angina sin correlato. Abre la pregunta, no cierra el diagnóstico.
     // "sin angina ni dolor precordial" disparaba el aviso: la expresión no miraba la
     // negación. Se recorta el texto desde cualquier negador hasta el próximo punto.
@@ -1673,7 +1703,6 @@ function renderBullsEye(svgId, stateKey) {
                 : (actual === GRADO_PINCEL ? 1 : GRADO_PINCEL);
             path.setAttribute('fill', SCORE_COLORS[WM[stateKey][seg.id]]);
             updateWMSI();
-            updateSegTableRow(seg.id);
             scheduleSave();
         });
 
@@ -1810,11 +1839,9 @@ function updateWMSI() {
 
     document.getElementById('wmsi-reposo').textContent = repTxt;
     document.getElementById('wmsi-estres').textContent = wmsiEst !== null ? wmsiEst : '—';
-    document.getElementById('wmsi-rep-tabla').textContent = repTxt;
-    document.getElementById('wmsi-est-tabla').textContent = estTxt;
 
-    // Respuesta global
-    const globalResp = document.getElementById('wmsi-global-resp');
+    // Respuesta global (vivía en el pie de la tabla retirada: si no está, no se pinta)
+    const globalResp = document.getElementById('wmsi-global-resp') || {};
     if (wmsiRep !== null && wmsiEst !== null) {
         const dif = parseFloat(wmsiEst) - parseFloat(wmsiRep);
         if (parseFloat(wmsiEst) > 1.0 && dif > 0.1) {
@@ -1841,51 +1868,28 @@ function interpWMSI(w) {
 }
 
 function contarMotilidad() {
-    let evalRep = 0, evalEst = 0, isquemicos = 0, viables = 0, cicatriz = 0, sinPar = 0;
-    const terrIsq = new Set();
-    SEGMENTS.forEach(s => {
-        const r = WM.reposo[s.id], e = WM.estres[s.id];
-        if (r > 0) evalRep++;
-        if (e > 0) evalEst++;
-        const c = classifyResponse(r, e);
-        if (c.key === 'isquemia' || c.key === 'isquemia_necrosis') { isquemicos++; terrIsq.add(s.territory); }
-        if (c.key === 'viable') viables++;
-        if (c.key === 'cicatriz') cicatriz++;
-        if (c.key === 'parcial') sinPar++;
-    });
-    return { evalRep, evalEst, isquemicos, viables, cicatriz, sinPar, territorios: [...terrIsq] };
+    const M = clasificarMotilidad(septumFueraDeAnalisis());
+    return {
+        evalRep: M.evalRep, evalEst: M.evalEst,
+        isquemicos: M.isquemicos.length, aislados: M.aislados.length,
+        viables: M.recuperaron.length, cicatriz: M.secuelas.length, sinPar: M.sinPar,
+        territorios: esPatronApical(M.isquemicos) ? [] : territoriosDe(M.isquemicos)
+    };
 }
 
 // ── RESUMEN COMPACTO DEBAJO DEL BULL'S EYE ──
-// Replica el criterio de recolectarHallazgos(): con trastorno de conducción los
-// segmentos septales se apartan ANTES de clasificar y quedan fuera del WMSI. El
-// resumen es lo único que se mira en la carga habitual, así que tiene que decir
-// lo mismo que el informe que se firma, no el número crudo de la tabla.
+// Sale de la MISMA clasificación que el informe: con el septum fuera del análisis los
+// septales se apartan antes de clasificar y quedan fuera del WMSI.
 function motilidadComoEnInforme() {
-    const sel = document.getElementById('ecg_conduccion');
-    const hayConduccion = CONDUCCION_LIMITA_SEPTUM.includes(sel ? sel.value : 'ninguno');
-
-    const isq = [], secuela = [], sinPar = [], septales = [];
-    let evalRep = 0, evalEst = 0;
-    SEGMENTS.forEach(s => {
-        const r = WM.reposo[s.id], e = WM.estres[s.id];
-        if (r > 0) evalRep++;
-        if (e > 0) evalEst++;
-        if (hayConduccion && SEGMENTOS_SEPTALES.includes(s.id)) {
-            if (r > 1 || e > 1) septales.push(s.id);
-            return;
-        }
-        const c = classifyResponse(r, e);
-        if (c.key === 'isquemia' || c.key === 'isquemia_necrosis') isq.push(s);
-        else if (c.key === 'cicatriz') secuela.push(s);
-        else if (c.key === 'parcial') sinPar.push(s);
-    });
-    const porId = (a, b) => a.id - b.id;
-    isq.sort(porId); secuela.sort(porId); sinPar.sort(porId);
-
-    const excluir = hayConduccion ? SEGMENTOS_SEPTALES : null;
+    const fuera = septumFueraDeAnalisis();
+    const M = clasificarMotilidad(fuera);
+    const excluir = fuera ? SEGMENTOS_SEPTALES : null;
     return {
-        hayConduccion, septales, isq, secuela, sinPar, evalRep, evalEst,
+        hayConduccion: fuera, septales: M.septales.map(x => x.id),
+        isq: M.isquemicos, aislados: M.aislados, secuela: M.secuelas,
+        sinPar: SEGMENTS.filter(sg => classifyResponse(WM.reposo[sg.id], WM.estres[sg.id]).key === 'parcial' &&
+                                      !(fuera && SEGMENTOS_SEPTALES.includes(sg.id))),
+        evalRep: M.evalRep, evalEst: M.evalEst,
         wmsiRep: calcWMSI('reposo', excluir),
         wmsiEst: calcWMSI('estres', excluir)
     };
@@ -1935,7 +1939,8 @@ function pintarResumenMotilidad() {
         `<span class="${segs.length ? clase : ''}">${etiqueta}: ${listarSegmentos(segs)}</span>`;
     l2.innerHTML = [
         trozo('Isquémicos', M.isq, 'mot-mal'),
-        trozo('Secuela', M.secuela, 'mot-ojo'),
+        ...(M.aislados.length ? [trozo('Nuevo aislado', M.aislados, 'mot-ojo')] : []),
+        trozo('Sin cambio', M.secuela, 'mot-ojo'),
         trozo('Sin par', M.sinPar, 'mot-ojo')
     ].join(' &nbsp;·&nbsp; ');
 }
@@ -1945,7 +1950,9 @@ function updateMotilidadResumen(wmsiRep, wmsiEst) {
 
     const c = contarMotilidad();
     const elSeg = document.getElementById('seg-evaluados');
-    if (!elSeg) return;
+    // Lo deducido NO puede depender de que exista un cuadro de pantalla: si falta el
+    // resumen, igual se recalculan el patrón y la interpretación.
+    if (!elSeg) { avisarWMSIConduccion(); autocompletarPatron(); refrescarDeducidos(); return; }
 
     const noEvalEst = 17 - c.evalEst;
     let txt = `Reposo ${c.evalRep}/17 · Estrés ${c.evalEst}/17`;
@@ -1968,13 +1975,15 @@ function updateMotilidadResumen(wmsiRep, wmsiEst) {
 
     const elIsq = document.getElementById('seg-isquemicos');
     if (c.isquemicos === 0) {
-        elIsq.textContent = c.evalEst > 0 ? '0 — sin isquemia inducible' : '—';
+        elIsq.textContent = c.evalEst > 0
+            ? (c.aislados ? '0 — un segmento nuevo aislado: no alcanza para isquemia' : '0 — sin isquemia inducible')
+            : '—';
         elIsq.style.color = '';
     } else {
         const ext = c.isquemicos <= 2 ? 'leve' : c.isquemicos <= 4 ? 'moderada' : 'extensa';
         elIsq.textContent = `${c.isquemicos} segmento(s) — extensión ${ext}` +
-            (c.viables ? ` · ${c.viables} con mejoría/viabilidad` : '') +
-            (c.cicatriz ? ` · ${c.cicatriz} sin cambio (cicatriz)` : '');
+            (c.viables ? ` · ${c.viables} con mejoría` : '') +
+            (c.cicatriz ? ` · ${c.cicatriz} sin cambio` : '');
         elIsq.style.color = 'var(--color-error)';
     }
 
@@ -2016,15 +2025,87 @@ function avisarWMSIConduccion() {
 // Clasificación de la respuesta de UN segmento entre reposo y pico.
 // Devuelve { key, label } — 'key' se usa para contar isquemia/viabilidad.
 // Score 0 = NO EVALUADO: nunca debe interpretarse como normal ni como cambio.
+// CRITERIOS DE LUCAS (super prompt de motilidad, 04/11/2026) — criterio propio:
+//  · Sobre un segmento YA alterado, la isquemia exige cambio de CATEGORÍA
+//    (hipoquinesia → aquinesia → disquinesia). De leve a moderada no hay cambio
+//    significativo: las dos son hipoquinesia.
+//  · Por simetría, de moderada a leve tampoco es mejoría.
+//  · De disquinesia a aquinesia no es mejoría: es la misma cicatriz.
+//  · Las etiquetas de mejoría no interpretan viabilidad: el eco de esfuerzo no la evalúa.
+const CATEGORIA_GRADO = { 1: 0, 2: 1, 3: 1, 4: 2, 5: 3 };
 function classifyResponse(scoreRep, scoreEst) {
     if (scoreRep === 0 && scoreEst === 0) return { key: 'na',        label: '—' };
     if (scoreRep === 0 || scoreEst === 0)  return { key: 'parcial',  label: 'Sin par reposo/estrés' };
     if (scoreRep === 1 && scoreEst === 1)  return { key: 'normal',   label: 'Normal' };
     if (scoreRep === 1 && scoreEst > 1)    return { key: 'isquemia', label: 'Isquemia inducible' };
-    if (scoreRep > 1 && scoreEst === 1)    return { key: 'viable',   label: 'Normalización (viabilidad)' };
-    if (scoreRep > 1 && scoreEst < scoreRep) return { key: 'viable', label: 'Mejoría (viabilidad probable)' };
-    if (scoreRep > 1 && scoreEst > scoreRep) return { key: 'isquemia_necrosis', label: 'Isquemia sobre necrosis' };
-    return { key: 'cicatriz', label: 'Sin cambio (necrosis / cicatriz)' };
+    if (scoreRep > 1 && scoreEst === 1)    return { key: 'viable',   label: 'Normalización con el esfuerzo' };
+    const cr = CATEGORIA_GRADO[scoreRep], ce = CATEGORIA_GRADO[scoreEst];
+    if (ce > cr) return { key: 'isquemia_necrosis', label: 'Progresión sobre alteración basal' };
+    if (ce < cr && !(scoreRep === 5 && scoreEst === 4))
+        return { key: 'viable', label: 'Mejoría con el esfuerzo' };
+    return { key: 'cicatriz', label: 'Sin cambio significativo' };
+}
+
+// ══════════════════════════════════════════════
+//  CLASIFICACIÓN DE LA MOTILIDAD — una sola, para el informe y para la pantalla
+//
+//  Antes el informe, el resumen bajo el bull's eye y el contador clasificaban cada
+//  uno por su cuenta, y bastaba tocar un criterio para que dijeran cosas distintas.
+//
+//  CRITERIOS PROPIOS (Lucas, 04/11/2026), declarados en pantalla:
+//   · Un territorio (DA, CD, Cx) cuenta como comprometido sólo con ≥2 segmentos
+//     alterados de ese territorio. Un segmento aislado se describe, no suma vaso.
+//   · Si la ÚNICA alteración nueva del estudio es un segmento, no es isquemia:
+//     queda en `aislados` y el estudio no sale positivo por él.
+// ══════════════════════════════════════════════
+const SEGMENTOS_POR_TERRITORIO_MIN = 2;
+
+// ¿El septum queda fuera del análisis? Conducción que lo mueve mal, o cirugía previa.
+function septumFueraDeAnalisis() {
+    const chk = id => !!(document.getElementById(id) || {}).checked;
+    const sel = document.getElementById('ecg_conduccion');
+    const conduccion = chk('ant_bcri') ? 'bcri' : chk('ant_marcapasos') ? 'marcapasos'
+                     : (sel ? sel.value : 'ninguno');
+    return CONDUCCION_LIMITA_SEPTUM.includes(conduccion) ||
+           chk('ant_crm') || chk('ant_rva') || chk('ant_rvm');
+}
+
+function clasificarMotilidad(septumFuera) {
+    const nuevos = [], secuelas = [], septales = [];
+    const anormalesReposo = [], recuperaron = [], sinParReposo = [];
+    let evalRep = 0, evalEst = 0, sinPar = 0;
+    SEGMENTS.forEach(s => {
+        const r = WM.reposo[s.id], e = WM.estres[s.id];
+        if (r > 0) evalRep++;
+        if (e > 0) evalEst++;
+        const c = classifyResponse(r, e);
+        if (c.key === 'parcial') sinPar++;
+        if (septumFuera && SEGMENTOS_SEPTALES.includes(s.id)) {
+            if (r > 1 || e > 1) septales.push({ ...s, scoreReposo: r, scoreEstres: e });
+            return;
+        }
+        const seg = { ...s, scoreReposo: r, scoreEstres: e, respuesta: c.key };
+        // La motilidad de REPOSO se lee del reposo y de nada más.
+        if (r > 1) {
+            anormalesReposo.push(seg);
+            if (c.key === 'viable') recuperaron.push(seg);
+            if (c.key === 'parcial') sinParReposo.push(seg);
+        }
+        if (c.key === 'isquemia' || c.key === 'isquemia_necrosis') nuevos.push(seg);
+        if (c.key === 'cicatriz') secuelas.push(seg);
+    });
+    const porId = (a, b) => a.id - b.id;
+    [nuevos, secuelas, septales, anormalesReposo, recuperaron, sinParReposo].forEach(l => l.sort(porId));
+    // Un único segmento nuevo en todo el estudio: hallazgo aislado, no isquemia.
+    const aislado = nuevos.length === 1;
+    return {
+        isquemicos: aislado ? [] : nuevos,
+        aislados: aislado ? nuevos : [],
+        // Los que empeoraron sobre una alteración basal ("isquemia sobre necrosis").
+        progresaron: aislado ? [] : nuevos.filter(x => x.respuesta === 'isquemia_necrosis'),
+        secuelas, septales, anormalesReposo, recuperaron, sinParReposo,
+        evalRep, evalEst, sinPar
+    };
 }
 
 const RESP_CLASS = {
@@ -2041,54 +2122,20 @@ function getResponse(scoreRep, scoreEst) {
     return `<span class="${RESP_CLASS[r.key]}" title="${r.label}">${short}</span>`;
 }
 
-function makeBtns(segId, stateKey) {
-    return SCORE_COLORS.map((color, i) =>
-        `<button class="seg-score-btn ${WM[stateKey][segId] === i ? 'active' : ''}"
-            style="background:${i === 4 ? '#B91C1C' : i === 5 ? '#7E22CE' : color}; color:${i >= 4 ? '#fff' : '#111'}"
-            onclick="setScore(${segId},'${stateKey}',${i})" title="${SCORE_LABELS[i]}">${i}</button>`
-    ).join('');
-}
-
-function buildSegmentsTable() {
-    const tbody = document.getElementById('segments-tbody');
-    tbody.innerHTML = '';
-    // Siempre mostrar en orden 1-17 independientemente del orden visual del bull's eye
-    const sorted = [...SEGMENTS].sort((a, b) => a.id - b.id);
-    sorted.forEach(seg => {
-        const badgeClass = seg.territory === 'DA' ? 'badge-da' : seg.territory === 'CD' ? 'badge-cd' : 'badge-cx';
-        const tr = document.createElement('tr');
-        tr.id = `seg-row-${seg.id}`;
-        tr.innerHTML = `
-            <td>${seg.id}</td>
-            <td>${seg.name}</td>
-            <td><span class="${badgeClass}">${seg.territory}</span></td>
-            <td id="btns-rep-${seg.id}">${makeBtns(seg.id, 'reposo')}</td>
-            <td id="btns-est-${seg.id}">${makeBtns(seg.id, 'estres')}</td>
-            <td id="resp-${seg.id}">${getResponse(WM.reposo[seg.id], WM.estres[seg.id])}</td>
-        `;
-        tbody.appendChild(tr);
-    });
-}
+// La tabla "Ver detalle por segmentos" se retiró (04/11/2026): el bull's eye y la
+// barra de grados alcanzan. buildSegmentsTable() queda como función vacía porque la
+// llaman los refrescos de pantalla y los tests.
+function buildSegmentsTable() {}
 
 function setScore(segId, stateKey, score) {
     marcarMotilidadTocada();
     WM[stateKey][segId] = score;
-    updateSegTableRow(segId);
     updateWMSI();
     // Actualizar color en SVG correspondiente
     const svgId = stateKey === 'reposo' ? 'svg-reposo' : 'svg-estres';
     const path = document.querySelector(`#${svgId} path[data-id="${segId}"]`);
     if (path) path.setAttribute('fill', SCORE_COLORS[score]);
     scheduleSave();
-}
-
-function updateSegTableRow(segId) {
-    const repCell = document.getElementById(`btns-rep-${segId}`);
-    const estCell = document.getElementById(`btns-est-${segId}`);
-    const respCell = document.getElementById(`resp-${segId}`);
-    if (repCell) repCell.innerHTML = makeBtns(segId, 'reposo');
-    if (estCell) estCell.innerHTML = makeBtns(segId, 'estres');
-    if (respCell) respCell.innerHTML = getResponse(WM.reposo[segId], WM.estres[segId]);
 }
 
 // ── ESTRÉS DIASTÓLICO ─────────────────────────
@@ -2547,7 +2594,6 @@ const CAMPOS_HEREDADOS = [
     { id: 'crm_anio',        txt: 'Año de la cirugía' },
 ];
 const CASILLAS_HEREDADAS = [
-    { id: 'ant_iam', txt: 'Infarto de miocardio previo' },
     { id: 'atc_da',  txt: 'Angioplastia a la DA' },
     { id: 'atc_cd',  txt: 'Angioplastia a la CD' },
     { id: 'atc_cx',  txt: 'Angioplastia a la Cx' },
@@ -4145,43 +4191,20 @@ function recolectarHallazgos() {
     // su alteración es eléctrica, no isquémica ni necrótica. Al quedar fuera de `secuelas`
     // e `isquemicos`, la rama de secuela se vuelve inalcanzable por construcción y no se
     // les atribuye ningún territorio coronario.
-    const isquemicos = [], secuelas = [], septales = [];
-    const anormalesReposo = [], recuperaron = [], sinParReposo = [];
-    SEGMENTS.forEach(s => {
-        const r = WM.reposo[s.id], e = WM.estres[s.id];
-        const c = classifyResponse(r, e);
-        if (H.hayConduccion && SEGMENTOS_SEPTALES.includes(s.id)) {
-            if (r > 1 || e > 1) septales.push({ ...s, scoreReposo: r, scoreEstres: e });
-            return;
-        }
-        // La motilidad de REPOSO se lee del reposo y de nada más. Antes la línea de
-        // Reposo se decidía mirando `secuelas`, que es una clasificación de la
-        // RESPUESTA al esfuerzo: todo segmento basal anormal que mejorara con el
-        // esfuerzo ('viable') o que quedara sin par ('parcial') desaparecía, y el
-        // informe afirmaba "motilidad parietal normal" sobre segmentos cargados
-        // como anormales en el bull's eye.
-        if (r > 1) {
-            anormalesReposo.push({ ...s, scoreReposo: r, scoreEstres: e, respuesta: c.key });
-            if (c.key === 'viable') recuperaron.push({ ...s, scoreReposo: r, scoreEstres: e });
-            if (c.key === 'parcial') sinParReposo.push({ ...s, scoreReposo: r });
-        }
-        if (c.key === 'isquemia' || c.key === 'isquemia_necrosis') isquemicos.push({ ...s, scoreEstres: e });
-        if (c.key === 'cicatriz') secuelas.push({ ...s, scoreReposo: r });
-    });
-    const porId = (a, b) => a.id - b.id;
-    isquemicos.sort(porId);
-    secuelas.sort(porId);
-    septales.sort(porId);
-    anormalesReposo.sort(porId);
-    recuperaron.sort(porId);
-    sinParReposo.sort(porId);
+    const M = clasificarMotilidad(H.hayConduccion);
+    const { isquemicos, secuelas, septales, anormalesReposo, recuperaron, sinParReposo } = M;
     H.septalesConduccion = septales;
 
     H.isquemicos = isquemicos;
+    // Un único segmento nuevo en todo el estudio: se describe, no hace positivo.
+    H.aislados = M.aislados;
+    H.progresaron = M.progresaron;
     H.secuelas = secuelas;
     H.anormalesReposo = anormalesReposo;
     H.recuperaron = recuperaron;
     H.sinParReposo = sinParReposo;
+    // "En relación con evento previo" sólo se afirma con el infarto cargado.
+    H.infartoPrevio = !!(document.getElementById('ant_iam') || {}).checked;
     H.territoriosIsquemia = territoriosDe(isquemicos);
     H.territoriosSecuela = territoriosDe(secuelas);
     H.territoriosReposo = territoriosDe(anormalesReposo);
@@ -4193,7 +4216,8 @@ function recolectarHallazgos() {
     // quedó sin par, el reposo describe y no interpreta.
     // Qué motor escribe la motilidad de reposo. Por estudio, no global: si el texto
     // de Doppler no convence en un caso, se vuelve al propio con un clic.
-    H.motorTexto = v('motor_texto') === 'doppler' ? 'doppler' : 'actual';
+    // Queda un solo motor de texto: el de la app de eco Doppler, para reposo y esfuerzo.
+    H.motorTexto = 'doppler';
 
     H.reposoTodoSecuela = anormalesReposo.length > 0 &&
                           anormalesReposo.every(s => s.respuesta === 'cicatriz');
@@ -4306,11 +4330,12 @@ function esPatronApical(segs) {
     return segs.length >= 3 && segs.every(s => SEGMENTOS_APICALES.includes(s.id));
 }
 
+// CRITERIO PROPIO: un territorio cuenta sólo con ≥2 segmentos alterados suyos
+// (SEGMENTOS_POR_TERRITORIO_MIN). El ápex (17) no tiene vaso asignado y no cuenta.
 function territoriosDe(segs) {
-    const t = new Set();
-    segs.forEach(s => { if (s.id !== 17) t.add(s.territory); });
-    if (!t.size && segs.some(s => s.id === 17)) return [];   // ápex aislado: sin vaso
-    return [...t];
+    const n = {};
+    segs.forEach(s => { if (s.id !== SEGMENTO_APEX) n[s.territory] = (n[s.territory] || 0) + 1; });
+    return ['DA', 'CD', 'Cx'].filter(t => (n[t] || 0) >= SEGMENTOS_POR_TERRITORIO_MIN);
 }
 
 // ── Capa 2: selector de rama ──────────────────
@@ -4330,6 +4355,8 @@ function elegirRama(H) {
     // Hipoquinesia global: no es secuela segmentaria y no tiene territorio coronario
     if (H.patronGlobal) return 'dilatada';
     if (H.secuelas.length) return 'secuela';
+    // Una única alteración nueva de un segmento: ni positivo ni negativo pleno.
+    if (H.aislados.length) return 'aislado';
     // ECG positivo con eco negativo. Requiere que el ST sea valorable: con BCRI,
     // marcapasos o preexcitación ya declaramos ilegible el ST y no hay discordancia.
     if (H.stIsquemico && !H.hayConduccion) return 'discordancia';
@@ -4380,21 +4407,79 @@ function deSegmentos(segs) {
     return (segs.length === 1 ? 'del segmento ' : 'de los segmentos ') + segmentosEnProsa(segs);
 }
 
-// "el territorio de la arteria X" cuando hay vaso; "la región apical" cuando no
-function territorioFrase(terrs) {
-    return terrs.length ? 'territorio de ' + territoriosEnProsa(terrs) : 'la región apical';
+// El territorio, con sigla y UNA sola vez (en la conclusión): "territorio DA",
+// "territorios CD y Cx". Reposo y Esfuerzo describen la motilidad, no el vaso.
+function siglaTerritorios(terrs) {
+    return (terrs.length === 1 ? 'territorio ' : 'territorios ') + listarEnProsa(terrs);
+}
+// Dónde está un grupo de segmentos, para la conclusión. Con patrón apical no se
+// nombra ningún vaso; con segmentos que no llegan a dos por territorio, tampoco.
+function fraseTerritorioDe(segs) {
+    if (esPatronApical(segs)) return 'el casquete apical';
+    const terrs = territoriosDe(segs);
+    if (terrs.length) return siglaTerritorios(terrs);
+    return segs.length === 1 ? 'un segmento aislado' : 'segmentos aislados, sin distribución coronaria definida';
+}
+function fraseTerritorioIsquemia(H) { return fraseTerritorioDe(H.isquemicos); }
+function fraseTerritorioSecuela(H) { return fraseTerritorioDe(H.secuelas); }
+
+// ── La motilidad en palabras: un solo motor, el de la app de eco Doppler ──
+// Agrupa por pared ("de las paredes anterior y anteroseptal, a nivel basal y medio")
+// en vez de enumerar segmentos. Si los motores no cargaron, cae al texto por grados.
+function mapaDeSegmentos(segs, campo) {
+    const wm = {};
+    for (let id = 1; id <= 17; id++) wm[id] = 1;
+    segs.forEach(sg => { wm[sg.id] = sg[campo]; });
+    return wm;
+}
+const minuscula = t => t ? t.charAt(0).toLowerCase() + t.slice(1) : t;
+function describirSegmentos(segs, campo) {
+    if (!segs.length) return '';
+    if (typeof MotilidadDoppler !== 'undefined') {
+        try {
+            return minuscula(MotilidadDoppler.describirFase(mapaDeSegmentos(segs, campo), null).texto)
+                .replace(/\.\s*$/, '');
+        } catch (e) { /* cae al texto por grados */ }
+    }
+    return motilidadPorGrados(segs, campo);
+}
+function ubicacionSegmentos(segs) {
+    if (!segs.length) return '';
+    if (typeof MotilidadDoppler !== 'undefined' && MotilidadDoppler.ubicacion) {
+        try { return MotilidadDoppler.ubicacion(segs.map(x => x.id)); } catch (e) { /* abajo */ }
+    }
+    return deSegmentos(segs);
 }
 
-// Con patrón apical no se nombra ningún vaso: se describe el patrón.
-function fraseTerritorioIsquemia(H) {
-    return H.patronApical ? 'la región apical en su totalidad' : territorioFrase(H.territoriosIsquemia);
+// Lo NUEVO del esfuerzo: alteraciones sobre segmentos normales ("nueva …") y
+// progresiones sobre segmentos ya alterados ("progresión de hipoquinesia a aquinesia
+// …"), que no son "nuevas". Vale para la isquemia y para el hallazgo aislado.
+function nuevasEnProsa(H) {
+    const todos = H.isquemicos.length ? H.isquemicos : (H.aislados || []);
+    const puros = todos.filter(x => x.scoreReposo === 1);
+    const progresan = todos.filter(x => x.scoreReposo > 1);
+    const partes = [];
+    if (puros.length) partes.push(describirSegmentos(puros, 'scoreEstres'));
+    const grupos = {};
+    progresan.forEach(x => {
+        const k = `${GRADO_PROSA[x.scoreReposo]}→${GRADO_PROSA[x.scoreEstres]}`;
+        (grupos[k] = grupos[k] || []).push(x);
+    });
+    const progresiones = Object.keys(grupos).map(k => {
+        const [de, a] = k.split('→');
+        return `progresión de ${de} a ${a} ${ubicacionSegmentos(grupos[k])}`;
+    });
+    const lista = [...partes, ...progresiones];
+    const cuerpo = lista.length > 1
+        ? lista.slice(0, -1).join(', ') + ', y ' + lista[lista.length - 1]
+        : (lista[0] || 'alteración de la motilidad');
+    // "nueva" sólo califica a lo que apareció sobre un segmento normal.
+    const conNueva = puros.length ? 'nueva ' + cuerpo : cuerpo;
+    return { min: conNueva, may: mayuscula(conNueva), soloCuerpo: cuerpo };
 }
-function fraseTerritorioSecuela(H) {
-    return H.patronApicalSecuela ? 'la región apical en su totalidad' : territorioFrase(H.territoriosSecuela);
-}
-function fraseTerritorioReposo(H) {
-    return H.patronApicalReposo ? 'la región apical en su totalidad' : territorioFrase(H.territoriosReposo);
-}
+
+// "+1 punto", "+8 puntos"
+const puntosTxt = n => Math.abs(n) === 1 ? 'punto' : 'puntos';
 
 // Cómo se dice el cambio del WMSI, con el verbo que corresponde al signo del delta.
 function fraseWMSIEnProsa(H) {
@@ -4707,7 +4792,9 @@ const HALLAZGOS = [
     {
         id: 'secuela',
         conducta: () => 'El esfuerzo NO evalúa viabilidad. Si se plantea revascularizar ese territorio, confirmarla con dobutamina a dosis baja o resonancia con realce tardío.',
-        nivel: 'segunda',
+        // Fuera del párrafo pronóstico: la frase va como oración propia de la
+        // conclusión (reposoEnConclusion). Sigue en el panel y en la categoría.
+        nivel: 'pantalla',
         peso: 'intermedio',
         activo: H => H.secuelas.length > 0,
         informe: () => NARRATIVA.pronostico.secuelaPron,
@@ -5105,83 +5192,22 @@ function metodoEnProsa(H) {
 
 // Vista previa en vivo: los dos textos de motilidad de reposo, lado a lado, con el
 // que va al informe marcado. Se mira mientras se carga el bull's eye.
-function renderComparacionMotilidad() {
-    const cont = document.getElementById('comparacion-motilidad');
-    if (!cont) return;
+// Quedó un solo motor: la comparación de textos ya no existe. La función se conserva
+// vacía porque la llama el refresco de pantalla.
+function renderComparacionMotilidad() {}
 
-    let H;
-    try { H = recolectarHallazgos(); }
-    catch (e) { cont.innerHTML = ''; return; }
-
-    const T = NARRATIVA;
-    const propio = H.patronGlobal ? T.reposoMotilidadGlobal
-        : !H.anormalesReposo.length ? T.reposoMotilidadNormal
-        : rellenar(H.reposoTodoSecuela ? T.reposoMotilidadSecuela : T.reposoMotilidadAlterada,
-            datosReposoDe(H));
-    const doppler = H.patronGlobal ? T.reposoMotilidadGlobal : textoDopplerReposo(H);
-
-    const may = t => t ? t.charAt(0).toUpperCase() + t.slice(1).replace(/\.?$/, '.') : '';
-    const elegido = H.motorTexto;
-    const caja = (clave, rotulo, txt) =>
-        `<div class="mb-texto${elegido === clave ? ' elegido' : ''}">` +
-        `<span class="mb-texto-rotulo">${rotulo}${elegido === clave ? ' · va al informe' : ''}</span>` +
-        `${txt ? may(txt) : '<em>no disponible</em>'}</div>`;
-
-    cont.innerHTML =
-        caja('actual', 'Texto actual', propio) +
-        caja('doppler', 'Motor A + C', doppler) +
-        (doppler && may(propio) !== may(doppler)
-            ? '<div class="mb-difiere">Los dos textos difieren. El informe sale con el que está marcado.</div>'
-            : '');
-}
-
-// Los marcadores del bloque de reposo, para poder armar el texto propio fuera de
-// construirNarrativa(). Antes vivían sueltos ahí adentro.
 function datosReposoDe(H) {
-    return {
-        motilidadReposo: motilidadPorGrados(H.anormalesReposo, 'scoreReposo'),
-        territorioReposoFrase: fraseTerritorioReposo(H),
-    };
+    return { motilidadReposo: describirSegmentos(H.anormalesReposo, 'scoreReposo') };
 }
 
-// La motilidad de reposo, con el motor que el estudio tenga elegido.
-//
-// El texto de Doppler (Motor A) describe la anatomía mucho mejor —"de las paredes
-// anterior y anteroseptal, a nivel basal y medio" donde el propio enumera cuatro
-// segmentos— pero es una pieza nueva: se elige por estudio y arranca en el propio.
+// La motilidad de reposo: sólo los trastornos, por pared, sin territorio.
 function motilidadReposoEnProsa(H, datosReposo) {
     const T = NARRATIVA;
-    if (H.motorTexto === 'doppler') {
-        const d = textoDopplerReposo(H);
-        if (d) return d;
-        // Si los motores no cargaron, el informe sale con el texto propio y no vacío.
-    }
     if (!H.anormalesReposo.length) return T.reposoMotilidadNormal;
-    return rellenar(H.reposoTodoSecuela ? T.reposoMotilidadSecuela
-                                        : T.reposoMotilidadAlterada, datosReposo);
-}
-
-// Texto de los motores de Doppler para la fase de reposo, o '' si no están cargados.
-// Los septales salen del análisis con trastorno de conducción, igual que del WMSI.
-function textoDopplerReposo(H) {
-    if (typeof MotilidadDoppler === 'undefined') return '';
-    try {
-        const excluir = H.hayConduccion ? SEGMENTOS_SEPTALES : null;
-        const r = MotilidadDoppler.describirFase(WM.reposo, excluir);
-        // El territorio de Motor C sustituye al paréntesis propio: decirlo dos veces
-        // con dos criterios distintos sería peor que no decirlo.
-        //
-        // SALVO en el patrón apical, donde manda el criterio de acá. Motor C lo
-        // atribuye a la descendente anterior distal; nosotros no le asignamos vaso
-        // porque un ápex comprometido puede ser Takotsubo, miocardiopatía hipertrófica
-        // apical o DA envolvente, y porque es coherente con excluir el 17 del
-        // territorio y del WMSI. Esa decisión no cambia por elegir el otro motor.
-        // En el patrón apical el criterio propio es NO asignar vaso, y el texto del
-        // motor ya dice que el compromiso es apical: omitir la cláusula es
-        // exactamente eso, sin repetir "apical" una tercera vez.
-        const territorio = H.patronApicalReposo ? '' : r.territorio;
-        return territorio ? r.texto.replace(/\.\s*$/, '') + `, ${territorio}` : r.texto;
-    } catch (e) { return ''; }
+    // "En relación con evento previo" exige las dos cosas: que nada haya cambiado
+    // con el esfuerzo Y que el infarto esté cargado como antecedente.
+    return rellenar(H.reposoTodoSecuela && H.infartoPrevio ? T.reposoMotilidadSecuela
+                                                          : T.reposoMotilidadAlterada, datosReposo);
 }
 
 // El bloque de reposo, con forma estable: motilidad, FEy, llenado, geometría.
@@ -5247,11 +5273,12 @@ function lineaMotilidadEnProsa(H) {
     // secuelas, así que un WMSI de reposo de 1,12 convivía con "sin segmentos
     // comprometidos" en la misma línea.
     const ids = new Set();
-    [H.isquemicos, H.anormalesReposo].forEach(g => (g || []).forEach(s => ids.add(s.id)));
+    [H.isquemicos, H.aislados, H.anormalesReposo].forEach(g => (g || []).forEach(s => ids.add(s.id)));
     const comprometidos = ids.size;
     const detalle = [];
     if (H.isquemicos.length) detalle.push(`${H.isquemicos.length} con isquemia inducible`);
-    if (H.secuelas.length) detalle.push(`${H.secuelas.length} sin respuesta al esfuerzo`);
+    if ((H.aislados || []).length) detalle.push('1 nuevo aislado');
+    if (H.secuelas.length) detalle.push(`${H.secuelas.length} sin cambio significativo`);
     if (H.recuperaron.length) detalle.push(`${H.recuperaron.length} con mejoría`);
     if (H.sinParReposo.length) detalle.push(`${H.sinParReposo.length} sin par reposo/esfuerzo`);
     const segs = comprometidos === 0 ? 'sin segmentos comprometidos'
@@ -5302,7 +5329,7 @@ function cerrarConFormula(texto) {
 function feyEstresEnProsa(H) {
     if (!(H.feyEstres > 0)) return '';
     return `FEy post-esfuerzo ${H.feyEstres} %` +
-        (H.deltaFey !== null ? ` (Δ ${H.deltaFey >= 0 ? '+' : ''}${H.deltaFey} puntos)` : '') + '.';
+        (H.deltaFey !== null ? ` (Δ ${H.deltaFey >= 0 ? '+' : ''}${H.deltaFey} ${puntosTxt(H.deltaFey)})` : '') + '.';
 }
 
 // Volúmenes ventriculares, cuando están cargados. Son opcionales: si no se miden,
@@ -5313,6 +5340,30 @@ function volumenesEnProsa(vtd, vts, sufijo) {
     if (vtd > 0) partes.push(`VTD${s} ${nProsa(vtd)} mL`);
     if (vts > 0) partes.push(`VTS${s} ${nProsa(vts)} mL`);
     return partes.length ? mayuscula(listarEnProsa(partes)) + '.' : '';
+}
+
+function fijaVerboDe(H) {
+    return H.secuelas.every(x => x.scoreEstres === x.scoreReposo)
+        ? 'no se modificó' : 'no mostró cambios significativos';
+}
+
+// Qué pasó con la alteración de reposo, dicho en la conclusión y con su territorio.
+// La rama de secuela ya la nombra en el veredicto; la dilatada no tiene territorio.
+function reposoEnConclusion(H, rama) {
+    if (rama === 'dilatada' || H.patronGlobal) return '';
+    const partes = [];
+    const causa = H.infartoPrevio ? ', en relación con secuela de infarto previo' : '';
+    if (H.secuelas.length) {
+        if (rama !== 'secuela')
+            partes.push(` Alteración basal en ${fraseTerritorioDe(H.secuelas)} sin cambios ` +
+                `${fijaVerboDe(H) === 'no se modificó' ? '' : 'significativos '}con el esfuerzo${causa}.`);
+        // El eco de esfuerzo no evalúa viabilidad: una sola frase, siempre la misma.
+        partes.push(' ' + mayuscula(NARRATIVA.pronostico.secuelaPron) + '.');
+    }
+    if (H.recuperaron.length)
+        partes.push(` La alteración basal en ${fraseTerritorioDe(H.recuperaron)} ` +
+            `${H.recuperaron.every(x => x.scoreEstres === 1) ? 'se normalizó' : 'mejoró'} con el esfuerzo.`);
+    return partes.join('');
 }
 
 function construirNarrativa(H) {
@@ -5363,7 +5414,8 @@ function construirNarrativa(H) {
         trastorno: cond.trastorno || '',
         alTrastorno: cond.alTrastorno || '',
         hallazgoSeptal: cond.hallazgoSeptal || '',
-        segmentosSeptales: segmentosEnProsa(H.septalesConduccion || [])
+        segmentosSeptales: segmentosEnProsa(H.septalesConduccion || []),
+        ubicacionSeptal: ubicacionSegmentos(H.septalesConduccion || [])
     };
     const hayAsincronia = H.hayConduccion && (H.septalesConduccion || []).length > 0;
 
@@ -5379,15 +5431,24 @@ function construirNarrativa(H) {
         territorioSecuelaFrase: fraseTerritorioSecuela(H),
         // Motilidad basal: describe TODO lo anormal en reposo, cualquiera haya sido
         // su respuesta al esfuerzo.
-        motilidadReposo: motilidadPorGrados(H.anormalesReposo, 'scoreReposo'),
-        segmentosReposo: segmentosEnProsa(H.anormalesReposo),
-        deSegmentosReposo: deSegmentos(H.anormalesReposo),
-        territorioReposoFrase: fraseTerritorioReposo(H),
+        motilidadReposo: describirSegmentos(H.anormalesReposo, 'scoreReposo'),
+        // Si TODO lo basal quedó igual (o todo mejoró, o todo quedó sin par) alcanza con
+        // "la alteración basal": el reposo ya la describió. Si fue sólo una parte, se
+        // dice cuál.
+        fijaSujeto: H.secuelas.length === H.anormalesReposo.length ? 'La alteración basal'
+            : mayuscula('la ' + describirSegmentos(H.secuelas, 'scoreReposo')) + ' basal',
+        // "No se modificó" sólo si el puntaje quedó igual. De leve a moderada, o de
+        // disquinesia a aquinesia, el grado cambió pero no de forma significativa.
+        fijaVerbo: fijaVerboDe(H),
+        recuperaronSujeto: H.recuperaron.length === H.anormalesReposo.length ? 'La alteración basal'
+            : mayuscula('la ' + describirSegmentos(H.recuperaron, 'scoreReposo')) + ' basal',
+        sinParSujeto: H.sinParReposo.length === H.anormalesReposo.length ? 'La alteración basal'
+            : mayuscula('la ' + describirSegmentos(H.sinParReposo, 'scoreReposo')) + ' basal',
         // Los segmentos basales anormales que mejoraron o que quedaron sin par:
         // antes se perdían del informe por completo.
         segmentosRecuperaron: segmentosEnProsa(H.recuperaron),
         recuperaronArt: conc(H.recuperaron, 'El segmento', 'Los segmentos'),
-        verboRecuperaron: conc(H.recuperaron, 'normalizó o mejoró', 'normalizaron o mejoraron'),
+        verboRecuperaron: H.recuperaron.every(x => x.scoreEstres === 1) ? 'se normalizó' : 'mejoró',
         segmentosSinPar: segmentosEnProsa(H.sinParReposo),
         sinParArt: conc(H.sinParReposo, 'El segmento', 'Los segmentos'),
         sinParValorable: conc(H.sinParReposo, 'no resultó valorable', 'no resultaron valorables'),
@@ -5422,7 +5483,13 @@ function construirNarrativa(H) {
     // ST-T en las del ECG: antes la redacción de esta línea cambiaba según la TA.
     const acompanamiento = acompanamientoEnProsa(H);
     const datosEsfuerzo = {
-        motilidadEsfuerzo: motilidadPorGrados(H.isquemicos, 'scoreEstres'),
+        nuevas: nuevasEnProsa(H).may,
+        nuevasMin: nuevasEnProsa(H).min,
+        nuevasCuerpo: nuevasEnProsa(H).soloCuerpo,
+        fijaSujeto: datosReposo.fijaSujeto,
+        fijaVerbo: datosReposo.fijaVerbo,
+        // Con un segmento nuevo aislado no se puede decir "sin nuevas alteraciones".
+        sinNuevas: H.aislados.length ? '' : ', sin nuevas alteraciones',
         segmentos: segmentosEnProsa(H.isquemicos),
         deSegmentos: deSegmentos(H.isquemicos),
         territorio: territoriosEnProsa(H.territoriosIsquemia),
@@ -5437,7 +5504,7 @@ function construirNarrativa(H) {
         acompanamiento: acompanamiento,
         caidaFey: H.caidaFey ? `, con caída de la FEy de ${H.feyReposo} % a ${H.feyEstres} % post-esfuerzo` : '',
         hallazgos: H.isquemicos.length
-            ? `nuevas alteraciones de la motilidad: ${motilidadPorGrados(H.isquemicos, 'scoreEstres')}`
+            ? `nuevas alteraciones de la motilidad: ${nuevasEnProsa(H).soloCuerpo}`
             : 'los hallazgos descritos',
         feyReposo: H.feyReposo || nada,
         feyEstres: H.feyEstres || nada,
@@ -5446,7 +5513,8 @@ function construirNarrativa(H) {
         reservaGlobal: H.deltaFey === null ? '' : rellenar(
             H.reservaGlobal ? T.reservaGlobalConservada : T.reservaGlobalAusente,
             { feyReposo: H.feyReposo, feyEstres: H.feyEstres,
-              deltaFey: H.reservaGlobal ? H.deltaFey : (H.deltaFey >= 0 ? '+' + H.deltaFey : H.deltaFey) })
+              deltaFey: H.reservaGlobal ? H.deltaFey : (H.deltaFey >= 0 ? '+' + H.deltaFey : H.deltaFey),
+              puntos: puntosTxt(H.deltaFey) })
     };
     const plantillaEsfuerzo = {
         discordancia:  T.esfuerzoDiscordancia,
@@ -5458,6 +5526,7 @@ function construirNarrativa(H) {
         positivaMulti: T.esfuerzoPositivoMulti,
         positivaUnico: T.esfuerzoPositivoUnico,
         secuela:       T.esfuerzoSecuela,
+        aislado:       T.esfuerzoAislado,
         diastolico:    T.esfuerzoDiastolico,
         // Una sola forma para la rama negativa: la asincronía septal es lo único que
         // cambia lo que se puede afirmar sobre la MOTILIDAD.
@@ -5467,6 +5536,9 @@ function construirNarrativa(H) {
     if (hayAsincronia && rama !== 'negativa') textoEsfuerzo += ' ' + T.limitacionSeptalEsfuerzo;
     if (H.secuelas.length && H.isquemicos.length)
         textoEsfuerzo += ' ' + rellenar(T.parrafoSecuelaAgregado, datosReposo);
+    // El segmento nuevo aislado se describe siempre, cualquiera sea la rama.
+    if (H.aislados.length && rama !== 'aislado')
+        textoEsfuerzo += ' ' + rellenar(T.aisladoAgregado, datosEsfuerzo);
     // Lo que le pasó con el esfuerzo a cada segmento basal anormal tiene que decirse
     // en alguna línea. Las ramas describen la isquemia nueva y la secuela; la mejoría
     // y el par faltante no los cubre ninguna.
@@ -5539,6 +5611,14 @@ function construirNarrativa(H) {
         capacidadDilatada: H.mets ? ` La capacidad funcional fue ${adjetivoMETs(H.mets)}.` : '',
         territorioFrase: fraseTerritorioIsquemia(H),
         territorioSecuelaFrase: fraseTerritorioSecuela(H),
+        // Isquemia sobre un segmento ya alterado: se dice que el territorio tenía
+        // alteración basal, no "nueva".
+        sobreBasal: !H.progresaron.length ? ''
+            : H.progresaron.length === H.isquemicos.length ? ' con alteración basal'
+            : ', en parte sobre segmentos con alteración basal',
+        secuelaCausa: H.infartoPrevio ? ', en relación con secuela de infarto previo' : '',
+        fijaVerbo: fijaVerboDe(H),
+        nuevasMin: nuevasEnProsa(H).min,
         motivoNoConcluyente: motivoNoConcluyente(H)
     });
 
@@ -5580,6 +5660,14 @@ function construirNarrativa(H) {
     // ── El antecedente reencuadra el hallazgo ──
     // Va primero entre las oraciones finales: cambia cómo se lee la isquemia que el
     // veredicto acaba de informar, así que tiene que ir pegada a ella.
+    // La conclusión SIEMPRE menciona la alteración de reposo, si la hay. Antes se
+    // perdía en un positivo con secuela en otro territorio y en un negativo cuya
+    // alteración basal mejoraba.
+    const reposoConcl = reposoEnConclusion(H, rama);
+    if (reposoConcl) oracionesFinales.push(reposoConcl);
+    if (H.aislados.length && rama !== 'aislado')
+        oracionesFinales.push(` Se observó además ${nuevasEnProsa(H).min}, hallazgo aislado de significado incierto.`);
+
     const revasc = oracionRevascularizacion(H);
     if (revasc) oracionesFinales.push(revasc);
 
