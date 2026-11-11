@@ -17,7 +17,7 @@
     <header class="app-header">
         <div>
             <h1>Eco Estrés Cardíaco</h1>
-            <p class="version">v2.7 — Motilidad por pared</p>
+            <p class="version">v2.8 — Pared + nivel</p>
         </div>
         <div class="header-controls">
             <button type="button" class="btn btn-header" onclick="abrirPanel('perlas')" title="Perlas clínicas de los cursos, por tema">
@@ -964,17 +964,26 @@
                     <span class="mb-nota">Tocalo de nuevo para soltarlo. Sin pincel, el clic cicla y los grupos aplican hipoquinesia leve.</span>
                 </div>
 
+                <!-- Pared + nivel: se elige la pared y el nivel pinta sólo esa pared a esa
+                     altura ("anterior" + "basal" = anterior basal). Sin pared, el nivel pinta
+                     el anillo entero. -->
                 <div class="mb-fila">
                     <span class="mb-rotulo">Pared</span>
-                    <button class="mb-btn" onclick="aplicarGrupoMotilidad('paredes.anterior')">Anterior</button>
-                    <button class="mb-btn" onclick="aplicarGrupoMotilidad('paredes.septal')">Septal</button>
-                    <button class="mb-btn" onclick="aplicarGrupoMotilidad('paredes.inferior')">Inferior</button>
-                    <button class="mb-btn" onclick="aplicarGrupoMotilidad('paredes.lateral')">Lateral</button>
-                    <span class="mb-sep"></span>
+                    <button class="mb-btn mb-pared" data-pared="anterior" aria-pressed="false" onclick="elegirPared('anterior')">Anterior</button>
+                    <button class="mb-btn mb-pared" data-pared="anteroseptal" aria-pressed="false" onclick="elegirPared('anteroseptal')">Anteroseptal</button>
+                    <button class="mb-btn mb-pared" data-pared="inferoseptal" aria-pressed="false" onclick="elegirPared('inferoseptal')">Inferoseptal</button>
+                    <button class="mb-btn mb-pared" data-pared="inferior" aria-pressed="false" onclick="elegirPared('inferior')">Inferior</button>
+                    <button class="mb-btn mb-pared" data-pared="inferolateral" aria-pressed="false" onclick="elegirPared('inferolateral')">Inferolateral</button>
+                    <button class="mb-btn mb-pared" data-pared="anterolateral" aria-pressed="false" onclick="elegirPared('anterolateral')">Anterolateral</button>
+                </div>
+
+                <div class="mb-fila">
                     <span class="mb-rotulo">Nivel</span>
-                    <button class="mb-btn" onclick="aplicarGrupoMotilidad('niveles.basales')">Basales</button>
-                    <button class="mb-btn" onclick="aplicarGrupoMotilidad('niveles.medios')">Medios</button>
-                    <button class="mb-btn" onclick="aplicarGrupoMotilidad('niveles.apicales')">Apicales</button>
+                    <button class="mb-btn" onclick="aplicarNivelMotilidad('basal')">Basal</button>
+                    <button class="mb-btn" onclick="aplicarNivelMotilidad('medio')">Medio</button>
+                    <button class="mb-btn" onclick="aplicarNivelMotilidad('apical')">Apical</button>
+                    <button class="mb-btn" onclick="aplicarNivelMotilidad('toda')">Toda la pared</button>
+                    <span class="mb-nota" id="mb-nota-nivel">Sin pared elegida, el nivel pinta el anillo entero.</span>
                 </div>
 
                 <div class="mb-fila">
@@ -996,9 +1005,7 @@
                 <input type="hidden" id="motor_texto" value="doppler">
 
                 <div class="mb-fila mb-ayuda">
-                    Los grupos se SUMAN: «Anterior» y después «Apicales» deja las dos cosas marcadas.
-                    Si el grupo entero ya tiene ese grado, el botón lo apaga.
-                    El ápex entra en «Apicales» pero no en los territorios: su irrigación es variable y no se le asigna vaso.
+                    Elegí el grado y la pared, y después el nivel: «Hipo leve» → «Anterior» → «Basal» pinta sólo el anterior basal. Cada nivel que tocás se suma y el mismo botón lo apaga. Sin pared elegida, el nivel pinta el anillo entero. Los territorios pintan el vaso completo; el ápex sólo entra con «Apical» sin pared.
                 </div>
             </div>
         </div>
@@ -1793,12 +1800,12 @@
 <script src="motility-groups.js?v=2.2"></script>
 <script src="report-templates.js?v=2.7-motilidad"></script>
 <script src="sheets-storage.js?v=2.7-motilidad"></script>
-<script src="app.js?v=2.7-motilidad"></script>
+<script src="app.js?v=2.8-pared-nivel"></script>
 <script>
 // Control de versión: si el navegador sirvió una mezcla de archivos viejos y nuevos,
 // los botones fallan en silencio. Esto lo convierte en un aviso visible.
 (function () {
-    var APP_VERSION = '2.7';
+    var APP_VERSION = '2.8';
     var faltan = ['generarInforme', 'recolectarHallazgos', 'calcEjercicio'].filter(function (f) {
         return typeof window[f] !== 'function';
     });

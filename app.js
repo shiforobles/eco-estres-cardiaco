@@ -2894,9 +2894,12 @@ function setGradoPincel(grado) {
  * apaga: el mismo botón sirve para poner y para sacar.
  */
 function aplicarGrupoMotilidad(clave) {
-    marcarMotilidadTocada();
-    const ids = segmentosDeGrupo(clave);
+    aplicarSegmentosMotilidad(segmentosDeGrupo(clave));
+}
+
+function aplicarSegmentosMotilidad(ids) {
     if (!ids || !ids.length) return;
+    marcarMotilidadTocada();
     const grado = GRADO_PINCEL === null ? GRADO_SIN_PINCEL : GRADO_PINCEL;
 
     fasesDeCarga().forEach(fase => {
@@ -2908,6 +2911,41 @@ function aplicarGrupoMotilidad(clave) {
     buildSegmentsTable();
     updateWMSI();
     scheduleSave();
+}
+
+// ── Pared + nivel (pedido de Lucas, 10/11/2026) ──
+// "Hipoquinesia → anterior → basal" pinta SÓLO el anterior basal, no todo el anillo
+// basal. La pared se elige primero y queda marcada; cada nivel que se toca pinta esa
+// pared a esa altura (y el mismo botón lo apaga). Sin pared elegida, el nivel pinta
+// el anillo entero, como antes.
+// Seis paredes, las mismas que usa el texto del informe. A nivel apical el
+// ventrículo tiene cuatro segmentos: las dos septales comparten el 14 y las dos
+// laterales el 16.
+const PAREDES_MOTILIDAD = {
+    anterior:      { basal: [1], medio: [7],  apical: [13] },
+    anteroseptal:  { basal: [2], medio: [8],  apical: [14] },
+    inferoseptal:  { basal: [3], medio: [9],  apical: [14] },
+    inferior:      { basal: [4], medio: [10], apical: [15] },
+    inferolateral: { basal: [5], medio: [11], apical: [16] },
+    anterolateral: { basal: [6], medio: [12], apical: [16] },
+};
+const NIVEL_A_GRUPO = { basal: 'niveles.basales', medio: 'niveles.medios', apical: 'niveles.apicales' };
+let PARED_ELEGIDA = null;
+
+function elegirPared(pared) {
+    PARED_ELEGIDA = (PARED_ELEGIDA === pared || !PAREDES_MOTILIDAD[pared]) ? null : pared;
+    sincronizarBarraMotilidad();
+}
+
+function aplicarNivelMotilidad(nivel) {
+    if (nivel === 'toda') {
+        if (!PARED_ELEGIDA) { showNotice('Elegí primero una pared.', 'warn'); return; }
+        const p = PAREDES_MOTILIDAD[PARED_ELEGIDA];
+        aplicarSegmentosMotilidad([...new Set([...p.basal, ...p.medio, ...p.apical])]);
+        return;
+    }
+    if (PARED_ELEGIDA) aplicarSegmentosMotilidad(PAREDES_MOTILIDAD[PARED_ELEGIDA][nivel]);
+    else aplicarGrupoMotilidad(NIVEL_A_GRUPO[nivel]);
 }
 
 /** La vista se enciende y se apaga con el mismo botón. */
@@ -2933,6 +2971,11 @@ function sincronizarBarraMotilidad() {
     marcar('[data-fase]',  b => b.dataset.fase === FASE_CARGA);
     marcar('[data-grado]', b => parseInt(b.dataset.grado) === GRADO_PINCEL);
     marcar('[data-vista]', b => b.dataset.vista === VISTA_ACTIVA);
+    marcar('[data-pared]', b => b.dataset.pared === PARED_ELEGIDA);
+    const nota = document.getElementById('mb-nota-nivel');
+    if (nota) nota.textContent = PARED_ELEGIDA
+        ? `El nivel pinta sólo la pared ${PARED_ELEGIDA}. Tocá la pared de nuevo para soltarla.`
+        : 'Sin pared elegida, el nivel pinta el anillo entero.';
 }
 
 function setTerritoryScore(stateKey, territory, score) {

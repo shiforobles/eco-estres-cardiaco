@@ -70,6 +70,33 @@ exigir(WM.reposo[17] === 1, 'pintar DA no debe tocar el ápex');
 w.aplicarGrupoMotilidad('niveles.apicales');
 exigir(WM.reposo[17] === 4, 'pintar apicales sí debe tocar el ápex');
 
+// ── Pared + nivel: "hipoquinesia → anterior → basal" pinta sólo el anterior basal ──
+limpiar();
+w.setGradoPincel(2);
+w.elegirPared('anterior');
+exigir(w.eval('PARED_ELEGIDA') === 'anterior', 'la pared quedó elegida');
+const antesPared = [...Array(17)].map((_, i) => WM.reposo[i + 1]).join();
+exigir(antesPared === Array(17).fill(1).join(), 'elegir la pared no pinta nada');
+w.aplicarNivelMotilidad('basal');
+exigir(WM.reposo[1] === 2 && [2, 3, 4, 5, 6].every(id => WM.reposo[id] === 1),
+    'anterior + basal: sólo el segmento 1 (' + scores('reposo', [1, 2, 3, 4, 5, 6]) + ')');
+w.aplicarNivelMotilidad('medio');
+exigir(WM.reposo[7] === 2 && WM.reposo[13] === 1, 'anterior + medio se suma; el apical queda');
+w.aplicarNivelMotilidad('basal');
+exigir(WM.reposo[1] === 1 && WM.reposo[7] === 2, 'el mismo nivel apaga sólo lo suyo');
+w.elegirPared('anterolateral');
+w.setGradoPincel(4);
+w.aplicarNivelMotilidad('toda');
+exigir(todos('reposo', [6, 12, 16], 4) && WM.reposo[5] === 1, 'toda la pared anterolateral: 6, 12 y 16');
+w.elegirPared('inferoseptal');
+w.aplicarNivelMotilidad('apical');
+exigir(WM.reposo[14] === 4 && WM.reposo[17] === 1, 'inferoseptal apical = 14, sin el ápex');
+w.elegirPared('inferoseptal');
+exigir(w.eval('PARED_ELEGIDA') === null, 'tocar la pared de nuevo la suelta');
+w.setGradoPincel(3);
+w.aplicarNivelMotilidad('basal');
+exigir(todos('reposo', GRUPOS.niveles.basales, 3), 'sin pared, el nivel pinta el anillo entero');
+
 // ── La vista es un filtro, no un pincel ──────────────────────────
 limpiar();
 const antes = [...Array(17)].map((_, i) => WM.reposo[i + 1]);
