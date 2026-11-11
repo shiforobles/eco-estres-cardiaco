@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=2.7-motilidad">
+    <link rel="stylesheet" href="styles.css?v=2.8-espacios">
 </head>
 <body>
 <div class="container">
@@ -312,15 +312,15 @@
                 <label for="vts_reposo">VTS reposo (mL) <span class="firma-nota">(opcional)</span></label>
                 <input autocomplete="off" type="number" id="vts_reposo" placeholder="mL" min="5" max="400">
             </div>
-            <div class="form-group dato-en-linea">
+            <div class="form-group fila-nueva">
                 <label>Masa VI indexada (g/m²)</label>
                 <input autocomplete="off" type="text" id="imvi" class="calculated-value" placeholder="—" disabled>
             </div>
-            <div class="form-group dato-en-linea">
+            <div class="form-group">
                 <label>Espesor relativo — RWT</label>
                 <input autocomplete="off" type="text" id="rwt" class="calculated-value" placeholder="—" disabled>
             </div>
-            <div class="form-group linea-calculo" style="grid-column: 1 / -1">
+            <div class="form-group linea-calculo linea-calculo--en-fila">
                 <h3 class="subsection-title" title="Cálculo automático desde las medidas basales, la masa indexada y el espesor relativo">Geometría VI</h3>
                 <p id="geometria_vi_calculo" class="resultado-basal" role="status">No clasificable: faltan mediciones.</p>
                 <p id="geometria_vi_discrepancia" class="aviso-basal-heredado" role="status" hidden></p>
@@ -370,12 +370,12 @@
                 <input autocomplete="off" type="number" id="e_prima_lat_rep" placeholder="cm/s" step="0.1" oninput="calcDiastolico()">
             </div>
             <div class="form-group">
-                <label>E/e' promedio Reposo</label>
-                <input autocomplete="off" type="text" id="ee_reposo" class="calculated-value" placeholder="—" disabled>
-            </div>
-            <div class="form-group">
                 <label for="vrt_rep">VRT Reposo (m/s)</label>
                 <input autocomplete="off" type="number" id="vrt_rep" placeholder="m/s" step="0.1" min="0" max="6" oninput="calcDiastolico()">
+            </div>
+            <div class="form-group">
+                <label>E/e' promedio Reposo</label>
+                <input autocomplete="off" type="text" id="ee_reposo" class="calculated-value" placeholder="—" disabled>
             </div>
             <div class="form-group">
                 <label>E/A</label>
@@ -636,26 +636,9 @@
                 <div class="calc-row"><span>% de FC pico al adquirir la imagen:</span><span id="pct_fc_adq" class="calc-value">—</span></div>
             </div>
 
-            <details class="ayuda-carga" id="ayuda-hemodinamia">
-                <summary>Ayuda del registro hemodinámico</summary>
-                <ul>
-                    <li>Doble producto = FC × TA sistólica, se calcula solo. La FC de recuperación al 1.er minuto da el HRR₁.</li>
-                    <li id="etapa-carga-nota">En Astrand: etapa 1 = 150 Kgm/min, y cada etapa suma 150.</li>
-                    <li>La carga se calcula de la etapa. Si la cargás a mano, manda lo que escribas.</li>
-                    <li>Si cargás los METs de la ergometría, el informe usa ese valor y no el calculado.</li>
-                </ul>
-            </details>
-            <p class="firma-nota" id="criterios-propios-nota">Criterios propios (no de guía): DP &lt;20.000, HRR₁ ≤6 y el umbral de segmentos sin par por territorio.</p>
             <div id="aviso-dp" class="aviso-adquisicion" style="display:none"></div>
             <div id="aviso-adquisicion" class="aviso-adquisicion" style="display:none"></div>
 
-            <details class="plegable-tecnica" style="margin-top:0.75rem">
-            <summary class="firma-nota" style="cursor:pointer">⚠ Contraindicaciones y criterios de suspensión</summary>
-            <div class="info-banner info-banner-warning" style="margin-top:0.5rem">
-                <strong>Contraindicaciones absolutas del esfuerzo:</strong> IAM &lt;2 días, angina inestable, arritmia no controlada con compromiso hemodinámico, EAo severa sintomática, IC descompensada, TEP/trombosis aguda, miocarditis/pericarditis aguda, disección aórtica. &nbsp;|&nbsp;
-                <strong>Criterios absolutos de suspensión:</strong> caída de TAS &gt;10 mmHg bajo el basal con signos de isquemia, angina progresiva, ataxia/mareo/presíncope, signos de mala perfusión, TV sostenida, supradesnivel ST &gt;1 mm en derivaciones sin Q, dificultad para monitorizar, pedido del paciente.
-            </div>
-            </details>
         </div>
 
         <!-- DOBUTAMINA -->
@@ -1787,6 +1770,26 @@
             </dl>
         </details>
             </section>
+            <section class="card">
+                <h2 class="section-title">Registro hemodinámico</h2>
+            <details class="ayuda-carga" id="ayuda-hemodinamia">
+                <summary>Cómo se calcula el registro hemodinámico</summary>
+                <ul>
+                    <li>Doble producto = FC × TA sistólica, se calcula solo. La FC de recuperación al 1.er minuto da el HRR₁.</li>
+                    <li id="etapa-carga-nota">En Astrand: etapa 1 = 150 Kgm/min, y cada etapa suma 150.</li>
+                    <li>La carga se calcula de la etapa. Si la cargás a mano, manda lo que escribas.</li>
+                    <li>Si cargás los METs de la ergometría, el informe usa ese valor y no el calculado.</li>
+                </ul>
+            </details>
+            <p class="firma-nota" id="criterios-propios-nota">Criterios propios (no de guía): DP &lt;20.000, HRR₁ ≤6 y el umbral de segmentos sin par por territorio.</p>
+                <details class="ayuda-carga" id="ayuda-contraindicaciones">
+                    <summary>Contraindicaciones y criterios de suspensión</summary>
+                    <div class="info-banner info-banner-warning">
+                <strong>Contraindicaciones absolutas del esfuerzo:</strong> IAM &lt;2 días, angina inestable, arritmia no controlada con compromiso hemodinámico, EAo severa sintomática, IC descompensada, TEP/trombosis aguda, miocarditis/pericarditis aguda, disección aórtica. &nbsp;|&nbsp;
+                <strong>Criterios absolutos de suspensión:</strong> caída de TAS &gt;10 mmHg bajo el basal con signos de isquemia, angina progresiva, ataxia/mareo/presíncope, signos de mala perfusión, TV sostenida, supradesnivel ST &gt;1 mm en derivaciones sin Q, dificultad para monitorizar, pedido del paciente.
+            </div>
+                </details>
+            </section>
             <div id="perlas-lista"></div>
         </div>
     </div>
@@ -1800,7 +1803,7 @@
 <script src="motility-groups.js?v=2.2"></script>
 <script src="report-templates.js?v=2.7-motilidad"></script>
 <script src="sheets-storage.js?v=2.7-motilidad"></script>
-<script src="app.js?v=2.8-pared-nivel"></script>
+<script src="app.js?v=2.8-espacios"></script>
 <script>
 // Control de versión: si el navegador sirvió una mezcla de archivos viejos y nuevos,
 // los botones fallan en silencio. Esto lo convierte en un aviso visible.

@@ -1858,19 +1858,21 @@ textarea.auto-alto { resize: none; overflow: hidden; min-height: 42px; line-heig
 
 
 /* ── Resultado automático en un renglón ──────────────────────────────
-   Geometría VI y función diastólica: título, veredicto y criterios con su
-   corte van en una sola línea (baja a una segunda sólo si no entra).
-   La masa indexada y el RWT ya se leen ahí con su corte: sus dos campos
-   sueltos quedan en el DOM (los usan el cálculo y la batería) pero no se
-   muestran, y así no dejan una fila casi vacía. */
-.form-group.dato-en-linea { display: none; }
+   Geometría VI y función diastólica: en pantalla queda sólo el dato
+   autocompletado (título y veredicto). Los criterios con su corte se siguen
+   calculando pero no se muestran; la nota aparece únicamente cuando falta un
+   dato, hay una medida imposible, el resultado es indeterminado o hay una
+   corrección manual guardada. */
 .form-group.linea-calculo {
     flex-direction: row;
     flex-wrap: wrap;
     align-items: baseline;
     gap: 0.1rem 0.8rem;
-    padding: 0.45rem 0.75rem;
-    background: var(--color-bg-sub);
+    padding: 0.55rem 0.85rem;
+    /* Tinte del color de marca + filete: el resultado se separa de los campos
+       de carga a simple vista, sin llegar a ser una caja de aviso. */
+    background: var(--color-primary-bg);
+    border-left: 3px solid var(--color-primary);
     border-radius: var(--radius-md);
 }
 .linea-calculo .subsection-title {
@@ -1880,14 +1882,22 @@ textarea.auto-alto { resize: none; overflow: hidden; min-height: 42px; line-heig
     color: var(--color-text-secondary);
 }
 .linea-calculo .subsection-title::after { content: ":"; }
-.linea-calculo .resultado-basal { margin: 0; font-weight: 700; color: var(--color-text-primary); }
+.linea-calculo .resultado-basal { margin: 0; font-size: var(--font-size-lg); font-weight: 700; color: var(--color-primary-dark); }
+[data-theme="dark"] .linea-calculo .resultado-basal { color: var(--color-primary); }
 .linea-calculo .firma-nota { font-size: var(--font-size-sm); }
-/* display: contents: cada criterio se acomoda en la misma línea que el veredicto */
-.linea-calculo .criterios-ase { display: contents !important; }
-.linea-calculo .criterios-ase:empty { display: none !important; }
-.linea-calculo .criterio-ase { font-size: 0.8rem; line-height: 1.5; white-space: nowrap; }
-@media (max-width: 640px) { .linea-calculo .criterio-ase { white-space: normal; } }
-/* Con los criterios a la vista, la nota genérica ("Calculado desde…") sobra;
-   la de corrección manual se conserva siempre. */
-.linea-calculo:has(.criterios-ase:not(:empty)) .firma-nota:not(.origen-manual) { display: none; }
+.linea-calculo .criterios-ase { display: none !important; }
+.linea-calculo .resultado-basal[data-clasificado="1"] ~ .firma-nota:not(.origen-manual) { display: none; }
 .linea-calculo .aviso-basal-heredado { flex-basis: 100%; margin: 0.35rem 0 0; }
+
+/* Geometría: masa indexada, RWT y veredicto comparten fila, sin dejar un
+   campo suelto en un renglón propio. */
+.grid > .fila-nueva { grid-column-start: 1; }
+.grid > .linea-calculo--en-fila { grid-column: 3 / -1; align-self: end; min-height: 42px; align-items: center; }
+@media (max-width: 760px) {
+    .grid > .linea-calculo--en-fila { grid-column: 1 / -1; }
+}
+
+/* Los valores calculados (masa, RWT, E/e', E/A, LAVi…) un punto más grandes,
+   como en la app de eco Doppler: son resultados y tienen que leerse primero. */
+.form-group input.calculated-value { font-size: var(--font-size-lg); }
+.linea-calculo .resultado-basal::first-letter { text-transform: uppercase; }

@@ -342,7 +342,12 @@ function pintarResultadoBasal(id, calculado, nombres, nota) {
     const aviso = document.getElementById(id + '_discrepancia');
     const campo = document.getElementById(id);
     const txt = valor => nombres[valor] || 'No clasificable con los datos disponibles';
-    if (panel) panel.textContent = txt(calculado);
+    if (panel) {
+        panel.textContent = txt(calculado);
+        // Con veredicto firme la nota de procedencia sobra en pantalla (styles.css la oculta);
+        // sin veredicto, o indeterminado, la nota dice qué falta y se muestra.
+        panel.dataset.clasificado = calculado && calculado !== 'indeterminada' ? '1' : '';
+    }
     if (aviso) {
         const manual = fueCorregido(id);
         aviso.hidden = !manual;
