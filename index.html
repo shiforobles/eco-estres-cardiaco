@@ -312,16 +312,16 @@
                 <label for="vts_reposo">VTS reposo (mL) <span class="firma-nota">(opcional)</span></label>
                 <input autocomplete="off" type="number" id="vts_reposo" placeholder="mL" min="5" max="400">
             </div>
-            <div class="form-group">
+            <div class="form-group dato-en-linea">
                 <label>Masa VI indexada (g/m²)</label>
                 <input autocomplete="off" type="text" id="imvi" class="calculated-value" placeholder="—" disabled>
             </div>
-            <div class="form-group">
+            <div class="form-group dato-en-linea">
                 <label>Espesor relativo — RWT</label>
                 <input autocomplete="off" type="text" id="rwt" class="calculated-value" placeholder="—" disabled>
             </div>
-            <div class="form-group" style="grid-column: 1 / -1">
-                <h3 class="subsection-title">Geometría del ventrículo izquierdo — cálculo automático</h3>
+            <div class="form-group linea-calculo" style="grid-column: 1 / -1">
+                <h3 class="subsection-title" title="Cálculo automático desde las medidas basales, la masa indexada y el espesor relativo">Geometría VI</h3>
                 <p id="geometria_vi_calculo" class="resultado-basal" role="status">No clasificable: faltan mediciones.</p>
                 <p id="geometria_vi_discrepancia" class="aviso-basal-heredado" role="status" hidden></p>
                 <select autocomplete="off" id="geometria_vi" hidden aria-hidden="true" style="display:none">
@@ -382,14 +382,14 @@
                 <input autocomplete="off" type="text" id="ea_reposo" class="calculated-value" placeholder="—" disabled>
             </div>
             <div class="form-group">
-                <label for="lavi_reposo">Volumen AI indexado — LAVi (mL/m²)</label>
+                <label for="lavi_reposo">LAVi (mL/m²)</label>
                 <input autocomplete="off" type="text" id="lavi_reposo" class="calculated-value" placeholder="—" disabled>
             </div>
         </div>
 
-        <div class="grid" style="margin-top:1rem">
-            <div class="form-group" style="grid-column: 1 / -1">
-                <h3 class="subsection-title">Función diastólica basal — cálculo automático</h3>
+        <div class="grid" style="margin-top:0.75rem">
+            <div class="form-group linea-calculo" style="grid-column: 1 / -1">
+                <h3 class="subsection-title" title="Cálculo automático">Función diastólica</h3>
                 <p id="diast_grado_calculo" class="resultado-basal" role="status">No clasificable: información insuficiente.</p>
                 <p id="diast_grado_discrepancia" class="aviso-basal-heredado" role="status" hidden></p>
                 <select autocomplete="off" id="diast_grado" hidden aria-hidden="true" style="display:none">

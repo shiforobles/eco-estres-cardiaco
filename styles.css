@@ -1855,3 +1855,39 @@ textarea.auto-alto { resize: none; overflow: hidden; min-height: 42px; line-heig
     .ecg-det-grid, .ecg-leads-grid { grid-template-columns: 1fr; }
     .ecg-det-grid .ecg-span2 { grid-column: auto; }
 }
+
+
+/* ── Resultado automático en un renglón ──────────────────────────────
+   Geometría VI y función diastólica: título, veredicto y criterios con su
+   corte van en una sola línea (baja a una segunda sólo si no entra).
+   La masa indexada y el RWT ya se leen ahí con su corte: sus dos campos
+   sueltos quedan en el DOM (los usan el cálculo y la batería) pero no se
+   muestran, y así no dejan una fila casi vacía. */
+.form-group.dato-en-linea { display: none; }
+.form-group.linea-calculo {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.1rem 0.8rem;
+    padding: 0.45rem 0.75rem;
+    background: var(--color-bg-sub);
+    border-radius: var(--radius-md);
+}
+.linea-calculo .subsection-title {
+    margin: 0;
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--color-text-secondary);
+}
+.linea-calculo .subsection-title::after { content: ":"; }
+.linea-calculo .resultado-basal { margin: 0; font-weight: 700; color: var(--color-text-primary); }
+.linea-calculo .firma-nota { font-size: var(--font-size-sm); }
+/* display: contents: cada criterio se acomoda en la misma línea que el veredicto */
+.linea-calculo .criterios-ase { display: contents !important; }
+.linea-calculo .criterios-ase:empty { display: none !important; }
+.linea-calculo .criterio-ase { font-size: 0.8rem; line-height: 1.5; white-space: nowrap; }
+@media (max-width: 640px) { .linea-calculo .criterio-ase { white-space: normal; } }
+/* Con los criterios a la vista, la nota genérica ("Calculado desde…") sobra;
+   la de corrección manual se conserva siempre. */
+.linea-calculo:has(.criterios-ase:not(:empty)) .firma-nota:not(.origen-manual) { display: none; }
+.linea-calculo .aviso-basal-heredado { flex-basis: 100%; margin: 0.35rem 0 0; }
