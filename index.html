@@ -497,7 +497,7 @@
     <div class="bloque-sep" id="sec-esfuerzo">
         <span class="bloque-num">3</span>
         <span class="bloque-nombre">Esfuerzo</span>
-        <span class="bloque-hint">hemodinamia y ECG del esfuerzo</span>
+        <span class="bloque-hint">hemodinamia, síntomas y ECG del esfuerzo</span>
     </div>
 
     <!-- ══════════════════════════════════════
@@ -802,6 +802,13 @@
                     <textarea autocomplete="off" id="nc_descripcion" rows="3" placeholder="Descripción del apremio no convencional utilizado, dosis, duración..."></textarea>
                 </div>
             </div>
+        </div>
+
+        <!-- Lo que el operador OBSERVA y la app no puede deducir. Vale para cualquier protocolo. -->
+        <div class="sintomas-estudio">
+            <span class="sintomas-estudio__titulo">Síntomas durante el estudio</span>
+            <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="hal_angina"><label for="hal_angina">Angina</label></div>
+            <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="hal_disnea"><label for="hal_disnea">Disnea de esfuerzo</label></div>
         </div>
     </section>
 
@@ -1444,7 +1451,7 @@
     <div class="bloque-sep" id="sec-informe">
         <span class="bloque-num">5</span>
         <span class="bloque-nombre">Informe</span>
-        <span class="bloque-hint">avisos, interpretación y texto generado</span>
+        <span class="bloque-hint">avisos y texto generado</span>
     </div>
 
     <!-- ══════════════════════════════════════
@@ -1459,28 +1466,26 @@
         <div id="avisos-clinicos"></div>
     </section>
 
+
     <!-- ══════════════════════════════════════
-         SECCIÓN 7: INTERPRETACIÓN
+         SECCIÓN 9: REPORTE FINAL
          ══════════════════════════════════════ -->
-    <section class="card card-result">
-        <h2 class="section-title">Interpretación y Resultado</h2>
-
-        <!-- Lo que el operador OBSERVA y la app no puede deducir: queda a la vista. -->
-        <div class="grid grid-2col">
-            <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="hal_angina"><label for="hal_angina">Angina durante el estudio</label></div>
-            <div class="checkbox-group"><input autocomplete="off" type="checkbox" id="hal_disnea"><label for="hal_disnea">Disnea de esfuerzo</label></div>
-        </div>
-        <div id="resultado-banner" class="resultado-banner" style="display:none"></div>
-        <div class="form-group" style="margin-top:0.75rem">
+    <section class="card">
+        <h2 class="section-title">Informe Final</h2>
+        <!-- Los botones del informe viven en la botonera de abajo, igual que en la
+             app de eco Doppler. La firma pasó a ⚙ Sincronizar. -->
+        <!-- El cartel de veredicto se retiró: el resultado se lee en el informe. El nodo
+             queda oculto porque updateResultBanner() lo sigue escribiendo. -->
+        <div id="resultado-banner" class="resultado-banner" hidden></div>
+        <!-- Lo completa la app sola desde el bull's eye, el ECG y la hemodinamia.
+             Se pliega: está para agregar o corregir, no para cargar. -->
+        <details class="plegable-tecnica ajustes-informe" id="ajustes-informe">
+        <summary class="firma-nota" style="cursor:pointer">Agregar texto libre o corregir el resultado deducido</summary>
+        <div class="form-group" style="margin-top:0.6rem">
             <label for="conclusion_libre">Conclusión clínica (texto libre)</label>
-            <textarea autocomplete="off" id="conclusion_libre" rows="3" placeholder="Lo que quieras agregar al cierre del informe..."></textarea>
+            <textarea autocomplete="off" id="conclusion_libre" rows="2" placeholder="Lo que quieras agregar al cierre del informe..."></textarea>
         </div>
-
-        <!-- Todo lo de abajo lo completa la app sola desde el bull's eye, el ECG y la
-             hemodinamia. Se pliega: está para corregir, no para cargar. -->
-        <details class="plegable-tecnica" style="margin-top:0.75rem">
-        <summary class="subsection-title" style="cursor:pointer; list-style:none">Resultado deducido
-            <span class="firma-nota">— lo completa la app; se abre para corregir</span></summary>
+        <h3 class="subsection-title">Resultado deducido <span class="firma-nota">— lo completa la app; se cambia sólo para corregir</span></h3>
         <div class="grid">
             <div class="form-group">
                 <label for="resultado_estudio">Resultado del Estudio</label>
@@ -1542,15 +1547,6 @@
         </div>
         <span class="firma-nota">Se marcan solos desde el ECG, la hemodinamia y las arritmias ya cargadas. Si destildás alguno, la app deja de tocarlo.</span>
         </details>
-    </section>
-
-    <!-- ══════════════════════════════════════
-         SECCIÓN 9: REPORTE FINAL
-         ══════════════════════════════════════ -->
-    <section class="card">
-        <h2 class="section-title">Informe Final</h2>
-        <!-- Los botones del informe viven en la botonera de abajo, igual que en la
-             app de eco Doppler. La firma pasó a ⚙ Sincronizar. -->
         <p class="informe-vacio" id="informe-vacio">El informe aparece acá al apretar <strong>Generar informe</strong> en la botonera de abajo.</p>
         <details id="completud-detalle" class="completud-detalle">
             <summary>Ver completud <span id="completud-resumen" role="status" aria-live="polite">Sin comprobar</span></summary>

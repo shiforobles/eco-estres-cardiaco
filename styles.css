@@ -1901,3 +1901,20 @@ textarea.auto-alto { resize: none; overflow: hidden; min-height: 42px; line-heig
    como en la app de eco Doppler: son resultados y tienen que leerse primero. */
 .form-group input.calculated-value { font-size: var(--font-size-lg); }
 .linea-calculo .resultado-basal::first-letter { text-transform: uppercase; }
+
+/* ── Sin tarjeta de "Interpretación y Resultado" ─────────────────────
+   Los síntomas se cargan en Esfuerzo; el texto libre y la corrección manual
+   viven plegados dentro de Informe Final; el cartel de veredicto no se muestra. */
+#resultado-banner[hidden] { display: none !important; }
+.sintomas-estudio {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem 1.5rem;
+    margin-top: 1rem;
+    padding-top: 0.85rem;
+    border-top: 1px solid var(--color-border);
+}
+.sintomas-estudio__titulo { font-size: var(--font-size-sm); font-weight: 600; color: var(--color-text-secondary); }
+.ajustes-informe { margin: 0 0 0.75rem; }
+.ajustes-informe[open] { padding-bottom: 0.75rem; border-bottom: 1px solid var(--color-border); }
