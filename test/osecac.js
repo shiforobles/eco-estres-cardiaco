@@ -101,8 +101,10 @@ CASOS.forEach(({ nombre, w }) => {
 
     // ── 3 · REPOSO: sólo el eco basal ──
     exigir(/FEy/i.test(O.reposo), `${rot} el reposo informa la FEy`);
-    exigir(/E\/e'|presiones de llenado|no consignad/i.test(O.reposo),
-        `${rot} el reposo informa la función diastólica`);
+    // Con E/e' cargado sale como referencia; sin él no se nombra (v2.9).
+    exigir(H.eeReposo ? /Relación E\/e' [\d,]+, (presiones de llenado|sin poder)/.test(O.reposo)
+                      : !/E\/e'/.test(O.reposo),
+        `${rot} el reposo informa la función diastólica sólo si se midió`);
     exigir(/presión sistólica pulmonar/i.test(O.reposo),
         `${rot} el reposo informa la presión pulmonar, aunque sea para decir que falta`);
     // Nada del esfuerzo se cuela en el cuadro de reposo.
@@ -120,9 +122,12 @@ CASOS.forEach(({ nombre, w }) => {
         `${rot} y el porcentaje de la FC máxima predicha`);
     exigir(/se detuvo|detención/i.test(primerRenglon),
         `${rot} y el motivo de detención`);
-    exigir(/WMSI/i.test(O.esfuerzo), `${rot} el esfuerzo trae la línea de WMSI`);
-    exigir(/diastólico de esfuerzo/i.test(O.esfuerzo),
-        `${rot} el esfuerzo trae el test diastólico`);
+    // v2.9 (Lucas, 11/11/2026): el WMSI no va en el cuadro.
+    exigir(!/WMSI/i.test(O.esfuerzo), `${rot} el esfuerzo no trae el WMSI`);
+    // El diastólico sale si se hizo (hay E/e' post) y nunca como "No evaluado".
+    exigir(H.eeEstres ? /diastólico de esfuerzo/i.test(O.esfuerzo) : !/diastólico de esfuerzo/i.test(O.esfuerzo),
+        `${rot} el test diastólico sale sólo si se hizo`);
+    exigir(!/No evaluado/.test(O.esfuerzo), `${rot} nunca "No evaluado"`);
     exigir(!/se sugiere correlación/i.test(O.esfuerzo),
         `${rot} el cuadro de esfuerzo no cierra como una conclusión`);
 
@@ -145,8 +150,8 @@ CASOS.forEach(({ nombre, w }) => {
 {
     const w = CASOS.find(c => c.nombre === 'positivo de DA').w;
     const O = w.informeOsecac(w.recolectarHallazgos());
-    exigir(/Estudio diastólico de esfuerzo: Positivo\.$/m.test(O.esfuerzo),
-        'con el diastólico positivo, el cuadro de esfuerzo trae sólo el resultado');
+    exigir(/^Estudio diastólico de esfuerzo positivo: E\/e' [^\n]*m\/s\.$/m.test(O.esfuerzo),
+        'con el diastólico positivo, el cuadro de esfuerzo trae el resultado con sus valores');
     exigir(/diastólico de esfuerzo resultó positivo/i.test(O.conclusion),
         'y la conclusión lo explica');
     exigir(!/presiones de llenado/i.test(O.esfuerzo),
@@ -218,9 +223,10 @@ CASOS.forEach(({ nombre, w }) => {
 {
     const w = negativo();
     const O = w.informeOsecac(w.recolectarHallazgos());
-    exigir(/48 mm/.test(O.reposo), 'el DDVI sale con su número');
-    exigir(/10 mm/.test(O.reposo), 'el septum también');
-    exigir(/52 mL/.test(O.reposo), 'y el volumen auricular');
+    // v2.9: como la conclusión de eco Doppler, las medidas no se repiten si la
+    // geometría es normal; sólo justifican una geometría anormal o una dilatación.
+    exigir(!/48 mm|10 mm|52 mL/.test(O.reposo), 'con geometría normal no se repiten las medidas');
+    exigir(/diámetros y espesores conservados/.test(O.reposo), 'y se dice la conclusión');
     exigir(/28 mmHg/.test(O.reposo), 'y la presión pulmonar estimada');
 }
 
@@ -289,8 +295,10 @@ CASOS.forEach(({ nombre, w }) => {
 {
     const w = cargarApp(); casoBase(w); todoNormal(w);
     const O = w.informeOsecac(w.recolectarHallazgos());
-    exigir(/Presión pulmonar no estimada\./.test(O.reposo),
-        'sin el dato, el cuadro dice "Presión pulmonar no estimada"');
+    exigir(!/Presión pulmonar|presión sistólica pulmonar/i.test(O.reposo),
+        'sin el dato, la presión pulmonar no se nombra (v2.9)');
+    exigir(!/Sin valvulopatías/.test(O.reposo),
+        'ni "Sin valvulopatías" sin ningún dato valvular cargado');
 }
 
 // ── 4 · Volúmenes ventriculares, opcionales ──────────────────────
@@ -324,14 +332,12 @@ CASOS.forEach(({ nombre, w }) => {
         'y el informe largo también los trae');
 }
 
-// ── 5 · El WMSI, una sola vez dentro de ESFUERZO ─────────────────
+// ── 5 · El WMSI no va en el cuadro de ESFUERZO (v2.9) ─────────────
 {
     const w = CASOS.find(c => c.nombre === 'positivo de DA').w;
     const O = w.informeOsecac(w.recolectarHallazgos());
     const veces = (O.esfuerzo.match(/WMSI/g) || []).length;
-    exigir(veces === 1, `el WMSI sale una vez en el cuadro de esfuerzo (salió ${veces})`);
-    exigir(/WMSI 1,00 → /.test(O.esfuerzo),
-        'y la que queda es la línea cuantitativa, con el delta y los segmentos');
+    exigir(veces === 0, `el WMSI no sale en el cuadro de esfuerzo (salió ${veces})`);
     exigir(!/El WMSI ascendió/.test(O.esfuerzo),
         'la oración del WMSI de la descripción sale del cuadro');
     // El informe largo conserva las dos: son párrafos distintos.
@@ -349,8 +355,8 @@ CASOS.forEach(({ nombre, w }) => {
     set(w, 'fevi_reposo', 58); set(w, 'fevi_pico', 52);
     const O = w.informeOsecac(w.recolectarHallazgos());
     const veces = (O.esfuerzo.match(/WMSI/g) || []).length;
-    exigir(veces === 1,
-        `con un territorio y caída de FEy, el WMSI sale una vez (salió ${veces})`);
+    exigir(veces === 0,
+        `con un territorio y caída de FEy, el WMSI no sale (salió ${veces})`);
     exigir(/FEy post-esfuerzo 52 %/.test(O.esfuerzo), 'y la FEy post-esfuerzo sigue');
 }
 
@@ -364,8 +370,8 @@ CASOS.forEach(({ nombre, w }) => {
     const O = w.informeOsecac(w.recolectarHallazgos());
     exigir(/FEy/.test(O.esfuerzo), 'la FEy post-esfuerzo sigue en el cuadro');
     exigir(/50/.test(O.esfuerzo), 'con su número');
-    exigir((O.esfuerzo.match(/WMSI/g) || []).length === 1,
-        'y el WMSI sigue saliendo una sola vez');
+    exigir((O.esfuerzo.match(/WMSI/g) || []).length === 0,
+        'y el WMSI no sale');
 }
 
 // ── 1 · El informe largo cierra con la fórmula, una sola vez ─────

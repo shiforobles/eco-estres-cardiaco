@@ -787,36 +787,42 @@ function evaluarDiastolicoEsfuerzo() {
     const eprimaSep = num('e_prima_rep');
     if (enFibrilacionAuricular()) return { clave: 'fa', falta: [], detalle: [] };
 
-    // Sin E/e' post o sin VRT no se puede concluir nada.
-    const falta = [];
-    if (!est) falta.push("el E/e' post-esfuerzo");
-    if (!(vrt > 0)) falta.push('la VRT post-esfuerzo');
-    if (falta.length) return { clave: 'insuficiente', falta, detalle: [] };
+    // Sin E/e' post-esfuerzo no hay estudio diastólico: no se concluye nada.
+    if (!est) return { clave: 'insuficiente', falta: ["el E/e' post-esfuerzo"], detalle: [] };
+
+    // Sin VRT (sin insuficiencia tricuspídea para medir) el estudio se informa igual con
+    // los parámetros que hay (Lucas, 11/11/2026). Antes caía en "No evaluado" aunque E y
+    // e' de las dos fases estuvieran cargados.
+    const hayVRT = vrt > 0;
 
     // El corte depende de qué se cargó: promedio >14, septal aislado >15.
     const corteEE = est.promedio ? DIAST_EE_PROMEDIO : DIAST_EE_SEPTAL;
     const cEE  = est.valor > corteEE;
-    const cVRT = vrt > DIAST_VRT;
+    const cVRT = hayVRT && vrt > DIAST_VRT;
     // El e' septal de reposo es el tercer criterio; si no está, no se puede afirmar.
     const cEprima = eprimaSep > 0 && eprimaSep < DIAST_EPRIMA_SEP;
 
     const detalle = [
         { ok: cEE,  txt: `E/e' ${est.promedio ? 'promedio' : 'septal'} post-esfuerzo ` +
                          `${nProsa(est.valor, 1)} (corte > ${corteEE})` },
-        { ok: cVRT, txt: `VRT post-esfuerzo ${nProsa(vrt, 1)} m/s (corte > ${nProsa(DIAST_VRT, 1)})` },
+        { ok: cVRT, txt: hayVRT
+            ? `VRT post-esfuerzo ${nProsa(vrt, 1)} m/s (corte > ${nProsa(DIAST_VRT, 1)})`
+            : 'VRT post-esfuerzo no medible: se concluye con E/e\' y e\'' },
         { ok: cEprima, txt: eprimaSep > 0
             ? `e' septal en reposo ${nProsa(eprimaSep, 1)} cm/s (corte < ${DIAST_EPRIMA_SEP})`
             : "e' septal en reposo no consignado" },
     ];
 
-    if (cEE && cVRT && cEprima) return { clave: 'positivo', detalle };
+    // Positivo: todos los criterios disponibles. Sin VRT, E/e' post elevado y e' septal
+    // de reposo bajo; con uno solo de los dos queda indeterminado, no positivo.
+    if (cEE && cEprima && (cVRT || !hayVRT)) return { clave: 'positivo', sinVRT: !hayVRT, detalle };
 
-    // Normal exige E/e' bajo en LAS DOS fases, no sólo post.
+    // Normal exige E/e' bajo en LAS DOS fases, no sólo post (y VRT normal si se midió).
     const normal = rep && rep.valor < DIAST_EE_NORMAL &&
-                   est.valor < DIAST_EE_NORMAL && vrt < DIAST_VRT;
-    if (normal) return { clave: 'negativo', detalle };
+                   est.valor < DIAST_EE_NORMAL && (!hayVRT || vrt < DIAST_VRT);
+    if (normal) return { clave: 'negativo', sinVRT: !hayVRT, detalle };
 
-    return { clave: 'indeterminado', detalle };
+    return { clave: 'indeterminado', sinVRT: !hayVRT, detalle };
 }
 
 const DIAST_ETIQUETA = {
@@ -2217,7 +2223,9 @@ function pintarDiastolicoEsfuerzo() {
     }
     const icono = { positivo: '⚠ ', negativo: '✓ ', indeterminado: '' }[r.clave] || '';
     set('diast_respuesta', icono + DIAST_ETIQUETA[r.clave]);
-    autocompletarDiastolico(r.clave === 'indeterminado' ? 'no_evaluado' : r.clave);
+    // Indeterminado es un resultado, no "no evaluado": se evaluó y no alcanzó para
+    // afirmar ni descartar.
+    autocompletarDiastolico(r.clave);
 
     if (box) {
         box.style.display = 'block';
@@ -2225,7 +2233,9 @@ function pintarDiastolicoEsfuerzo() {
             `<div class="criterio-ase ${d.ok ? 'criterio-alto' : 'criterio-normal'}">` +
             `${d.ok ? '▲' : '✓'} ${d.txt}</div>`).join('') +
             '<div class="criterio-ase criterio-corte">Criterio de <strong>ASE 2016</strong>: ' +
-            'las tres condiciones para positivo. <strong>Pendiente de actualizar a ASE 2025.</strong></div>';
+            'las tres condiciones para positivo. Sin VRT medible se concluye con los criterios ' +
+            'disponibles (E/e\' y e\'): <strong>criterio propio</strong>. ' +
+            '<strong>Pendiente de actualizar a ASE 2025.</strong></div>';
     }
 }
 
@@ -5488,8 +5498,9 @@ function construirNarrativa(H) {
         // "No se modificó" sólo si el puntaje quedó igual. De leve a moderada, o de
         // disquinesia a aquinesia, el grado cambió pero no de forma significativa.
         fijaVerbo: fijaVerboDe(H),
-        recuperaronSujeto: H.recuperaron.length === H.anormalesReposo.length ? 'La alteración basal'
-            : mayuscula('la ' + describirSegmentos(H.recuperaron, 'scoreReposo')) + ' basal',
+        // Siempre dice cuál (Lucas, 11/11/2026): el cuadro de Esfuerzo se pega en un
+        // formulario aparte y "la alteración basal" obligaba a volver al de Reposo.
+        recuperaronSujeto: mayuscula('la ' + describirSegmentos(H.recuperaron, 'scoreReposo')),
         sinParSujeto: H.sinParReposo.length === H.anormalesReposo.length ? 'La alteración basal'
             : mayuscula('la ' + describirSegmentos(H.sinParReposo, 'scoreReposo')) + ' basal',
         // Los segmentos basales anormales que mejoraron o que quedaron sin par:
@@ -5520,6 +5531,7 @@ function construirNarrativa(H) {
     piezas.volumenesReposo = volumenesEnProsa(H.vtdReposo, H.vtsReposo, '');
     if (piezas.volumenesReposo) piezas.reposoEco += ' ' + piezas.volumenesReposo;
     piezas.reposoDiastolica = bloqueDiastolicaReposo(H);
+    piezas.reposoOsecac = reposoOsecacEnProsa(H, datosReposo, datosConduccion, hayAsincronia);
     linea(T.lineaReposo, [
         piezas.metodo,
         piezas.reposoEco,
@@ -5558,6 +5570,8 @@ function construirNarrativa(H) {
         feyEstres: H.feyEstres || nada,
         eeEstres: nProsa(H.eeEstres) || nada,
         vrtEstres: nProsa(H.vrtEstres) || nada,
+        // Sin IT no hay VRT: "con VRT de — m/s" decía un número que no existe.
+        vrtEstresFrase: nProsa(H.vrtEstres) ? `, con VRT de ${nProsa(H.vrtEstres)} m/s` : ', sin VRT medible',
         reservaGlobal: H.deltaFey === null ? '' : rellenar(
             H.reservaGlobal ? T.reservaGlobalConservada : T.reservaGlobalAusente,
             { feyReposo: H.feyReposo, feyEstres: H.feyEstres,
@@ -5620,13 +5634,10 @@ function construirNarrativa(H) {
     parrafos.push(rellenar(T.ecgPostEsfuerzo, { contenido: ecgEsfuerzoEnProsa(H) }));
 
     // ── ESTUDIO DIASTÓLICO ──
-    piezas.diastolicoEsfuerzo = {
-        negativo: T.diastolicoNegativo,
-        positivo: T.diastolicoPositivo
-    }[H.diastResultado] || T.diastolicoNoEvaluado;
-    if (H.fibrilacionAuricular) piezas.diastolicoEsfuerzo =
-        'Estudio diastólico de esfuerzo: no aplicable en fibrilación auricular.';
-    parrafos.push(piezas.diastolicoEsfuerzo);
+    const diast = diastolicoEsfuerzoEnProsa(H);
+    piezas.diastolicoEsfuerzo = diast.completo;
+    piezas.diastolicoDatos = diast.datos;
+    if (piezas.diastolicoEsfuerzo) parrafos.push(piezas.diastolicoEsfuerzo);
 
     // ── MÓDULOS OPCIONALES ──
     piezas.modulos = [];
@@ -5810,6 +5821,136 @@ const OSECAC_BLOQUES = [
     { id: 'conclusion', titulo: 'CONCLUSIÓN' }
 ];
 
+// ══════════════════════════════════════════════
+//  CUADRO DE REPOSO DE OSECAC (Lucas, 11/11/2026)
+//  Se pega tal cual en el formulario. Igual que la conclusión del VI de la app de
+//  eco Doppler: no repite las medidas crudas, sólo las que justifican una geometría
+//  anormal o una dilatación. La motilidad va enganchada a la frase del ventrículo, la
+//  FEy siempre con su número (es la referencia del Δ post-esfuerzo) y el ECG basal en
+//  párrafo aparte. Lo que no se midió no se nombra: ni "Presión pulmonar no
+//  estimada" ni "Sin valvulopatías significativas" sin ningún dato valvular cargado.
+// ══════════════════════════════════════════════
+
+// Diámetro diastólico por encima del normal, ASE 2015 (el mismo corte de eco Doppler).
+const DDVI_NORMAL_MAX = { M: 58, F: 52 };   // mm
+function viDilatado(H) {
+    const lim = DDVI_NORMAL_MAX[H.sexo];
+    return !!(lim && H.ddvi > lim);
+}
+
+const GEOMETRIA_OSECAC = {
+    remodelado: 'remodelado concéntrico',
+    hvi_concentrica: 'hipertrofia concéntrica',
+    hvi_excentrica: 'hipertrofia excéntrica'
+};
+
+// La frase del ventrículo, sin predicado de motilidad. '' si no hay nada que decir.
+function ventriculoOsecacEnProsa(H) {
+    const dil = viDilatado(H);
+    // Corregida a mano, los números pueden contradecir la clasificación elegida.
+    const manual = fueCorregido('geometria_vi');
+    const valores = [];
+    if (dil) valores.push(`diámetro diastólico ${nProsa(H.ddvi)} mm`);
+    if (!manual && H.imvi > 0) valores.push(`masa indexada ${nProsa(H.imvi, 0)} g/m²`);
+    if (!manual && H.rwt > 0) valores.push(`espesor relativo ${nProsa(H.rwt, 2)}`);
+    const par = valores.length ? ` (${valores.join(', ')})` : '';
+    const geo = GEOMETRIA_OSECAC[H.geometriaVI];
+    if (geo) return `Ventrículo izquierdo con ${geo}${dil ? ' y dilatación ventricular' : ''}${par}`;
+    if (H.geometriaVI === 'normal') return dil
+        ? `Ventrículo izquierdo dilatado con remodelado excéntrico${par}`
+        : 'Ventrículo izquierdo de diámetros y espesores conservados, con geometría ventricular normal';
+    return dil ? `Ventrículo izquierdo dilatado (diámetro diastólico ${nProsa(H.ddvi)} mm)` : '';
+}
+
+function reposoOsecacEnProsa(H, datosReposo, datosConduccion, hayAsincronia) {
+    const T = NARRATIVA;
+    const oraciones = [];
+
+    if (H.reposoLibre) {
+        // El texto libre del operador reemplaza la descripción del reposo, como en el
+        // informe largo.
+        oraciones.push(H.reposoLibre);
+    } else {
+        const vi = ventriculoOsecacEnProsa(H);
+        const mot = H.patronGlobal ? T.reposoMotilidadGlobal
+            : (H.anormalesReposo.length ? motilidadReposoEnProsa(H, datosReposo) : '');
+        if (vi && mot) {
+            // "y" → "e" delante de i- / hi- (hipoquinesia, inferior…), como en eco Doppler.
+            const primera = mot.trim().toLowerCase();
+            const conj = /^(i|hi(?!e))/.test(primera) ? 'e' : 'y';
+            oraciones.push(`${vi} ${conj} ${primera}`);
+        } else {
+            if (vi) oraciones.push(vi);
+            oraciones.push(mot || T.reposoMotilidadNormal);
+        }
+        if (hayAsincronia) oraciones.push(rellenar(T.asincroniaSeptalSuelta, datosConduccion).trim());
+        oraciones.push(H.feyReposo > 0
+            ? `Función sistólica ${gradoFeyEnProsa(H.feyReposo)} (FEy ${H.feyReposo} %)`
+            : `FEy ${T.sinDatoF}`);
+        if (H.vdProsa) oraciones.push(H.vdProsa.replace(/^con /, ''));
+    }
+    const vols = volumenesEnProsa(H.vtdReposo, H.vtsReposo, '');
+    if (vols) oraciones.push(vols);
+
+    // Diastólica: el E/e' de referencia y qué dice de las presiones.
+    const hayEE = !!nProsa(H.eeReposo);
+    if (H.fibrilacionAuricular) {
+        oraciones.push(bloqueDiastolicaReposo(H));
+    } else if (hayEE) {
+        const pres = (H.diastGrado === 'g2' || H.diastGrado === 'g3') ? ', presiones de llenado elevadas'
+            : H.diastGrado === 'indeterminada' ? T.presionesNoClasificable
+            : ', presiones de llenado normales';
+        oraciones.push(`Relación E/e' ${nProsa(H.eeReposo)}${pres}`);
+        if (['g1', 'g2', 'g3'].includes(H.diastGrado))
+            oraciones.push(rellenar(fueCorregido('diast_grado') ? T.diastolicaGradoManual : T.diastolicaGrado,
+                { grado: DIAST_GRADO_PROSA[H.diastGrado] }));
+    }
+
+    // Aurícula izquierda: sólo si está dilatada, con el valor que lo justifica.
+    const lavi = parseFloat(String(H.lavi || '').replace(',', '.'));
+    if (lavi > LAVI_ALTO) oraciones.push(`Aurícula izquierda dilatada (volumen indexado ${nProsa(lavi, 1)} mL/m²)`);
+
+    const valv = valvulopatiaReposoEnProsa(H);
+    if (valv !== 'Sin valvulopatías significativas.') oraciones.push(valv);
+    if (H.psapReposo) oraciones.push(psapEnProsa(H));
+
+    return unirOraciones(oraciones) + '\nECG basal: ' + ecgReposoEnProsa(H);
+}
+
+// ── Estudio diastólico de esfuerzo, con los valores que justifican el resultado ──
+// Devuelve dos formas: la completa (resultado, valores e interpretación) y la de datos
+// (resultado y valores), que usa el cuadro de Esfuerzo cuando la conclusión ya lo
+// interpreta. Sin E/e' post-esfuerzo no hay estudio: no sale ninguna línea, en lugar
+// del "No evaluado" de antes, que además salía con el estudio hecho y sin VRT.
+function diastolicoEsfuerzoEnProsa(H) {
+    if (H.fibrilacionAuricular) {
+        const t = 'Estudio diastólico de esfuerzo: no aplicable en fibrilación auricular.';
+        return { completo: t, datos: t };
+    }
+    const T = NARRATIVA;
+    const r = H.diastResultado;
+    if (!['negativo', 'positivo', 'indeterminado'].includes(r)) return { completo: '', datos: '' };
+    const rep = nProsa(H.eeReposo), est = nProsa(H.eeEstres), vrt = nProsa(H.vrtEstres);
+    // Corregido a mano sin los números: la frase de siempre, sin valores que inventar.
+    if (!est) {
+        const t = { negativo: T.diastolicoNegativo, positivo: T.diastolicoPositivo }[r] || '';
+        return { completo: t, datos: t.replace(/,[^,]*$/, '.') };
+    }
+    const ee = rep ? `E/e' ${rep} → ${est}` : `E/e' post-esfuerzo ${est}`;
+    const valores = vrt ? `${ee} y VRT ${vrt} m/s` : ee;
+    const sinVRT = vrt ? '' : ' (VRT no medible)';
+    const interp = {
+        negativo: ', sin aumento de las presiones de llenado con el esfuerzo',
+        positivo: ', con aumento de las presiones de llenado inducido por el ejercicio',
+        indeterminado: ''
+    }[r];
+    const inicio = `Estudio diastólico de esfuerzo ${r}: ${valores}`;
+    return {
+        completo: `${inicio}${interp}${sinVRT}.`,
+        datos: `${inicio}${sinVRT}.`
+    };
+}
+
 // Dimensiones, espesores, volumen auricular y presión pulmonar. El cuerpo del
 // informe los resume en "geometría ventricular normal"; el cuadro de Reposo los
 // pide con su número.
@@ -5874,14 +6015,7 @@ function informeOsecac(H) {
     const { piezas, rama } = construirNarrativa(H);
 
     // ── REPOSO: el eco basal y, al final, el ECG basal ──
-    const reposo = [
-        medidasReposoEnProsa(H),
-        piezas.reposoEco,
-        mayuscula(piezas.reposoDiastolica.replace(/\.*$/, '')) + '.',
-        valvulopatiaReposoEnProsa(H),
-        psapEnProsa(H),
-        'ECG basal: ' + ecgReposoEnProsa(H)
-    ].filter(Boolean).join(' ');
+    const reposo = piezas.reposoOsecac;
 
     // ── ESFUERZO: la hemodinamia primero, después el eco post-esfuerzo ──
     // Los síntomas van en el renglón de hemodinamia, salvo que la descripción del
@@ -5897,7 +6031,7 @@ function informeOsecac(H) {
     // interpretación en el de Conclusión. Cuando la conclusión ya lo explica, acá
     // queda sólo el resultado: si no, la misma oración sale dos veces casi igual.
     const diastolico = /diastólico de esfuerzo/i.test(conclusion)
-        ? piezas.diastolicoEsfuerzo.replace(/^(Estudio diastólico de esfuerzo: \w+)[^]*$/, '$1.')
+        ? piezas.diastolicoDatos
         : piezas.diastolicoEsfuerzo;
 
     // El WMSI se dice una sola vez, en la línea cuantitativa: ahí además viene con el
@@ -5918,7 +6052,8 @@ function informeOsecac(H) {
 
     const esfuerzo = [
         hemodinamia,
-        [textoEsfuerzo, piezas.motilidad].filter(Boolean).join(' '),
+        // Sin la línea cuantitativa del WMSI (Lucas, 11/11/2026): en el cuadro no aporta.
+        textoEsfuerzo,
         diastolico,
         ...piezas.modulos,
         'ECG de esfuerzo y recuperación: ' + ecgEsfuerzoEnProsa(H)

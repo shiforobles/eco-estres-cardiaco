@@ -17,7 +17,7 @@
     <header class="app-header">
         <div>
             <h1>Eco Estrés Cardíaco</h1>
-            <p class="version">v2.8 — Pared + nivel</p>
+            <p class="version">v2.9 — Cuadros OSECAC</p>
         </div>
         <div class="header-controls">
             <button type="button" class="btn btn-header" onclick="abrirPanel('perlas')" title="Perlas clínicas de los cursos, por tema">
@@ -1140,6 +1140,7 @@
             <option value="no_evaluado">No evaluado</option>
             <option value="negativo">Negativo</option>
             <option value="positivo">Positivo</option>
+            <option value="indeterminado">Indeterminado</option>
         </select>
         <span id="diast_resultado_origen" style="display:none"></span>
     </section>
@@ -1797,14 +1798,14 @@
 <script src="motility-estres.js?v=2.7-motilidad"></script>
 <script src="pearls.js?v=2.3-estetica-1"></script>
 <script src="motility-groups.js?v=2.2"></script>
-<script src="report-templates.js?v=2.7-motilidad"></script>
+<script src="report-templates.js?v=2.9-cuadros"></script>
 <script src="sheets-storage.js?v=2.7-motilidad"></script>
-<script src="app.js?v=2.8-espacios"></script>
+<script src="app.js?v=2.9-cuadros"></script>
 <script>
 // Control de versión: si el navegador sirvió una mezcla de archivos viejos y nuevos,
 // los botones fallan en silencio. Esto lo convierte en un aviso visible.
 (function () {
-    var APP_VERSION = '2.8';
+    var APP_VERSION = '2.9';
     var faltan = ['generarInforme', 'recolectarHallazgos', 'calcEjercicio'].filter(function (f) {
         return typeof window[f] !== 'function';
     });

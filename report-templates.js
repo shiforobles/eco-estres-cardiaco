@@ -261,7 +261,7 @@ const NARRATIVA = {
                        'afirmar ni descartar nuevas alteraciones de la motilidad parietal.',
 
     esfuerzoDiastolico: 'Sin nuevas alteraciones de la motilidad parietal. La relación E/e\' promedio ascendió a ' +
-                       '{{eeEstres}}, con VRT de {{vrtEstres}} m/s, sin el incremento esperado de e\', hallazgos compatibles con aumento de las ' +
+                       '{{eeEstres}}{{vrtEstresFrase}}, sin el incremento esperado de e\', hallazgos compatibles con aumento de las ' +
                        'presiones de llenado del ventrículo izquierdo inducido por el ejercicio.',
 
     esfuerzoHipotensiva: 'Se objetivaron {{hallazgos}}, con caída de la FEy de {{feyReposo}} % a {{feyEstres}} %.',

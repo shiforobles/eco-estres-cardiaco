@@ -80,9 +80,14 @@ exigir(diast(() => { set('e_onda_est',120); set('e_prima_est',7); set('e_prima_l
 exigir(diast(() => { set('e_onda_est',120); set('e_prima_est',7); set('e_prima_lat_est',9);
     set('vrt_est',3.0); set('e_prima_rep',9); }).clave === 'indeterminado',
     "sin e' septal bajo no es positivo");
+// Sin VRT se informa con lo que hay (Lucas, 11/11/2026). Negativo sólo con E/e' bajo
+// en LAS DOS fases: sin E/e' de reposo no alcanza y queda indeterminado.
 exigir(diast(() => { set('e_onda_est',90); set('e_prima_est',12); set('e_prima_lat_est',14);
-    set('e_prima_rep',9); }).clave === 'insuficiente',
-    'sin VRT son datos insuficientes, NUNCA negativo');
+    set('e_prima_rep',9); }).clave === 'indeterminado',
+    'sin VRT y sin E/e\' de reposo: indeterminado, nunca negativo');
+exigir(diast(() => { set('e_onda_rep',80); set('e_prima_rep',10); set('e_prima_lat_rep',12);
+    set('e_onda_est',90); set('e_prima_est',12); set('e_prima_lat_est',14); }).clave === 'negativo',
+    'sin VRT, E/e\' <10 en reposo y post: negativo');
 exigir(diast(() => { set('vrt_est',2.2); }).clave === 'insuficiente',
     "sin E/e' post, ídem");
 exigir(diast(() => { set('e_onda_est',120); set('e_prima_est',7); set('vrt_est',3.0);
