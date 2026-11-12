@@ -274,7 +274,11 @@ const NARRATIVA = {
                        'de la motilidad parietal en ninguno de los territorios evaluados, pese a los cambios del segmento ST ' +
                        'descritos.{{acompanamiento}}',
 
-    // ── HIPOQUINESIA GLOBAL / MIOCARDIOPATÍA DILATADA ─────────────────
+    // ── HIPOQUINESIA GLOBAL ─────────────────────────────────────────────
+    // Se describe el patrón, no se le pone nombre: «miocardiopatía dilatada» es un
+    // diagnóstico clínico (ESC 2023) que exige VI dilatado y descartar causa coronaria
+    // o de carga; ni la FEy ni la hipoquinesia global alcanzan. Si el médico la marcó
+    // en Antecedentes, sale ahí.
     // Patrón no coronario: NO se enumeran segmentos ni se atribuyen territorios,
     // y no existe "el resto de los segmentos" del que hablar.
     reposoDilatada:   'En reposo se observó hipoquinesia global del ventrículo izquierdo, sin distribución en territorio ' +
@@ -322,7 +326,7 @@ const NARRATIVA = {
 
         dilatada: 'Conclusión: prueba de eco estrés con ejercicio sin isquemia inducible, en un ventrículo izquierdo con ' +
                   'hipoquinesia global y función sistólica {{gradoFey}}, sin reserva contráctil con el esfuerzo. El patrón ' +
-                  'de compromiso no sigue una distribución coronaria, en relación con miocardiopatía dilatada{{vdConcl}}.' +
+                  'de compromiso no sigue una distribución coronaria{{vdConcl}}.' +
                   '{{capacidadDilatada}}',
 
         // ST con cambios y eco negativo. No se dice "positiva", "isquémicos" ni
