@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=2.8-espacios">
+    <link rel="stylesheet" href="styles.css?v=2.9-patron">
 </head>
 <body>
 <div class="container">
@@ -1041,13 +1041,15 @@
             exige cambio de categoría (hipoquinesia → aquinesia → disquinesia).
         </p>
 
-        <!-- Patrón de la alteración: lo deduce el bull's eye (≥12 segmentos, tres
-             territorios y FEy ≤40 %). Oculto, no borrado: sigue siendo corregible
-             desde el resumen plegado de Interpretación. -->
-        <select id="patron_motilidad" style="display:none" aria-hidden="true">
-            <option value="segmentaria">Segmentaria (distribución coronaria)</option>
-            <option value="global">Global (no coronaria)</option>
-        </select>
+        <!-- Patrón de la alteración: lo elige el operador (Lucas, 18/11/2026). La app
+             no lo propone; si se cumple el criterio de referencia, sólo avisa. -->
+        <div class="form-group patron-motilidad">
+            <label for="patron_motilidad">Patrón de la alteración</label>
+            <select id="patron_motilidad">
+                <option value="segmentaria">Segmentaria (distribución coronaria)</option>
+                <option value="global">Global (no coronaria)</option>
+            </select>
+        </div>
         <span id="patron_motilidad_origen" style="display:none"></span>
 
         <!-- Motilidad en recuperación: retirada de la pantalla. No alimentaba el
@@ -1795,12 +1797,12 @@
 <script src="vendor/doppler/motility-model.js?v=2.2"></script>
 <script src="vendor/doppler/motility-engine.js?v=2.2"></script>
 <script src="vendor/doppler/territory-engine.js?v=2.2"></script>
-<script src="motility-estres.js?v=2.7-motilidad"></script>
+<script src="motility-estres.js?v=2.9-redaccion"></script>
 <script src="pearls.js?v=2.3-estetica-1"></script>
 <script src="motility-groups.js?v=2.2"></script>
 <script src="report-templates.js?v=2.9-mcd"></script>
 <script src="sheets-storage.js?v=2.7-motilidad"></script>
-<script src="app.js?v=2.9-cuadros"></script>
+<script src="app.js?v=2.9-patron"></script>
 <script>
 // Control de versión: si el navegador sirvió una mezcla de archivos viejos y nuevos,
 // los botones fallan en silencio. Esto lo convierte en un aviso visible.

@@ -9,8 +9,9 @@ const CASOS = [
   { n: 5,  t: 'Aquinesia inferior + hipoquinesia inferolateral fijas', ...fijos({ 4: 4, 10: 4, 5: 3, 11: 3 }) },
   { n: 6,  t: 'BCRI con septum alterado en reposo y esfuerzo', campos: { ant_bcri: true }, ...fijos({ 2: 3, 3: 3, 8: 3, 9: 3 }) },
   { n: 7,  t: 'BCRI + hipoquinesia inferolateral fija', campos: { ant_bcri: true }, ...fijos({ 5: 3, 11: 3 }) },
-  { n: 8,  t: 'Miocardiopatía dilatada, FEy 30 % (FEy cargada después del bull\'s eye)',
-    campos: { fevi_reposo: 30, fevi_pico: 32 }, feyDespues: true,
+  // Patrón global marcado a mano: desde el 18/11/2026 la app no lo propone.
+  { n: 8,  t: 'Hipoquinesia global marcada a mano, FEy 30 % (FEy cargada después del bull\'s eye)',
+    campos: { fevi_reposo: 30, fevi_pico: 32, patron_motilidad: 'global' }, feyDespues: true,
     ...fijos(Object.fromEntries(Array.from({ length: 17 }, (_, i) => [i + 1, 3]))) },
   { n: 9,  t: 'IAM anterior (aquinesia DA fija) + 1 segmento lateral nuevo', campos: { ant_iam: true },
     reposo: { 7: 4, 8: 4, 13: 4, 14: 4 }, estres: { 7: 4, 8: 4, 13: 4, 14: 4, 12: 2 } },

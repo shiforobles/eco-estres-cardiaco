@@ -1918,3 +1918,6 @@ textarea.auto-alto { resize: none; overflow: hidden; min-height: 42px; line-heig
 .sintomas-estudio__titulo { font-size: var(--font-size-sm); font-weight: 600; color: var(--color-text-secondary); }
 .ajustes-informe { margin: 0 0 0.75rem; }
 .ajustes-informe[open] { padding-bottom: 0.75rem; border-bottom: 1px solid var(--color-border); }
+
+/* Patrón de la alteración: lo elige el operador, debajo del resumen de motilidad */
+.patron-motilidad { margin-top: var(--spacing-md); max-width: 320px; }

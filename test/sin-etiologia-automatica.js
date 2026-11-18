@@ -28,7 +28,9 @@ for (const c of CASOS) {
     set(w, 'ddvi', c.ddvi); set(w, 'siv_d', 9); set(w, 'pp_d', 9);
     if (c.seg) puntajes(w, c.seg, c.seg);
     set(w, 'fevi_reposo', c.fey); set(w, 'fevi_pico', c.fey + 2);
-    if (c.global) exigir(w.document.getElementById('patron_motilidad').value === 'global', `${c.t}: se esperaba patrón global`);
+    // La app ya no propone el patrón global: queda segmentario hasta que el operador lo cambie
+    exigir(w.document.getElementById('patron_motilidad').value === 'segmentaria', `${c.t}: la app propuso el patrón global sola`);
+    if (c.global) { set(w, 'patron_motilidad', 'global'); }
     const H = w.recolectarHallazgos();
     const O = w.informeOsecac(H);
     const largo = informe(w).texto;
@@ -44,6 +46,26 @@ for (const c of CASOS) {
     const w = cargarApp(); casoBase(w); todoNormal(w);
     set(w, 'ant_mcd', true);
     exigir(/miocardiopat[ií]a dilatada/i.test(informe(w).texto), 'antecedente consignado: debe figurar en el informe');
+}
+
+// Redacción (18/11/2026)
+{
+    const w = cargarApp(); casoBase(w); todoNormal(w);
+    set(w, 'ddvi', 61); set(w, 'siv_d', ''); set(w, 'pp_d', '');
+    puntajes(w, { 7: 4, 13: 3, 11: 2, 12: 2 }, { 7: 4, 13: 3, 11: 2, 12: 2 });
+    set(w, 'fevi_reposo', 45);
+    const O = w.informeOsecac(w.recolectarHallazgos());
+    if (ver) console.log('\n── redacción ──\n' + O.reposo + '\n' + O.esfuerzo);
+    exigir(!/, con [^.;]*, con /.test(O.reposo), 'redacción: dos «, con» seguidos en el reposo');
+    exigir(!/dilatad[oa] \([^)]*\) (y|e) /.test(O.reposo), 'redacción: «dilatado (…) y» une adjetivo y sustantivo');
+}
+{
+    const w = cargarApp(); casoBase(w); todoNormal(w);
+    puntajes(w, { 1: 4, 8: 3 }, { 1: 4, 8: 1 });
+    const H = w.recolectarHallazgos();
+    const todo = [w.informeOsecac(H).esfuerzo, informe(w).texto].join('\n');
+    if (ver) console.log('\n── basal basal ──\n' + w.informeOsecac(H).esfuerzo);
+    exigir(!/\b(\w+) \1\b/.test(todo), 'redacción: palabra repetida («basal basal»)');
 }
 
 console.log(fallas ? `${fallas} fallas` : `Sin fallas — sin etiología automática: ${CASOS.length} escenarios + antecedente consignado`);
