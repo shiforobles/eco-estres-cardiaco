@@ -56,7 +56,7 @@ puntajes(w, { 1: 2 }, { 1: 4, 7: 3 });
 w.autocompletarInterpretacion();
 let H = w.recolectarHallazgos(), N = w.construirNarrativa(H);
 exigir(N.rama === 'positivaUnico', 'progresión + nuevo en el mismo territorio: positivo');
-exigir(/Nueva hipoquinesia moderada del segmento anterior medio, y progresión de hipoquinesia a aquinesia del segmento anterior basal/.test(N.piezas.esfuerzo),
+exigir(/Nueva hipoquinesia moderada de la pared anterior \(medio\), y progresión de hipoquinesia a aquinesia de la pared anterior \(basal\)/.test(N.piezas.esfuerzo),
     'lo nuevo y la progresión se dicen por separado: ' + N.piezas.esfuerzo);
 exigir(/en territorio DA, en parte sobre segmentos con alteración basal/.test(N.piezas.conclusion), N.piezas.conclusion);
 

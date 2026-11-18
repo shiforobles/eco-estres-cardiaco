@@ -68,10 +68,11 @@ const { linea } = require('./harness');
         const { texto } = w.construirNarrativa(H);
         const lRep = linea(texto, 'Reposo');
         // La frase de motilidad es el segundo párrafo del bloque (el primero es el método)
-        // Se saca el paréntesis del territorio: ahí 'anterior' es el nombre del VASO
-        // (arteria descendente anterior), no una pared, y daba falsos positivos.
+        // Se saca un paréntesis de territorio si lo hubiera: ahí 'anterior' es el VASO
+        // (arteria descendente anterior). Los niveles también van entre paréntesis
+        // desde el 18/11/2026 ("(basal y medio)") y ésos se conservan.
         const motil = (lRep.split('\n\n')[1] || '').split('.')[0]
-            .replace(/\([^)]*\)/g, '').toLowerCase();
+            .replace(/\([^)]*arteria[^)]*\)/g, '').toLowerCase();
         const e = ESPERADO[id];
 
         if (e.apex) {

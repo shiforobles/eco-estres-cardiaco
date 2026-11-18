@@ -49,6 +49,13 @@ Estas no se cambian sin consultar. Cada una está porque el error ya pasó.
 - **El territorio coronario se nombra una sola vez, en la conclusión, con sigla**
   (DA, CD, Cx). Reposo y Esfuerzo describen la motilidad por pared, con el motor de
   eco Doppler, y sólo lo nuevo o lo que empeora en el esfuerzo.
+- **Redacción de la motilidad: prosa ordenada (Lucas, 18/11/2026).** De lo más grave a
+  lo más leve; paredes con los mismos niveles juntas y el nivel una sola vez, entre
+  paréntesis ("de las paredes anterior, septal e inferior (basal y medio)"); "pared
+  septal" y "pared lateral" cuando sus dos subdivisiones coinciden; "en toda su
+  extensión" sólo con el segmento apical incluido. Vive en `motility-estres.js` (sólo
+  eco estrés; la app de Doppler sigue con su texto). Lo vigila
+  `test/motilidad-prosa-ordenada.js`.
 - **"En relación con evento previo" sólo con la casilla Infarto previo.**
 - **Pronóstico y categorización no van al informe (Lucas, 18/11/2026).** Ni cifras de
   eventos ("<1 % anual", "5 % anual"), ni juicio de riesgo ("predictor de mortalidad",

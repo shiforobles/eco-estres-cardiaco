@@ -1,4 +1,5 @@
-// Tanda de motilidad (super prompt v2 de Lucas, 04/11/2026): los 19 casos probados
+// Tanda de motilidad (super prompt v2 de Lucas, 04/11/2026; redacción en prosa
+// ordenada desde el 18/11/2026): los 19 casos probados
 // en la app real, con lo que cada uno tiene que decir y lo que no puede decir.
 const h = require('./harness');
 const { CASOS, armar } = require('./casos-motilidad-def');
@@ -39,11 +40,11 @@ CASOS.forEach(c => {
 // ── Caso por caso ──
 exigir(R[1].rama === 'positivaUnico' && /en territorio DA\./.test(con(1)), '1: positivo DA');
 exigir(/Nueva hipoquinesia moderada/.test(esf(1)) && !/segmentos anterior medio, anteroseptal medio/.test(esf(1)), '1: por pared');
-exigir(R[2].rama === 'positivaUnico' && /Nueva hipoquinesia leve anterolateral a nivel basal y medio/.test(esf(2)) && /territorio Cx/.test(con(2)), '2: anterolateral');
+exigir(R[2].rama === 'positivaUnico' && /Nueva hipoquinesia leve de la pared anterolateral \(basal y medio\)/.test(esf(2)) && /territorio Cx/.test(con(2)), '2: anterolateral');
 exigir(R[3].rama === 'secuela' && /alteración basal en territorio DA no se modificó/.test(con(3)), '3: fija DA sin causa');
-exigir(/Aquinesia inferior a nivel basal y medio/.test(rep(4)) && /territorio CD/.test(con(4)), '4: aquinesia inferior');
-exigir(/territorios CD y Cx/.test(con(5)) && /hipoquinesia moderada inferolateral/.test(rep(5)), '5: dos territorios fijos');
-exigir(R[6].rama === 'negativa' && /asincronía de las paredes anteroseptal e inferoseptal/.test(rep(6)), '6: BCRI, septum fuera');
+exigir(/Aquinesia de la pared inferior \(basal y medio\)/.test(rep(4)) && /territorio CD/.test(con(4)), '4: aquinesia inferior');
+exigir(/territorios CD y Cx/.test(con(5)) && /hipoquinesia moderada de la pared inferolateral \(basal y medio\)/.test(rep(5)), '5: dos territorios fijos');
+exigir(R[6].rama === 'negativa' && /asincronía de la pared septal \(basal y medio\)/.test(rep(6)), '6: BCRI, septum fuera');
 exigir(R[7].rama === 'secuela' && /territorio Cx/.test(con(7)) && /bloqueo completo de rama izquierda/.test(con(7)), '7: BCRI + fija');
 exigir(R[8].rama === 'dilatada' && /Hipoquinesia global/.test(rep(8)), '8: dilatada con la FEy cargada después');
 const antes8 = armar(w, h, CASOS.find(c => c.n === 8), { feyAntes: true });
@@ -55,7 +56,7 @@ exigir(/secuela de infarto previo/.test(con(9)) && /hallazgo aislado de signific
 exigir(!/sin nuevas alteraciones/.test(esf(9)), '9: no dice "sin nuevas alteraciones"');
 exigir(R[10].rama === 'positivaMulti' && /territorios DA y CD/.test(con(10)), '10: multivaso');
 exigir(!/alto riesgo|multiterritorial/.test(esf(10)), '10: la interpretación va sólo en la conclusión');
-exigir(R[11].rama === 'positivaUnico' && /Progresión de hipoquinesia a aquinesia inferior/.test(esf(11)) && !/Nueva aquinesia/.test(esf(11)),
+exigir(R[11].rama === 'positivaUnico' && /Progresión de hipoquinesia a aquinesia de la pared inferior \(basal y medio\)/.test(esf(11)) && !/Nueva aquinesia/.test(esf(11)),
     '11: progresión, no "nueva"');
 exigir(/en territorio CD con alteración basal/.test(con(11)), '11: isquemia en territorio con alteración basal');
 exigir(R[12].rama === 'secuela' && !R[12].H.isquemicos.length && /no mostró cambios significativos/.test(esf(12)), '12: leve → moderada sin isquemia');
@@ -67,8 +68,8 @@ exigir(R[15].rama === 'positivaUnico' && /territorio Cx/.test(con(15)), '15: BCR
 exigir(R[16].rama === 'secuela' && !R[16].H.recuperaron.length && !/se normalizó|mejoró con/.test(esf(16) + con(16)), '16: disquinesia → aquinesia no es mejoría');
 exigir(R[17].rama === 'positivaUnico' && /territorio CD\./.test(con(17)) && /Alteración basal en territorio DA sin cambios/.test(con(17)),
     '17: positivo CD que nombra la secuela DA');
-exigir(/paredes anterior, anteroseptal, inferoseptal e inferior en toda su extensión/.test(rep(18)) && /Δ \+1 punto\)/.test(esf(18)), '18: extenso, por pared');
-exigir(/Nueva aquinesia anterior medio-apical, con hipoquinesia leve/.test(esf(19)) && /territorio DA/.test(con(19)), '19: grados mixtos');
+exigir(/Aquinesia de las paredes anterior, septal e inferior en toda su extensión y del ápex/.test(rep(18)) && /Δ \+1 punto\)/.test(esf(18)), '18: extenso, por pared');
+exigir(/Nueva aquinesia de la pared anterior \(medio y apical\), con hipoquinesia leve de la pared anterior \(basal\)/.test(esf(19)) && /territorio DA/.test(con(19)), '19: grados mixtos');
 [3, 4, 5, 7, 9, 12, 16, 17, 18].forEach(k =>
     exigir((con(k).match(/La ausencia de mejoría con el esfuerzo no descarta miocardio viable\./g) || []).length === 1,
         `${k}: la frase de viabilidad, una vez y tal cual`));

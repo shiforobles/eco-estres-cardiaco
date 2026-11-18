@@ -126,6 +126,102 @@
     const ENUMERA_DEMASIADO = /de los segmentos [^.;]*?,[^.;]*?,[^.;]*?(,| y | e )/;
     const APICALES = [13, 14, 15, 16, 17];
 
+    // ── 5 · Prosa ordenada (Lucas, 18/11/2026) ─────────────────────
+    // Con muchos segmentos el texto del motor se hacía difícil de leer. Formato
+    // elegido: de lo más grave a lo más leve; en cada grado, las paredes que
+    // comparten niveles van juntas y el nivel se dice una sola vez, entre
+    // paréntesis. "Aquinesia del anillo apical, con hipoquinesia leve de las paredes
+    // anterior, anteroseptal, inferoseptal e inferior (basal y medio)."
+    //  · "en toda su extensión" sólo para las paredes que tienen segmento apical
+    //    propio (anterior e inferior) o para el septum entero (2, 3, 8, 9 y 14).
+    //  · El anillo apical (13-16) se nombra entero; con el ápex, casquete apical.
+    //  · El apical septal (14) y el apical lateral (16) sueltos van por su nombre.
+    const PAREDES_NIVEL = [
+        { nombre: 'anterior',      b: 1, m: 7,  a: 13 },
+        { nombre: 'anteroseptal',  b: 2, m: 8 },
+        { nombre: 'inferoseptal',  b: 3, m: 9 },
+        { nombre: 'inferior',      b: 4, m: 10, a: 15 },
+        { nombre: 'inferolateral', b: 5, m: 11 },
+        { nombre: 'anterolateral', b: 6, m: 12 },
+    ];
+    const ANILLO = [13, 14, 15, 16];
+
+    /** Dónde, sin el grado: "de las paredes anterior e inferior (basal y medio) y del ápex". */
+    function ubicacionOrdenada(ids) {
+        const S = new Set(ids);
+        const usados = new Set();
+        const piezas = [];
+        if (ANILLO.every(id => S.has(id))) {
+            if (S.has(APEX)) { piezas.push('del casquete apical'); usados.add(APEX); }
+            else piezas.push('del anillo apical');
+            ANILLO.forEach(id => usados.add(id));
+        }
+        // Cada pared con sus niveles alterados.
+        const nivelesDe = p => {
+            const n = [];
+            if (S.has(p.b) && !usados.has(p.b)) n.push('basal');
+            if (S.has(p.m) && !usados.has(p.m)) n.push('medio');
+            if (p.a && S.has(p.a) && !usados.has(p.a)) n.push('apical');
+            return n;
+        };
+        // Pared septal y pared lateral (Lucas, 18/11/2026): si las dos subdivisiones
+        // (anteroseptal e inferoseptal; anterolateral e inferolateral) tienen los mismos
+        // niveles, se nombran como una sola pared. Con su segmento apical (14 o 16),
+        // la pared queda "en toda su extensión".
+        const unidades = [];
+        // La clave es la que aparece primero en PAREDES_NIVEL.
+        const pares = { anteroseptal: ['inferoseptal', 'septal', 14], inferolateral: ['anterolateral', 'lateral', 16] };
+        const yaUnidas = new Set();
+        PAREDES_NIVEL.forEach(p => {
+            if (yaUnidas.has(p.nombre)) return;
+            const par = pares[p.nombre];
+            if (par) {
+                const otra = PAREDES_NIVEL.find(x => x.nombre === par[0]);
+                const n1 = nivelesDe(p), n2 = nivelesDe(otra);
+                if (n1.length && n1.join() === n2.join()) {
+                    yaUnidas.add(otra.nombre);
+                    const apical = par[2];
+                    const conApical = n1.length === 2 && S.has(apical) && !usados.has(apical);
+                    [p.b, p.m, otra.b, otra.m].forEach(id => { if (S.has(id)) usados.add(id); });
+                    if (conApical) usados.add(apical);
+                    unidades.push({ nombre: par[1], clave: conApical ? 'en toda su extensión' : `(${lista(n1)})` });
+                    return;
+                }
+            }
+            const niveles = nivelesDe(p);
+            if (!niveles.length) return;
+            [p.b, p.m, p.a].forEach(id => { if (id && S.has(id)) usados.add(id); });
+            unidades.push({ nombre: p.nombre,
+                clave: (p.a && niveles.length === 3) ? 'en toda su extensión' : `(${lista(niveles)})` });
+        });
+        // Paredes con el mismo conjunto de niveles van juntas.
+        const grupos = [];
+        unidades.forEach(u => {
+            let g = grupos.find(x => x.clave === u.clave);
+            if (!g) { g = { clave: u.clave, paredes: [] }; grupos.push(g); }
+            g.paredes.push(u.nombre);
+        });
+        grupos.forEach(g => piezas.push(
+            `${g.paredes.length > 1 ? 'de las paredes' : 'de la pared'} ${lista(g.paredes)} ${g.clave}`));
+        if (S.has(14) && !usados.has(14)) { piezas.push('del segmento apical septal'); usados.add(14); }
+        if (S.has(16) && !usados.has(16)) { piezas.push('del segmento apical lateral'); usados.add(16); }
+        if (S.has(APEX) && !usados.has(APEX)) piezas.push('del ápex');
+        return lista(piezas);
+    }
+
+    function describirOrdenado(st) {
+        const grupos = [5, 4, 3, 2].map(g => {
+            const ids = Object.keys(st).map(Number).filter(id => st[id] === g);
+            return ids.length ? `${NOMBRE_GRADO[g]} ${ubicacionOrdenada(ids)}` : '';
+        }).filter(Boolean);
+        // El segundo grado entra con «, con»; los siguientes, con «y»/«e».
+        let t = grupos[0];
+        grupos.slice(1).forEach((g, i) => {
+            t += i === 0 ? `, con ${g}` : ((/^(i|hi(?!e))/i.test(g) ? ' e ' : ' y ') + g);
+        });
+        return mayuscula(t + '.');
+    }
+
     /**
      * Texto de motilidad de una fase, con los motores de Doppler.
      * @param {Object} wm   WM.reposo o WM.estres
@@ -154,6 +250,9 @@
         } else if (anormales.length === 5 && APICALES.every(id => st[id] === st[APEX])) {
             // (b) Los cinco apicales, mismo grado, nada más.
             texto = mayuscula(`${NOMBRE_GRADO[st[APEX]]} de la totalidad del casquete apical.`);
+        } else if (!/global del ventrículo izquierdo/i.test(MotorA5.describe(sinApex))) {
+            // (5) Prosa ordenada: todo lo segmentario.
+            texto = describirOrdenado(st);
         } else {
             texto = unirAdyacentes(limpiarNiveles(MotorA5.describe(sinApex)));
             if (ENUMERA_DEMASIADO.test(texto)) {
@@ -185,6 +284,7 @@
      */
     function ubicacion(ids) {
         if (!ids || !ids.length) return '';
+        return ubicacionOrdenada(ids);
         const wm = {};
         for (let id = 1; id <= 17; id++) wm[id] = ids.includes(id) ? 3 : 1;
         return describirFase(wm, null).texto
@@ -227,5 +327,5 @@
 
     function mayuscula(t) { return t ? t.charAt(0).toUpperCase() + t.slice(1) : t; }
 
-    raiz.MotilidadDoppler = { describirFase, ubicacion, ubicacionPorPared, MotorA5, TEXTO_NORMAL: Engine.NORMAL_TEXT };
+    raiz.MotilidadDoppler = { describirFase, ubicacion, ubicacionPorPared, ubicacionOrdenada, MotorA5, TEXTO_NORMAL: Engine.NORMAL_TEXT };
 })(typeof window !== 'undefined' ? window : globalThis);
