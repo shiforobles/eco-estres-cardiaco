@@ -1060,6 +1060,7 @@ details[open] summary::after { content: ' ▲'; }
 .cat-panel.hint-intermedio { border-left-color: var(--color-warning); background: var(--color-warning-bg); }
 .cat-panel.hint-bajo { border-left-color: var(--color-success); background: var(--color-success-bg); }
 .cat-motivos { margin: 0.35rem 0 0 1rem; padding: 0; }
+.cat-pronostico { margin-top: 0.6rem; padding-top: 0.5rem; border-top: 1px dashed currentColor; opacity: 0.95; }
 .cat-motivos li { margin-bottom: 0.45rem; }
 /* La conducta sugerida vive sólo acá: salió del informe para no dejar escrita una
    indicación que el médico tratante queda obligado a justificar si no la sigue. */

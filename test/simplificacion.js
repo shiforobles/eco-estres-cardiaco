@@ -177,12 +177,17 @@ set4('peso', 80); set4('ej_protocolo', 'astrand'); set4('ej_etapa', 4);
 w4.calcCargaYMets();
 exigir(Math.abs(parseFloat(w4.document.getElementById('ej_mets').value) - 5.8) < 0.2,
     'sin el dato de la ergometría manda la fórmula del ACSM');
+// Desde el 18/11/2026 los METs del informe salen siempre de la fórmula del ACSM: el
+// valor del ergómetro queda para comparar y, si difiere, se avisa.
 set4('ej_mets_ergo', 9.2);
-exigir(w4.document.getElementById('ej_mets').value === '9.2',
-    'cargada la ergometría, el informe usa ese valor');
-exigir(w4.recolectarHallazgos().mets === 9.2,
-    'y el motor del informe lee los METs de la ergometría');
-// Y manda incluso sobre unos METs escritos a mano antes.
+exigir(Math.abs(parseFloat(w4.document.getElementById('ej_mets').value) - 5.9) < 0.05,
+    'cargada la ergometría, el informe sigue usando la fórmula del ACSM (5,9)');
+exigir(Math.abs(w4.recolectarHallazgos().mets - 5.9) < 0.05,
+    'y el motor del informe lee los METs de la fórmula');
+w4.validarEstudio('negativa');
+exigir(/ergómetro informa 9,2 METs/.test((w4.document.getElementById('validacion-panel') || {}).innerHTML || ''),
+    'con 9,2 del ergómetro contra 5,9 de la fórmula, avisa la diferencia');
+// Unos METs escritos a mano siguen mandando: el ergómetro no los pisa.
 const w5 = cargarApp();
 const set5 = (id, val) => { const e = w5.document.getElementById(id); e.value = val;
     e.dispatchEvent(new w5.Event('input', { bubbles: true }));
@@ -190,12 +195,24 @@ const set5 = (id, val) => { const e = w5.document.getElementById(id); e.value = 
 set5('peso', 80); set5('ej_protocolo', 'astrand'); set5('ej_etapa', 4);
 set5('ej_mets', 11);
 set5('ej_mets_ergo', 7.4);
-exigir(w5.document.getElementById('ej_mets').value === '7.4',
-    'el dato de la ergometría manda sobre unos METs escritos a mano');
-// Borrarlo devuelve el cálculo a la fórmula.
-set5('ej_mets_ergo', '');
-exigir(Math.abs(parseFloat(w5.document.getElementById('ej_mets').value) - 5.8) < 0.2,
-    'y al borrarlo vuelve la fórmula del ACSM');
+exigir(w5.document.getElementById('ej_mets').value === '11',
+    'el dato de la ergometría no pisa unos METs escritos a mano');
+// Sin peso, la fórmula no puede calcular: ahí se usa el del ergómetro.
+const wSinPeso = cargarApp();
+const setSinPeso = (id, val) => { const e = wSinPeso.document.getElementById(id); e.value = val;
+    e.dispatchEvent(new wSinPeso.Event('input', { bubbles: true }));
+    e.dispatchEvent(new wSinPeso.Event('change', { bubbles: true })); };
+setSinPeso('ej_protocolo', 'astrand'); setSinPeso('ej_etapa', 3); setSinPeso('ej_mets_ergo', 4.4);
+exigir(wSinPeso.document.getElementById('ej_mets').value === '4.4',
+    'sin peso no hay fórmula: se usa el valor del ergómetro');
+// Rasente (11/11): 80 kg, 450 Kgm/min → 4,9 METs con el ACSM exacto (antes 4,8).
+const wRasente = cargarApp();
+const setRasente = (id, val) => { const e = wRasente.document.getElementById(id); e.value = val;
+    e.dispatchEvent(new wRasente.Event('input', { bubbles: true }));
+    e.dispatchEvent(new wRasente.Event('change', { bubbles: true })); };
+setRasente('peso', 80); setRasente('ej_protocolo', 'astrand'); setRasente('ej_etapa', 3);
+exigir(wRasente.document.getElementById('ej_mets').value === '4.9',
+    `450 Kgm/min con 80 kg son 4,9 METs (ACSM 1,8) y dio ${wRasente.document.getElementById('ej_mets').value}`);
 
 // ── 9 · "Todo normal" también confirma la motilidad ──────────────
 const w6 = cargarApp();

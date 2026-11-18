@@ -31,8 +31,11 @@ let r = correr('CASO REAL de la jornada', () => {
     set(w, 'esf_max_fc', 150); set(w, 'esf_rec_fc', 140);
     [1, 2, 3, 7, 8, 9, 13, 14].forEach(id => w.setScore(id, 'estres', 3));
 });
-exigir(r.n === 3, `el caso real debía quedar en 3 frases, quedó en ${r.n}`);
-exigir(/la carga isquémica es alta/i.test(r.parr), 'falta la frase fusionada de extensión');
+// Desde el 18/11/2026 al informe va sólo el hallazgo descriptivo: la extensión y la
+// capacidad funcional. El WMSI, la FEy, el HRR₁ y la tensión ya están en el cuerpo.
+exigir(r.n === 2, `el caso real debía quedar en 2 frases, quedó en ${r.n}`);
+exigir(/La isquemia compromete 8 segmentos de 2 territorios coronarios/.test(r.parr), 'falta la frase de extensión');
+exigir(/Capacidad funcional severamente reducida \(3,4 METs/.test(r.parr), 'falta la capacidad funcional');
 exigir(!/se sugiere/i.test(r.parr), 'el párrafo pronóstico no puede sugerir conducta');
 exigir(!/alto riesgo de eventos/.test(r.parr),
     'en rama positiva no debe repetirse el juicio que ya dio el veredicto');
@@ -40,8 +43,9 @@ exigir(!/respuesta tensional|tensión arterial alcanzó/.test(r.parr), 'la hiper
 exigir(!/recuperación de la frecuencia cardíaca/.test(r.parr), 'el HRR₁ de 10 no debía entrar');
 exigir(!/reserva contráctil global/.test(r.parr), 'la reserva contráctil no debía entrar');
 
+// La respuesta hipertensiva ya la describe el párrafo de hemodinamia: no se repite.
 r = correr('hipertensiva sola, estudio limpio', () => { set(w, 'esf_max_tas', 228); });
-exigir(/tensión arterial alcanzó/.test(r.parr), 'sin críticos, la hipertensiva debe entrar');
+exigir(!/tensión arterial alcanzó/.test(r.parr), 'la hipertensiva ya está en el cuerpo: no se repite');
 
 r = correr('hipertensiva junto a un crítico', () => {
     set(w, 'esf_max_tas', 228); set(w, 'ej_mets', 3);
@@ -57,7 +61,7 @@ exigir(r.n === 1, `las tres de extensión debían dar 1 frase, dieron ${r.n}`);
 r = correr('extensa sin multiterritorial (7 segs DA aquinéticos)', () => {
     [1, 2, 7, 8, 13, 14, 17].forEach(id => w.setScore(id, 'estres', 4));
 });
-exigir(r.n === 1 && /carga isquémica es alta/i.test(r.parr), 'extensa + WMSI alto debían fusionarse');
+exigir(r.n === 1 && /La isquemia compromete 7 segmentos\./.test(r.parr), 'extensa + WMSI alto debían fusionarse');
 
 // Testigo de la corrección de escala: seis segmentos con hipoquinesia moderada daban
 // WMSI 1,71 con el puntaje crudo y la frase del "~5 % anual". En escala ASE dan 1,35.
@@ -85,8 +89,11 @@ exigir(!/no cabe esperar recuperación funcional/.test(conclSecuela), 'SOBREAFIR
 r = correr('HRR₁ 10: sale del informe', () => { set(w, 'esf_rec_fc', 140); set(w, 'esf_max_fc', 150); });
 exigir(r.n === 0, 'el HRR₁ de 10 no debe imprimir');
 
-r = correr('HRR₁ 4: entra', () => { set(w, 'esf_rec_fc', 146); set(w, 'esf_max_fc', 150); });
-exigir(r.n === 1, 'el HRR₁ de 4 debe imprimir');
+// El HRR₁ ya figura en el párrafo de hemodinamia; su lectura pronóstica, en pantalla.
+r = correr('HRR₁ 4: no se repite en la conclusión', () => { set(w, 'esf_rec_fc', 146); set(w, 'esf_max_fc', 150); });
+exigir(r.n === 0, 'el HRR₁ de 4 ya está en el cuerpo: no se repite');
+exigir(w.frasesPronosticoPantalla(r.H, w.elegirRama(r.H)).some(f => /disfunción autonómica/.test(f)),
+    'pero su lectura pronóstica sigue en pantalla');
 
 // patronApical exento del tope: 1 crítico + 5 de segunda, el apical no puede caer
 r = correr('tope activo + patrón apical exento', () => {
@@ -103,5 +110,29 @@ exigir(/compromiso apical|región apical|tres territorios coronarios por anatom�
 
 r = correr('todo normal', () => {});
 exigir(r.n === 0, 'un estudio normal no debe tener párrafo');
+// Negativo con buen estímulo: la cifra de <1 % anual queda en pantalla, no en el informe.
+const conclNormal = w.construirNarrativa(r.H).piezas.conclusion;
+exigir(!/% anual|Categorización|bajo riesgo/.test(conclNormal), 'la conclusión no lleva cifras ni categorización');
+exigir(w.frasesPronosticoPantalla(r.H, w.elegirRama(r.H)).some(f => /menor al 1 % anual/.test(f)),
+    'la cifra de bajo riesgo se ve en pantalla');
+
+// Sin hemodinamia no se sabe si el estímulo fue suficiente: ni en pantalla se afirma
+// el bajo riesgo ("no evaluado" no es "normal").
+r = correr('negativo sin FC ni TA cargadas', () => {
+    ['esf_max_fc', 'esf_max_tas', 'esf_max_tad'].forEach(id => set(w, id, ''));
+});
+exigir(!w.frasesPronosticoPantalla(r.H, w.elegirRama(r.H)).some(f => /1 % anual/.test(f)),
+    'sin FC ni doble producto no se afirma el bajo riesgo');
+
+// Ninguna frase del informe puede estratificar riesgo ni indicar conducta.
+r = correr('caso cargado: nada de riesgo en el informe', () => {
+    set(w, 'fevi_reposo', 40); set(w, 'fevi_pico', 38);
+    set(w, 'ej_mets', 3.4); set(w, 'esf_max_tas', 228);
+    set(w, 'esf_max_fc', 150); set(w, 'esf_rec_fc', 146);
+    [1, 2, 3, 4, 7, 8, 9, 10, 13, 14].forEach(id => w.setScore(id, 'estres', 4));
+});
+const conclCargada = w.construirNarrativa(r.H).piezas.conclusion;
+exigir(!/% anual|mortalidad|alto riesgo|marcador de|peor pronóstico|valor pronóstico|beneficio pronóstico|Categorización|conducta puede/.test(conclCargada),
+    'la conclusión no puede llevar cifras de eventos, juicio de riesgo ni conducta: ' + conclCargada);
 
 console.log(fallas ? `\n${fallas} FALLAS` : '\nSin fallas');

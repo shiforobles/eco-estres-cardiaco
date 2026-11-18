@@ -17,7 +17,7 @@
     <header class="app-header">
         <div>
             <h1>Eco Estrés Cardíaco</h1>
-            <p class="version">v2.9 — Cuadros OSECAC</p>
+            <p class="version">v3.0 — Pronóstico en pantalla y METs ACSM</p>
         </div>
         <div class="header-controls">
             <button type="button" class="btn btn-header" onclick="abrirPanel('perlas')" title="Perlas clínicas de los cursos, por tema">
@@ -1520,7 +1520,7 @@
                 <span class="firma-nota" id="territorio_afectado_origen"></span>
             </div>
             <div class="form-group">
-                <label for="categorizacion">Categorización de riesgo</label>
+                <label for="categorizacion">Categorización de riesgo <span class="firma-nota">(sólo en pantalla · no va al informe)</span></label>
                 <select autocomplete="off" id="categorizacion">
                     <option value="">Seleccionar...</option>
                     <option value="bajo">Riesgo bajo</option>
@@ -1800,14 +1800,14 @@
 <script src="motility-estres.js?v=2.9-redaccion"></script>
 <script src="pearls.js?v=2.3-estetica-1"></script>
 <script src="motility-groups.js?v=2.2"></script>
-<script src="report-templates.js?v=2.9-mcd"></script>
+<script src="report-templates.js?v=3.0-pronostico"></script>
 <script src="sheets-storage.js?v=2.7-motilidad"></script>
-<script src="app.js?v=2.9-patron"></script>
+<script src="app.js?v=3.0-pronostico"></script>
 <script>
 // Control de versión: si el navegador sirvió una mezcla de archivos viejos y nuevos,
 // los botones fallan en silencio. Esto lo convierte en un aviso visible.
 (function () {
-    var APP_VERSION = '2.9';
+    var APP_VERSION = '3.0';
     var faltan = ['generarInforme', 'recolectarHallazgos', 'calcEjercicio'].filter(function (f) {
         return typeof window[f] !== 'function';
     });

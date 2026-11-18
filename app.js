@@ -948,13 +948,18 @@ function categoriaMETs(mets) {
 //
 //  Astrand en este laboratorio: etapa 1 = 150 Kgm/min y cada etapa suma 150.
 //
-//  METs por la fórmula del ACSM para cicloergómetro:
-//    VO2 (mL/kg/min) = 7 + (10,8 × W) / peso        — W en vatios
-//    1 Kgm/min = 0,1635 W        1 MET = 3,5 mL/kg/min
-//  El 7 son el metabolismo basal más el pedaleo sin carga.
+//  METs por la fórmula del ACSM para cicloergómetro (ACSM's Guidelines for
+//  Exercise Testing and Prescription), con la carga en Kgm/min:
+//    VO2 (mL/kg/min) = 1,8 × carga / peso + 7        1 MET = 3,5 mL/kg/min
+//  El 7 son el metabolismo basal (3,5) más el pedaleo sin carga (3,5).
+//  Antes se pasaba a vatios (× 0,1635) y se multiplicaba por 10,8: eso da 1,766 en
+//  lugar de 1,8 y subestimaba ~0,1 MET (Lucas, 18/11/2026: "como debe ser").
+//  La fórmula supone estado estable: si la última etapa no se completó, sobreestima.
 // ══════════════════════════════════════════════
 const ASTRAND_KGM_POR_ETAPA = 150;
-const KGM_A_WATT = 0.1635;
+const ACSM_CICLO_FACTOR = 1.8;
+// Diferencia a partir de la cual se avisa que el ergómetro informa otros METs.
+const METS_DIFERENCIA_AVISO = 0.3;
 
 function cargaDeEtapa(etapa, protocolo) {
     if (!(etapa > 0)) return null;
@@ -966,8 +971,7 @@ function cargaDeEtapa(etapa, protocolo) {
 
 function metsDeCarga(kgm, peso) {
     if (!(kgm > 0) || !(peso > 0)) return null;
-    const vatios = kgm * KGM_A_WATT;
-    const vo2 = 7 + (10.8 * vatios) / peso;
+    const vo2 = 7 + (ACSM_CICLO_FACTOR * kgm) / peso;
     return Math.round((vo2 / 3.5) * 10) / 10;
 }
 
@@ -989,17 +993,21 @@ function calcCargaYMets(cargaManual) {
     if (deEtapa !== null) sugerir('ej_carga', deEtapa,
         `Etapa ${num('ej_etapa')} del protocolo de Astrand. Podés corregirla.`);
 
-    // Los METs del informe de la técnica mandan sobre la fórmula: si los dos informes
-    // van a la misma historia clínica, no pueden decir dos capacidades distintas.
+    // Los METs del informe salen de la fórmula del ACSM (Lucas, 18/11/2026). El valor
+    // del ergómetro ya no la pisa: queda para comparar, y si difiere se avisa. Sólo
+    // cuando la fórmula no puede calcularse (falta carga o peso) se usa el del
+    // ergómetro, para no dejar el dato vacío.
     const metsErgo = num('ej_mets_ergo');
-    // Cargar el valor de la ergometría es un acto más explícito que haber escrito unos
-    // METs a mano antes: ése es el que el operador quiere ver en el informe.
-    if (metsErgo > 0) olvidarCorreccion('ej_mets');
-    const mets = metsErgo > 0 ? metsErgo : metsDeCarga(num('ej_carga'), num('peso'));
+    const metsFormula = metsDeCarga(num('ej_carga'), num('peso'));
+    const mets = metsFormula !== null ? metsFormula : (metsErgo > 0 ? metsErgo : null);
     if (mets !== null) {
-        sugerir('ej_mets', mets, metsErgo > 0
-            ? 'Tomados del informe de la ergometría. La fórmula del ACSM queda de lado.'
-            : `Fórmula del ACSM para cicloergómetro, con ${num('ej_carga')} Kgm/min y ${num('peso')} kg. Podés corregirlos.`);
+        const estable = ' Supone estado estable: si la última etapa no se completó, sobreestima.';
+        sugerir('ej_mets', mets, metsFormula !== null
+            ? `Fórmula del ACSM para cicloergómetro (1,8 × carga ÷ peso + 7), con ${num('ej_carga')} Kgm/min y ${num('peso')} kg.` + estable +
+              (metsErgo > 0 && Math.abs(metsErgo - metsFormula) >= METS_DIFERENCIA_AVISO
+                  ? ` El ergómetro informa ${nProsa(metsErgo)} METs: el informe usa ${nProsa(metsFormula)}.` : '') +
+              ' Podés corregirlos.'
+            : 'Tomados del informe de la ergometría: falta la carga o el peso para la fórmula del ACSM.');
     } else if (!fueCorregido('ej_mets')) {
         const falta = !(num('ej_carga') > 0) ? 'la carga' : 'el peso';
         notaOrigen('ej_mets', `Falta ${falta} para calcular los METs con la fórmula del ACSM, ` +
@@ -1477,6 +1485,46 @@ function evaluarCategorizacion() {
     };
 }
 
+// Negativo con estímulo suficiente y el eco completo: es la condición de la cifra de
+// "<1 % anual". Sin FC o sin doble producto cargados no se sabe si el estímulo fue
+// suficiente, así que no se afirma ("no evaluado" no es "normal").
+function esNegativoBajoRiesgo(H, rama) {
+    return rama === 'negativa' && !H.isquemicos.length &&
+           H.pctFCmax > 0 && H.dobleProducto > 0 &&
+           !H.fcSuboptima && !H.estimuloInsuficiente &&
+           !H.territoriosNoEvaluables.length;
+}
+
+// Las frases pronósticas completas —cifras de eventos, estratos, juicio de riesgo—.
+// Desde el 18/11/2026 no van al informe: se ven sólo en pantalla, para el operador.
+function frasesPronosticoPantalla(H, rama) {
+    const frases = [];
+    if (esNegativoBajoRiesgo(H, rama)) frases.push(NARRATIVA.pronostico.negativoBajoRiesgo.trim());
+    const ids = new Set(hallazgosActivos(H).map(h => h.id));
+    const ext = fraseExtensionIsquemia(H, ids, rama, false);
+    let vistaExt = false;
+    hallazgosActivos(H).forEach(h => {
+        let t = null;
+        if (ext && HALLAZGOS_EXTENSION.includes(h.id)) { if (vistaExt) return; vistaExt = true; t = ext; }
+        else { try { t = h.informe ? h.informe(H, rama) : null; } catch (e) { t = null; } }
+        if (t) {
+            t = t.trim().replace(/\.$/, '');
+            t = t.charAt(0).toUpperCase() + t.slice(1) + '.';
+            if (!frases.includes(t)) frases.push(t);
+        }
+    });
+    return frases;
+}
+
+function panelPronosticoHTML() {
+    let frases = [];
+    try { const H = recolectarHallazgos(); frases = frasesPronosticoPantalla(H, elegirRama(H)); }
+    catch (e) { frases = []; }
+    if (!frases.length) return '';
+    return '<div class="cat-pronostico"><strong>Pronóstico (no va al informe)</strong>' +
+        '<ul class="cat-motivos">' + frases.map(f => `<li>${f}</li>`).join('') + '</ul></div>';
+}
+
 function sugerirCategorizacion() {
     const el = document.getElementById('categorizacion-sugerida');
     if (!el) return;
@@ -1492,7 +1540,8 @@ function sugerirCategorizacion() {
     if (fueCorregido('categorizacion')) {
         el.innerHTML = '<strong>Categoría puesta a mano</strong>' +
             `<div class="cat-motivos">La app habría sugerido ${r.noConcluyente ? 'no categorizar' :
-              ({ bajo: 'riesgo bajo', intermedio: 'riesgo intermedio', alto: 'riesgo alto' }[r.nivel])}.</div>`;
+              ({ bajo: 'riesgo bajo', intermedio: 'riesgo intermedio', alto: 'riesgo alto' }[r.nivel])}.</div>` +
+            panelPronosticoHTML();
         el.className = 'hint-sugerida cat-panel';
         return;
     }
@@ -1502,7 +1551,7 @@ function sugerirCategorizacion() {
     if (r.noConcluyente) {
         el.innerHTML = '<strong>No categorizable</strong>' +
             '<div class="cat-motivos">El estudio es no concluyente: no permite estimar el riesgo. ' +
-            'Categorizar acá daría una falsa tranquilidad.</div>';
+            'Categorizar acá daría una falsa tranquilidad.</div>' + panelPronosticoHTML();
         el.className = 'hint-sugerida cat-panel';
         return;
     }
@@ -1514,6 +1563,7 @@ function sugerirCategorizacion() {
             `<li>${m.motivo}${m.conducta ? `<span class="cat-conducta">${m.conducta}</span>` : ''}</li>`).join('') + '</ul>'
         : '<div class="cat-motivos">Sin criterios de riesgo: WMSI pico normal, sin isquemia inducible ' +
           'ni marcadores de mal pronóstico.</div>';
+    html += panelPronosticoHTML();
     el.innerHTML = html;
     el.className = 'hint-sugerida cat-panel hint-' + r.nivel;
 }
@@ -4653,6 +4703,7 @@ const HALLAZGOS = [
         // En su propia rama ya es el núcleo de la conclusión; en EAo asintomática la
         // oración de cierre la informa con más peso.
         informe: (H, rama) => (rama === 'hipotensiva' || taLaDiceEAo(H)) ? null : NARRATIVA.pronostico.hipotension,
+        dato: (H, rama) => (rama === 'hipotensiva' || taLaDiceEAo(H)) ? null : NARRATIVA.pronostico.datoHipotension,
         motivo: () => 'respuesta hipotensiva al esfuerzo'
     },
     {
@@ -4663,6 +4714,8 @@ const HALLAZGOS = [
         activo: H => H.caidaFey,
         informe: (H, rama) => (rama === 'positivaMulti' || rama === 'hipotensiva') ? null
             : rellenar(NARRATIVA.pronostico.caidaFey, { feyReposo: H.feyReposo, feyEstres: H.feyEstres }),
+        dato: (H, rama) => (rama === 'positivaMulti' || rama === 'hipotensiva') ? null
+            : rellenar(NARRATIVA.pronostico.datoCaidaFey, { feyReposo: H.feyReposo, feyEstres: H.feyEstres }),
         motivo: H => `la FEy cae de ${H.feyReposo} % a ${H.feyEstres} % con el esfuerzo: sugiere isquemia extensa`
     },
     {
@@ -4672,6 +4725,7 @@ const HALLAZGOS = [
         peso: 'alto',
         activo: H => H.isquemicos.length && H.dobleProducto > 0 && H.dobleProducto < 20000,
         informe: H => rellenar(NARRATIVA.pronostico.umbralBajo, { dp: H.dobleProducto.toLocaleString('es-AR') }),
+        dato: H => rellenar(NARRATIVA.pronostico.datoUmbralBajo, { dp: H.dobleProducto.toLocaleString('es-AR') }),
         motivo: H => `isquemia con doble producto ${H.dobleProducto.toLocaleString('es-AR')}: umbral isquémico bajo`
     },
     {
@@ -4682,6 +4736,7 @@ const HALLAZGOS = [
         activo: H => H.isquemicos.length >= 5,
         // El cuerpo enumera los segmentos; acá va lo que esa extensión significa.
         informe: H => rellenar(NARRATIVA.pronostico.isquemiaExtensa, { n: H.isquemicos.length }),
+        dato: H => rellenar(NARRATIVA.pronostico.datoIsquemiaExtensa, { n: H.isquemicos.length }),
         motivo: H => `isquemia inducible en ${H.isquemicos.length} segmentos (≥5): extensa`
     },
     {
@@ -4742,6 +4797,15 @@ const HALLAZGOS = [
             const P = NARRATIVA.pronostico;
             const limiteNoCV = H.causaDetencion === 'otro';
             return rellenar(limiteNoCV ? P.metsLimiteNoCV : P.mets, {
+                grado: H.mets < 4 ? 'severamente reducida' : 'reducida',
+                mets: nProsa(H.mets),
+                pct: H.pctMets ? rellenar(P.metsPct, { pct: H.pctMets }) : '',
+                causa: H.causaDetencionTxt
+            });
+        },
+        dato: H => {
+            const P = NARRATIVA.pronostico;
+            return rellenar(H.causaDetencion === 'otro' ? P.datoMetsLimiteNoCV : P.datoMets, {
                 grado: H.mets < 4 ? 'severamente reducida' : 'reducida',
                 mets: nProsa(H.mets),
                 pct: H.pctMets ? rellenar(P.metsPct, { pct: H.pctMets }) : '',
@@ -4830,6 +4894,8 @@ const HALLAZGOS = [
         peso: 'intermedio',
         activo: H => H.patronApical,
         informe: () => NARRATIVA.pronostico.patronApicalPron,
+        // Interpretación, no pronóstico: sigue en el informe.
+        dato: () => NARRATIVA.pronostico.patronApicalPron,
         motivo: H => `compromiso apical extenso (${H.isquemicos.length} segmentos), sin distribución por territorio coronario`
     },
     {
@@ -4865,6 +4931,8 @@ const HALLAZGOS = [
         // El modificador de la conclusión dice QUE fue positivo; acá va qué significa.
         // En su propia rama la implicancia ya es el núcleo del veredicto.
         informe: (H, rama) => rama === 'diastolico' ? null : NARRATIVA.pronostico.diastolicoPron,
+        // Interpretación del hallazgo, no pronóstico: sigue en el informe.
+        dato: (H, rama) => rama === 'diastolico' ? null : NARRATIVA.pronostico.diastolicoPron,
         motivo: () => 'test diastólico de esfuerzo positivo'
     },
     {
@@ -4909,7 +4977,7 @@ const HALLAZGOS_EXTENSION = ['isquemiaExtensa', 'multiterritorial', 'wmsiAlto'];
 // Las ramas cuyo veredicto ya afirma el riesgo y sugiere la cinecoronariografía.
 const RAMAS_POSITIVAS = ['positivaUnico', 'positivaMulti', 'hipotensiva'];
 
-function fraseExtensionIsquemia(H, ids, rama) {
+function fraseExtensionIsquemia(H, ids, rama, paraInforme) {
     const presentes = HALLAZGOS_EXTENSION.filter(id => ids.has(id));
     if (presentes.length < 2) return null;
     const detalle = [];
@@ -4921,6 +4989,16 @@ function fraseExtensionIsquemia(H, ids, rama) {
     // En una rama positiva el juicio y la conducta ya están en el veredicto, dos
     // oraciones antes: queda sólo lo que el veredicto no da, que son los números.
     const P = NARRATIVA.pronostico;
+    // Al informe va sólo la cuantificación; el juicio ("alto riesgo", "beneficio de
+    // revascularizar") queda en pantalla.
+    // El WMSI ya está en la línea de Motilidad del cuerpo: acá sólo segmentos y
+    // territorios, en una frase que se lea ("8 segmentos de 2 territorios coronarios").
+    if (paraInforme) {
+        const segs = ids.has('isquemiaExtensa') || H.isquemicos.length ? `${H.isquemicos.length} segmentos` : '';
+        const terr = ids.has('multiterritorial') ? `${H.territoriosIsquemia.length} territorios coronarios` : '';
+        if (!segs && !terr) return null;
+        return rellenar(P.datoExtension, { detalle: segs && terr ? `${segs} de ${terr}` : (segs || terr) });
+    }
     return rellenar(RAMAS_POSITIVAS.includes(rama) ? P.extensionIsquemiaCuantifica
                                                    : P.extensionIsquemia,
                     { detalle: listarEnProsa(detalle) });
@@ -4935,7 +5013,10 @@ const CUPO_PRONOSTICO = 4;
 // el operador pueda verlo.
 let PRONOSTICO_RECORTADO = [];
 
-function oracionPronostica(H, rama) {
+// `paraInforme` (por defecto): arma lo que va a la conclusión, con el `dato` de cada
+// hallazgo —el hallazgo descriptivo, sin cifras de eventos ni juicio de riesgo—.
+// Sin él (false): arma las frases pronósticas completas, que sólo se ven en pantalla.
+function oracionPronostica(H, rama, paraInforme = true) {
     const P = NARRATIVA.pronostico;
     const activos = hallazgosActivos(H);
     const ids = new Set(activos.map(h => h.id));
@@ -4952,7 +5033,7 @@ function oracionPronostica(H, rama) {
         // eventos" como si fueran dos cosas.
         .filter(h => !(h.cubiertoPor || []).some(id => ids.has(id)))
         // Fuera del informe: siguen en el panel y siguen moviendo la categoría.
-        .filter(h => nivelDe(h) !== 'pantalla')
+        .filter(h => !paraInforme || nivelDe(h) !== 'pantalla')
         // La hipertensiva es el hallazgo de un estudio limpio y ruido al lado de uno
         // crítico.
         .filter(h => !(h.requiereSinCriticos && hayCritico))
@@ -4961,7 +5042,7 @@ function oracionPronostica(H, rama) {
 
     // La frase única de extensión reemplaza a los dos o tres que la componen, en la
     // posición del primero.
-    const extension = fraseExtensionIsquemia(H, ids, rama);
+    const extension = fraseExtensionIsquemia(H, ids, rama, paraInforme);
     let vistoExtension = false;
     const conTexto = [];
     candidatos.forEach(c => {
@@ -4972,7 +5053,8 @@ function oracionPronostica(H, rama) {
             return;
         }
         let texto = null;
-        try { texto = c.h.informe(H, rama); } catch (e) { texto = null; }
+        const fuente = paraInforme ? c.h.dato : c.h.informe;
+        try { texto = fuente ? fuente(H, rama) : null; } catch (e) { texto = null; }
         if (texto) conTexto.push({ ...c, texto });
     });
 
@@ -4982,13 +5064,18 @@ function oracionPronostica(H, rama) {
     const fijos  = conTexto.filter(sinTope);
     const segunda = conTexto.filter(c => !sinTope(c));
     const cupo = Math.max(0, CUPO_PRONOSTICO - fijos.length);
-    PRONOSTICO_RECORTADO = segunda.slice(cupo).map(c => c.h.id);
+    if (paraInforme) PRONOSTICO_RECORTADO = segunda.slice(cupo).map(c => c.h.id);
     // Se reordena todo junto: el exento no se va al frente por estar exento.
     const items = [...fijos, ...segunda.slice(0, cupo)]
         .sort((a, b) => a.orden - b.orden || a.i - b.i)
         .map(c => c.texto);
 
     if (!items.length) return '';
+
+    const mayusI = t => t.charAt(0).toUpperCase() + t.slice(1);
+    // Al informe: cada hallazgo es una oración propia de la conclusión, sin bisagra
+    // ("Merecen señalarse… con valor pronóstico propio") ni párrafo aparte.
+    if (paraInforme) return ' ' + items.map(mayusI).join('. ') + '.';
 
     // Un solo hallazgo va integrado; dos o más abren párrafo propio, porque tres
     // proposiciones con su implicancia dentro de una sola oración son ilegibles.
@@ -5734,10 +5821,8 @@ function construirNarrativa(H) {
     // bloque pronóstico porque decide cómo se encabeza el párrafo que lo matiza.
     // La cifra de "<1 % anual" sale de poblaciones con el eco completo: no puede
     // afirmarse con un territorio sin evaluar.
-    H.negativoBajoRiesgo = rama === 'negativa' && !H.isquemicos.length &&
-                           !H.fcSuboptima && !H.estimuloInsuficiente &&
-                           !H.territoriosNoEvaluables.length;
-    if (H.negativoBajoRiesgo) oracionesFinales.push(T.pronostico.negativoBajoRiesgo);
+    H.negativoBajoRiesgo = esNegativoBajoRiesgo(H, rama);
+    // La cifra ya no va al informe (Lucas, 18/11/2026): queda en el panel de pantalla.
 
     // Todo lo que le cambia la conducta al clínico: integrado si es uno, en párrafo
     // propio si son dos o más.
@@ -5772,7 +5857,8 @@ function construirNarrativa(H) {
     // El veredicto abre con punto propio, así que lo que sigue arranca oración nueva.
     conclusion = conclusion.replace(/^Conclusión: (.)/,
         (_, c) => 'Conclusión: ' + suf + ' ' + c.toUpperCase());
-    if (H.categorizacion) conclusion += ' ' + rellenar(T.categorizacion, { categorizacion: H.categorizacion });
+    // La categorización ya no va al informe (Lucas, 18/11/2026): confundía al que lo
+    // recibe. Queda en pantalla, con su motivo, para el operador.
     // La conclusión que escribe el operador cierra el informe: antes se cargaba y no
     // aparecía en ninguna parte.
     if (H.conclusionLibre) conclusion += rellenar(T.conclusionLibre, { texto: H.conclusionLibre });
@@ -6284,6 +6370,14 @@ function validarEstudio(rama) {
         av.push({ nivel: 'info', txt:
             `El párrafo pronóstico se limitó a ${CUPO_PRONOSTICO} hallazgos. Quedó fuera del informe: ` +
             `${listarEnProsa(nombres)}. Sigue contando para la categoría de riesgo.` });
+    }
+    // METs del ergómetro distintos de los de la fórmula: el informe usa la fórmula.
+    {
+        const ergo = num('ej_mets_ergo'), formula = metsDeCarga(num('ej_carga'), num('peso'));
+        if (ergo > 0 && formula !== null && Math.abs(ergo - formula) >= METS_DIFERENCIA_AVISO)
+            av.push({ nivel: 'warn', txt: `El ergómetro informa ${nProsa(ergo)} METs y la fórmula del ACSM ` +
+                `da ${nProsa(formula)}: el informe usa ${nProsa(formula)}. Si los dos informes van a la ` +
+                'misma historia clínica, van a decir capacidades distintas.' });
     }
     // Medidas del VI implausibles: no se calculó nada, y hay que decir por qué.
     medidasVI().problemas.forEach(txt => av.push({ nivel: 'error',

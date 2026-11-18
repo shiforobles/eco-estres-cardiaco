@@ -54,7 +54,10 @@ sinPar([5]);
 H = w.recolectarHallazgos();
 exigir(!H.territoriosNoEvaluables.length,
     `un solo segmento sin par no invalida el territorio, y marcó ${H.territoriosNoEvaluables}`);
-exigir(/menor al 1 %/.test(concl()), 'con los tres territorios evaluables la cifra sí corresponde');
+// Desde el 18/11/2026 la cifra no va al informe: se ve en pantalla.
+exigir(!/menor al 1 %/.test(concl()), 'la cifra de <1 % ya no va al informe');
+exigir(w.frasesPronosticoPantalla(H, w.elegirRama(H)).some(f => /menor al 1 %/.test(f)),
+    'con los tres territorios evaluables la cifra sí corresponde, en pantalla');
 
 // ── Dos segmentos sin par sí lo invalidan (el corte) ──
 todoNormal(w);

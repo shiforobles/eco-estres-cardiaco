@@ -50,6 +50,13 @@ Estas no se cambian sin consultar. Cada una está porque el error ya pasó.
   (DA, CD, Cx). Reposo y Esfuerzo describen la motilidad por pared, con el motor de
   eco Doppler, y sólo lo nuevo o lo que empeora en el esfuerzo.
 - **"En relación con evento previo" sólo con la casilla Infarto previo.**
+- **Pronóstico y categorización no van al informe (Lucas, 18/11/2026).** Ni cifras de
+  eventos ("<1 % anual", "5 % anual"), ni juicio de riesgo ("predictor de mortalidad",
+  "alto riesgo"), ni "Categorización:". Al informe va el hallazgo descriptivo (`dato`
+  en HALLAZGOS) y sólo si el cuerpo no lo dijo; la frase pronóstica (`informe`) y la
+  categoría se ven en pantalla. Lo vigila el barrido en las dos salidas.
+- **METs: fórmula del ACSM para cicloergómetro** (1,8 × Kgm/min ÷ peso + 7) ÷ 3,5. El
+  valor del ergómetro no la pisa: sólo se compara y se avisa si difiere ≥0,3.
 - **Los criterios propios se declaran como tales** en pantalla: DP <20.000, HRR₁ ≤6
   y el umbral de segmentos sin par por territorio no son cortes de guía.
 

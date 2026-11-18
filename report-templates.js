@@ -346,7 +346,7 @@ const NARRATIVA = {
                   'Se sugiere correlación clínica.',
 
         positivaMulti: 'Conclusión: prueba de eco estrés con ejercicio positiva para isquemia miocárdica inducible extensa, con compromiso de ' +
-                  '{{territorioFrase}}{{sobreBasal}}, sugestiva de enfermedad de múltiples vasos. Hallazgo de alto riesgo. ' +
+                  '{{territorioFrase}}{{sobreBasal}}, sugestiva de enfermedad de múltiples vasos. ' +
                   'Se sugiere correlación clínica.',
 
         // Sin "compatible con secuela" ni "conocida": la causa sólo se afirma con el
@@ -362,7 +362,7 @@ const NARRATIVA = {
                   'miocárdica inducible. Se sugiere correlación clínica.',
 
         hipotensiva: 'Conclusión: prueba de eco estrés con ejercicio positiva para isquemia miocárdica inducible en {{territorioFrase}}{{sobreBasal}}, con respuesta hipotensiva al esfuerzo. ' +
-                  'La caída tensional inducida constituye un marcador de alto riesgo. Se sugiere correlación clínica.',
+                  'Se sugiere correlación clínica.',
 
         diastolico: 'Conclusión: prueba de eco estrés con ejercicio negativa para isquemia miocárdica inducible, con test diastólico de esfuerzo ' +
                   'positivo, compatible con insuficiencia cardíaca con fracción de eyección preservada. Se sugiere correlación clínica.'
@@ -443,6 +443,25 @@ const NARRATIVA = {
     // El control de calidad de la adquisición —imagen tardía, doble producto en el
     // borde, WMSI inflado por conducción— NO entra: es del operador.
     pronostico: {
+        // ── LO QUE VA AL INFORME (Lucas, 18/11/2026) ──────────────────────
+        // El informe ya no lleva cifras de eventos ni juicios de riesgo: "menor al 1 %
+        // anual", "predictor independiente de mortalidad", "marcador de alto riesgo" y
+        // la categorización confundían al que lo recibe. Eso queda en pantalla, para el
+        // operador (panel de categorización). Al informe va sólo el HALLAZGO, como
+        // dato, y sólo si el cuerpo no lo dijo ya.
+        datoHipotension:   'respuesta hipotensiva al esfuerzo',
+        datoCaidaFey:      'la fracción de eyección cayó de {{feyReposo}} % a {{feyEstres}} % con el esfuerzo',
+        datoUmbralBajo:    'la isquemia apareció con un doble producto de {{dp}}',
+        datoIsquemiaExtensa: 'la isquemia compromete {{n}} segmentos',
+        datoExtension:     'la isquemia compromete {{detalle}}',
+        datoMets:          'capacidad funcional {{grado}} ({{mets}} METs{{pct}})',
+        datoMetsLimiteNoCV: 'capacidad funcional {{grado}} ({{mets}} METs{{pct}}), con la prueba detenida por ' +
+                     '{{causa}}: no es posible establecer si el límite fue cardiovascular',
+
+        // ── LO QUE QUEDA EN PANTALLA ──────────────────────────────────────
+        // Las frases de abajo ya no van al informe: las muestra el panel
+        // "Pronóstico (no va al informe)" junto a la categorización.
+
         // Un solo hallazgo: integrado en la conclusión
         integrada: ' Merece señalarse que {{hallazgo}}.',
 

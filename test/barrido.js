@@ -125,6 +125,14 @@ for (let i = 0; i < N; i++) {
         if (marca) reportar('formato en la salida de OSECAC: ' + marca[0], '');
     }
 
+    // Pronóstico y categorización fuera del informe (Lucas, 18/11/2026): ninguna de las
+    // dos salidas lleva cifras de eventos, juicio de riesgo, categorización ni conducta.
+    const RIESGO = /% anual|mortalidad|alto riesgo|riesgo alto|bajo riesgo|marcador de (alto )?riesgo|peor pronóstico|valor pronóstico|beneficio pronóstico|buen pronóstico|Categorización|la conducta puede/;
+    [['informe', texto], ['OSECAC', O ? O.texto : '']].forEach(([cual, t]) => {
+        const m = t.match(RIESGO);
+        if (m) reportar(`riesgo o pronóstico en el ${cual}: "${m[0]}"`, (t.match(new RegExp('.{0,80}' + m[0].replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '.{0,40}')) || [''])[0]);
+    });
+
     // El bloque de reposo abre siempre con el método, en prosa.
     const lRep = linea(texto, 'Reposo');
     if (!/^Reposo: Se realizó ecocardiograma con ejercicio en cicloergómetro/.test(lRep))
@@ -145,7 +153,9 @@ for (let i = 0; i < N; i++) {
         if (nivelDe(h) === 'pantalla') return false;
         if (h.requiereSinCriticos && hayCritico) return false;
         if ((h.cubiertoPor || []).some(id => activos.some(x => x.id === id))) return false;
-        try { return !!h.informe(H, rama); } catch (e) { return false; }
+        // Desde el 18/11/2026 lo que va al informe es el `dato` descriptivo; la frase
+        // pronóstica (`informe`) queda en pantalla.
+        try { return !!(h.dato && h.dato(H, rama)); } catch (e) { return false; }
     });
     if (informable && !parr)
         reportar('hallazgo informable activo sin párrafo pronóstico',
