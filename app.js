@@ -154,13 +154,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Limpieza única: el historial local, la casuística y la cola de envío se
     // discontinuaron. Se borran sus claves de ESTA computadora al cargar. El
-    // borrador del estudio en curso NO se toca.
+    // borrador del estudio en curso también se descarta (ver iniciarFormulario).
     ['eco-estres-historial', 'eco-estres-casuistica', 'ecoestres_cola_envio']
         .forEach(k => { try { localStorage.removeItem(k); } catch (e) { /* noop */ } });
     refrescarBadgePlanilla();
 
-    // Autosave / recuperación del estudio en curso (al final, con todo ya construido)
-    setupAutosave();
+    // La app abre siempre en blanco (al final, con todo ya construido)
+    iniciarFormulario();
 });
 
 // ── TEMA ──────────────────────────────────────
@@ -195,7 +195,6 @@ function fueCorregido(id) { return camposCorregidos[id] === true; }
 function marcarManual(id, nota) {
     camposCorregidos[id] = true;
     notaOrigen(id, nota || 'Corregido a mano: la app ya no lo modifica.', true);
-    scheduleSave();
 }
 
 // Devuelve el campo al control de la app. Se usa cuando aparece un dato que manda
@@ -889,7 +888,6 @@ function setProtocol(proto) {
     });
     document.querySelectorAll('.protocol-panel').forEach(p => p.style.display = 'none');
     document.getElementById('panel-' + proto).style.display = 'block';
-    scheduleSave();
 }
 
 // ── HELPERS HEMODINÁMICOS ─────────────────────
@@ -1230,12 +1228,12 @@ function agregarMedicacion(nombre, dosis) {
         medicacionActual.push({ nombre: n, dosis: d });
     registrarEnBanco(BANCO_MED_KEY, { nombre: n, dosis: d });
     if (nombre === undefined) { elN.value = ''; elD.value = ''; elN.focus(); }
-    renderMedicacion(); renderBancos(); scheduleSave();
+    renderMedicacion(); renderBancos();
 }
 
 function quitarMedicacion(i) {
     medicacionActual.splice(i, 1);
-    renderMedicacion(); scheduleSave();
+    renderMedicacion();
 }
 
 function renderMedicacion() {
@@ -1762,7 +1760,6 @@ function renderBullsEye(svgId, stateKey) {
                 : (actual === GRADO_PINCEL ? 1 : GRADO_PINCEL);
             path.setAttribute('fill', SCORE_COLORS[WM[stateKey][seg.id]]);
             updateWMSI();
-            scheduleSave();
         });
 
         // Tooltip
@@ -2194,7 +2191,6 @@ function setScore(segId, stateKey, score) {
     const svgId = stateKey === 'reposo' ? 'svg-reposo' : 'svg-estres';
     const path = document.querySelector(`#${svgId} path[data-id="${segId}"]`);
     if (path) path.setAttribute('fill', SCORE_COLORS[score]);
-    scheduleSave();
 }
 
 // ── ESTRÉS DIASTÓLICO ─────────────────────────
@@ -2316,7 +2312,6 @@ function setSpecialTab(tab) {
     });
     document.querySelectorAll('.special-panel').forEach(p => p.style.display = 'none');
     document.getElementById('panel-' + tab).style.display = 'block';
-    scheduleSave();
 }
 
 // CFR
@@ -2973,7 +2968,6 @@ function aplicarSegmentosMotilidad(ids) {
     });
     buildSegmentsTable();
     updateWMSI();
-    scheduleSave();
 }
 
 // ── Pared + nivel (pedido de Lucas, 10/11/2026) ──
@@ -3067,7 +3061,6 @@ function setTerritoryScore(stateKey, territory, score) {
     renderBullsEye('svg-' + stateKey, stateKey);
     buildSegmentsTable();
     updateWMSI();
-    scheduleSave();
 }
 
 function setAllNormal(stateKey) {
@@ -3076,7 +3069,6 @@ function setAllNormal(stateKey) {
     renderBullsEye('svg-' + stateKey, stateKey);
     buildSegmentsTable();
     updateWMSI();
-    scheduleSave();
 }
 
 function resetAllScores() {
@@ -3085,7 +3077,6 @@ function resetAllScores() {
     renderBullsEye('svg-estres', 'estres');
     buildSegmentsTable();
     updateWMSI();
-    scheduleSave();
 }
 
 // ── GENERADOR DE REPORTE ──────────────────────
@@ -3949,7 +3940,6 @@ const ECGmod = (function () {
         syncLegacy();
         if (typeof avisarArritmias === 'function') avisarArritmias();
         if (typeof refrescarDeducidos === 'function') refrescarDeducidos();
-        if (typeof scheduleSave === 'function') scheduleSave();
     }
 
     // ══ Serialización para el borrador ══
@@ -6366,7 +6356,6 @@ function generarInforme() {
     TEXTO_GENERADO = informe;
     marcarInformeEditado();
     out.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    scheduleSave();
 }
 
 // ── VALIDACIÓN DEL ESTUDIO ────────────────────
@@ -6794,7 +6783,6 @@ function osecacFueEditado() {
 function marcarOsecacEditado() {
     const aviso = document.getElementById('osecac-editado');
     if (aviso) aviso.style.display = osecacFueEditado() ? 'block' : 'none';
-    scheduleSave();
 }
 
 // Pinta los tres cuadros. Se llama desde generarInforme(): una sola acción produce
@@ -6863,7 +6851,6 @@ function seleccionarInforme() {
 function limpiarFormulario() {
     if (!confirm('¿Confirma iniciar un nuevo estudio? Se borrarán todos los datos.')) return;
     resetFormulario();
-    clearDraft();   // descartar el borrador guardado del estudio anterior
 }
 
 function resetFormulario() {
@@ -7030,24 +7017,16 @@ function applyPreset(name) {
 
     onEdadChange();
     window.scrollTo({ top: 0, behavior: 'smooth' });
-    scheduleSave();
 }
 
 // ══════════════════════════════════════════════
-//  AUTOSAVE / RECUPERACIÓN DEL ESTUDIO EN CURSO
+//  FOTO DEL ESTUDIO EN PANTALLA
+//  Desde el 18/11/2026 no hay autosave ni aviso de recuperación: la app abre
+//  siempre en blanco (Lucas). La foto sólo la usa el Deshacer de BORRAR TODO.
 // ══════════════════════════════════════════════
-const DRAFT_KEY = 'eco-estres-draft';
-const DRAFT_PENDIENTE_KEY = 'eco-estres-draft-pendiente';
+// Claves del autosave que se retiró: se borran al abrir la app.
+const DRAFT_KEYS_RETIRADAS = ['eco-estres-draft', 'eco-estres-draft-pendiente'];
 const DRAFT_VERSION = 3;
-const DRAFT_DEBOUNCE_MS = 600;
-
-// El autosave NUNCA se suspende. Mientras el aviso de recuperación está en pantalla
-// escribe en una clave separada, así lo que se carga en ese rato queda a salvo sin
-// pisar el borrador anterior. Al decidir, la clave elegida pasa a ser la definitiva.
-let autosaveEnabled = true;
-let draftKeyActual = DRAFT_KEY;    // dónde escribe el autosave ahora mismo
-let draftOfrecidoKey = null;       // qué clave está ofreciendo el aviso
-let saveTimer = null;
 
 // ── Captura de estado ─────────────────────────
 const CAMPOS_NO_ESTUDIO = ['firma_informe'];   // configuración del operador, no datos del paciente
@@ -7078,9 +7057,8 @@ function construirBorrador() {
         return {
             version: DRAFT_VERSION,
             savedAt: new Date().toISOString(),
-            // Identidad del estudio: así recuperar un borrador reguarda sobre la misma
-            // fila del Sheet en vez de duplicarla. Campo aditivo: un borrador viejo sin
-            // esta clave no es incompatible (readDraft no cambia de versión por esto).
+            // Identidad del estudio: el Deshacer de BORRAR TODO la conserva, así
+            // reguardar reemplaza la misma fila del Sheet en vez de duplicarla.
             estudioId: estudioId,
             fields: captureFields(),
             wm: { reposo: { ...WM.reposo }, estres: { ...WM.estres } },
@@ -7106,40 +7084,6 @@ function construirBorrador() {
             osecac: cuadrosOsecacEnPantalla(),
             osecacGenerado: { ...TEXTO_OSECAC }
         };
-}
-
-function saveDraft() {
-    try {
-        const draft = construirBorrador();
-        localStorage.setItem(draftKeyActual, JSON.stringify(draft));
-    } catch (e) {
-        console.warn('No se pudo guardar el borrador:', e);
-    }
-}
-
-function scheduleSave() {
-    if (!autosaveEnabled) return;
-    if (saveTimer) clearTimeout(saveTimer);
-    saveTimer = setTimeout(saveDraft, DRAFT_DEBOUNCE_MS);
-}
-
-function readDraft(key) {
-    try {
-        const raw = localStorage.getItem(key || DRAFT_KEY);
-        if (!raw) return null;
-        const d = JSON.parse(raw);
-        if (!d || d.version !== DRAFT_VERSION) return null; // versión incompatible: se ignora
-        return d;
-    } catch (e) {
-        return null;
-    }
-}
-
-function clearDraft() {
-    [DRAFT_KEY, DRAFT_PENDIENTE_KEY].forEach(k => {
-        try { localStorage.removeItem(k); } catch (e) { /* noop */ }
-    });
-    draftKeyActual = DRAFT_KEY;
 }
 
 // ── Restauración ──────────────────────────────
@@ -7188,7 +7132,7 @@ function restoreDobStages(saved) {
     });
 }
 
-// Aplica un estudio completo (borrador recuperado) al formulario
+// Aplica un estudio completo (la foto de construirBorrador) al formulario
 function aplicarEstudio(d) {
     if (!d) return;
 
@@ -7262,56 +7206,6 @@ function aplicarEstudio(d) {
 }
 
 
-// ── Aviso de recuperación (sin auto-relleno) ──
-function showRecoveryBanner(draft, cuantos) {
-    let whenTxt = 'fecha desconocida';
-    if (draft.savedAt) {
-        const d = new Date(draft.savedAt);
-        if (!isNaN(d)) whenTxt = d.toLocaleString('es-AR',
-            { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-    }
-    const quien = draft.fields && (draft.fields.paciente_id || draft.fields.paciente_nombre);
-    const bar = document.createElement('div');
-    bar.className = 'draft-banner';
-    bar.id = 'draft-recovery-banner';
-    bar.innerHTML = `
-        <span class="draft-banner-text">📋 Hay un estudio sin terminar${quien ? ' (' + quien + ')' : ''},
-            guardado el ${whenTxt}.${cuantos > 1 ? ' Se ofrece el más reciente de 2 borradores.' : ''}
-            <em>Mientras tanto podés cargar normalmente: lo que escribas ya se está guardando aparte.</em></span>
-        <span class="draft-banner-actions">
-            <button class="btn btn-primary btn-sm" id="draft-recover">Recuperar</button>
-            <button class="btn btn-secondary btn-sm" id="draft-discard">Descartar</button>
-        </span>`;
-    document.body.insertBefore(bar, document.body.firstChild);
-
-    document.getElementById('draft-recover').addEventListener('click', () => {
-        if (formularioTieneDatos() &&
-            !confirm('Ya cargaste datos en este formulario. Recuperar el estudio anterior los reemplaza. ¿Continuar?')) return;
-        const guardado = readDraft(draftOfrecidoKey);
-        resolverBorrador();
-        aplicarEstudio(guardado);
-        bar.remove();
-        saveDraft();
-        showNotice('Estudio recuperado.', 'ok');
-    });
-    document.getElementById('draft-discard').addEventListener('click', () => {
-        // Descartar borra el borrador VIEJO y conserva lo que haya en pantalla:
-        // si estuviste cargando mientras el aviso estaba visible, no se pierde nada.
-        resolverBorrador();
-        bar.remove();
-        saveDraft();
-    });
-}
-
-// Cierra la etapa de decisión: a partir de acá hay un solo borrador, el de siempre.
-function resolverBorrador() {
-    [DRAFT_KEY, DRAFT_PENDIENTE_KEY].forEach(k => {
-        try { localStorage.removeItem(k); } catch (e) { /* noop */ }
-    });
-    draftKeyActual = DRAFT_KEY;
-    draftOfrecidoKey = null;
-}
-
 // ── Notificación breve (toast) ────────────────
 function showNotice(msg, type) {
     const n = document.createElement('div');
@@ -7322,44 +7216,17 @@ function showNotice(msg, type) {
     setTimeout(() => { n.classList.remove('show'); setTimeout(() => n.remove(), 400); }, 4500);
 }
 
-// ── Init del autosave ─────────────────────────
-function setupAutosave() {
-    // Desactivar el autocompletado/restauración nativa del navegador: así la ÚNICA
-    // forma de recuperar datos del estudio anterior es el botón "Recuperar", y nunca
-    // aparecen campos del paciente previo sin pasar por el aviso.
+// ── Inicio del formulario ─────────────────────
+function iniciarFormulario() {
+    // Sin autocompletado ni restauración nativa del navegador: nunca aparecen
+    // campos del paciente anterior.
     document.querySelectorAll('input, textarea, select').forEach(el => {
         el.setAttribute('autocomplete', 'off');
     });
-
-    // Un solo "escucha" general cubre todos los campos, incluso los que se crean al vuelo
-    document.addEventListener('input', scheduleSave, true);
-    document.addEventListener('change', scheduleSave, true);
-    // Una última edición seguida de cierre inmediato se perdía: el debounce no
-    // llegaba a disparar.
-    window.addEventListener('pagehide', () => { try { saveDraft(); } catch (e) {} });
-    document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'hidden') { try { saveDraft(); } catch (e) {} }
-    });
     document.addEventListener('input', refrescarDeducidos, true);
     document.addEventListener('change', refrescarDeducidos, true);
-
-    // Borradores presentes. Puede haber dos si el navegador se cerró con el aviso abierto.
-    const candidatos = [DRAFT_KEY, DRAFT_PENDIENTE_KEY]
-        .map(k => ({ key: k, draft: readDraft(k) }))
-        .filter(c => c.draft);
-
-    autosaveEnabled = true;   // siempre activo, desde el primer momento
-
-    if (!candidatos.length) {
-        draftKeyActual = DRAFT_KEY;
-        return;
-    }
-
-    candidatos.sort((a, b) => new Date(b.draft.savedAt) - new Date(a.draft.savedAt));
-    draftOfrecidoKey = candidatos[0].key;
-    // Se escribe en la clave que NO se está ofreciendo, para no pisar lo que hay que recuperar
-    draftKeyActual = draftOfrecidoKey === DRAFT_KEY ? DRAFT_PENDIENTE_KEY : DRAFT_KEY;
-    showRecoveryBanner(candidatos[0].draft, candidatos.length);
+    // El borrador del autosave retirado no se ofrece ni se aplica: se descarta.
+    DRAFT_KEYS_RETIRADAS.forEach(k => { try { localStorage.removeItem(k); } catch (e) { /* noop */ } });
 }
 
 const PRESETS = {
@@ -7604,7 +7471,6 @@ function borrarTodo() {
     buildSegmentsTable();
     updateWMSI();
     if (typeof sincronizarBarraMotilidad === 'function') sincronizarBarraMotilidad();
-    clearDraft();
     if (window.scrollTo) { try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (e) { /* jsdom */ } }
     ofrecerDeshacerBorrado(previo, motilidadTocada);
 }
@@ -7624,7 +7490,6 @@ function ofrecerDeshacerBorrado(previo, motilidadTocada) {
         aplicarEstudio(previo);
         MOTILIDAD_TOCADA = motilidadTocada;   // aplicarEstudio la da por leída
         updateWMSI();
-        saveDraft();
         showNotice('Estudio recuperado.', 'ok');
     });
     temporizador = setTimeout(cerrar, DESHACER_SEGUNDOS * 1000);

@@ -33,10 +33,9 @@ assert.deepEqual(sheets.construirFila(cabecera + antes, ID_FIJO), filaAntes,
 assert.equal(d.querySelectorAll('#indicacion_aclaracion').length, 1);
 assert.ok(d.getElementById('indicacion_libre'), 'el campo heredado se conserva');
 
-// Borrador: no subir su versión ni perder los campos anteriores. Lleva el id del
-// estudio, para que recuperarlo reguarde sobre la misma fila del Sheet.
-w.saveDraft();
-const borrador = w.readDraft();
+// Foto del estudio (Deshacer de BORRAR TODO): no subir su versión ni perder los
+// campos anteriores. Lleva el id del estudio, para reguardar sobre la misma fila.
+const borrador = JSON.parse(JSON.stringify(w.construirBorrador()));
 assert.equal(borrador.version, w.eval('DRAFT_VERSION'));
 assert.equal(borrador.fields.indicacion_aclaracion, aclaracion);
 assert.ok(borrador.estudioId, 'el borrador guarda el id del estudio');

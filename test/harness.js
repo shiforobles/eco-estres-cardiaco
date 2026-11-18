@@ -31,7 +31,8 @@ function leer(f) {
     }
 }
 
-function cargarApp() {
+// `antes(w)`, opcional, corre antes de cargar los scripts (p. ej., sembrar localStorage).
+function cargarApp(antes) {
     const html = leer('index.html')
         // los <script src> no se resuelven en jsdom sin servidor: se inyectan a mano
         .replace(/<script src="[^"]*"><\/script>/g, '');
@@ -45,6 +46,7 @@ function cargarApp() {
     w.confirm = () => true;
     w.scrollTo = () => {};
     w.Element.prototype.scrollIntoView = () => {};
+    if (antes) antes(w);
     // Los scripts se inyectan como elementos: window.eval deja los `const` fuera del
     // ámbito global y nada queda visible después.
     ['vendor/doppler/motility-model.js', 'vendor/doppler/motility-engine.js',

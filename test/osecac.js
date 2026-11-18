@@ -425,13 +425,12 @@ CASOS.forEach(({ nombre, w }) => {
         'al decir que sí, el cuadro se rehace desde los datos');
     exigir(!w.osecacFueEditado(), 'y deja de estar editado');
 
-    // Lo editado se guarda con el borrador: cerrar el navegador no puede costarlo.
+    // Lo editado viaja en la foto del estudio: el Deshacer de BORRAR TODO no puede costarlo.
     caja('reposo').textContent = 'Reposo a mano.';
     w.marcarOsecacEditado();
-    w.saveDraft();
-    const d = JSON.parse(w.localStorage.getItem('eco-estres-draft'));
+    const d = JSON.parse(JSON.stringify(w.construirBorrador()));
     exigir(d.osecac && d.osecac.reposo === 'Reposo a mano.',
-        'el borrador guarda los cuadros con la edición');
+        'la foto guarda los cuadros con la edición');
     exigir(d.osecacGenerado && d.osecacGenerado.reposo !== 'Reposo a mano.',
         'y también lo que había dejado el generador, para seguir distinguiendo una cosa de la otra');
 

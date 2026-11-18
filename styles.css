@@ -313,7 +313,7 @@ textarea { resize: vertical; min-height: 2.5rem; }
 .btn-icon:hover { background: rgba(255,255,255,0.3); }
 .btn-sm { padding: 0.35rem 0.8rem; font-size: 0.8rem; }
 
-/* ── AVISO DE RECUPERACIÓN DE BORRADOR ── */
+/* ── AVISO FIJO ARRIBA (hoy: la app cargó a medias) ── */
 .draft-banner {
     position: sticky;
     top: 0;
