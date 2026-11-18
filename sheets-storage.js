@@ -15,9 +15,11 @@
    4. Va el identificador de HC, no el nombre del paciente.
 
    El estudio se envía DIRECTO al Sheet: sin copia local, sin cola, sin
-   contador. El POST usa mode:'no-cors', que entrega pero impide leer la
-   respuesta, así que la app no puede confirmar la recepción; si alguna vez
-   falla, se ve al revisar la planilla.
+   contador. Igual que la app de eco Doppler convencional (18/11/2026), la app
+   LEE la respuesta del script: "Guardado confirmado" sólo si el script escribió
+   la fila; si la respuesta no se puede leer avisa "sin confirmación", y si el
+   script informó un error lo muestra. La planilla es propia de eco estrés
+   (Base de Datos Eco Estrés), con su script: apps-script-eco-estres.gs.
 
    Para no duplicar filas, cada estudio lleva un ID propio (columna 'ID',
    última). El ID se arma al empezar el estudio y se mantiene mientras sea el
@@ -41,15 +43,8 @@ const EstresSheets = {
     estaConfigurado() { return !!this.getUrl(); },
 
     // Versión del contrato de columnas de la hoja de Estrés. Tiene que coincidir con
-    // ESQUEMA_ESTRES_V del Apps Script. Al subir de versión (columnas nuevas), hay que
-    // migrar la hoja ANTES de volver a enviar.
+    // ESQUEMA_ESTRES_V del Apps Script unificado (la planilla vieja).
     ESQUEMA: 5,
-    MIGRADO_KEY: 'ecoestres_esquema_migrado',
-    // El POST usa no-cors y no puede leer la respuesta: si la hoja quedó en el esquema
-    // viejo, el script rechaza la fila (HOJA_SIN_MIGRAR) y la app no se entera. Por eso
-    // se avisa hasta que el operador confirme que migró, en vez de dar un falso "guardado".
-    migrada()       { return localStorage.getItem(this.MIGRADO_KEY) === String(this.ESQUEMA); },
-    marcarMigrada() { try { localStorage.setItem(this.MIGRADO_KEY, String(this.ESQUEMA)); } catch (e) { /* noop */ } },
 
     // ── Columnas: filiación → antecedentes → hemodinamia → dominios → informe ──
     HEADERS: [
@@ -245,14 +240,37 @@ const EstresSheets = {
         ];
     },
 
+    /**
+     * Envía la fila y espera el acuse del script, como la app de eco Doppler.
+     * Devuelve { confirmed: true, accion } sólo si el script respondió status ok
+     * después de escribir ('agregada' o 'reemplazada'). Si la respuesta no se
+     * puede leer devuelve { confirmed: false }: la fila pudo guardarse o no.
+     * Lanza error si el script informó una falla.
+     */
     async enviar(fila) {
         const url = this.getUrl();
         if (!url) throw new Error('Falta configurar la URL del script');
-        await fetch(url, {
-            method: 'POST',
-            mode: 'no-cors',
-            body: JSON.stringify({ action: 'save', hoja: this.getHoja(), row: fila })
-        });
+        // Sin headers: el navegador usa text/plain, que no requiere preflight CORS.
+        const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+        const timer = ctrl ? setTimeout(() => ctrl.abort(), 30000) : null;
+        let data = null;
+        try {
+            const res = await fetch(url, {
+                method: 'POST',
+                redirect: 'follow',
+                body: JSON.stringify({ action: 'save', hoja: this.getHoja(), row: fila }),
+                signal: ctrl ? ctrl.signal : undefined
+            });
+            data = await res.json();
+        } catch (e) {
+            return { confirmed: false };
+        } finally {
+            if (timer) clearTimeout(timer);
+        }
+        if (data && data.status === 'ok') return { confirmed: true, accion: data.accion || 'agregada' };
+        if (data && (data.status === 'error' || data.ok === false))
+            throw new Error(data.msg || data.detalle || data.error || 'el script informó un error');
+        return { confirmed: false };
     },
 
     urlDePrueba() {
@@ -273,6 +291,11 @@ const EstresSheets = {
 // Después: Implementar → Nueva implementación → Aplicación web
 //   Ejecutar como: Yo   |   Quién tiene acceso: Cualquier usuario
 // Copiá la URL que termina en /exec y pegala en la app
+//
+// Script propio de la planilla de eco estrés (Base de Datos Eco Estrés). Mismo
+// funcionamiento que el de eco Doppler convencional: espera su turno si hay dos
+// guardados a la vez, responde recién con la fila escrita y la app lo confirma.
+// Guardar dos veces el mismo estudio REEMPLAZA su fila (columna 'ID').
 // ──────────────────────────────────────────────────────────────────
 
 const HOJA_POR_DEFECTO = '${this.HOJA_DEF}';
@@ -285,7 +308,9 @@ const HEADERS_ESTRES = ${headers};
 const COLUMNAS_NUMERICAS = ${JSON.stringify(idxRatio)};
 
 function doPost(e) {
+  const lock = LockService.getScriptLock();
   try {
+    lock.waitLock(20000); // dos guardados a la vez no se pisan
     const data   = JSON.parse(e.postData.contents);
     const ss     = SpreadsheetApp.getActiveSpreadsheet();
     const nombre = data.hoja || HOJA_POR_DEFECTO;
@@ -305,6 +330,23 @@ function doPost(e) {
       });
     }
 
+    // Una fila con otra cantidad de columnas se escribiría CORRIDA: se rechaza.
+    if (!Array.isArray(data.row) || data.row.length !== HEADERS_ESTRES.length) {
+      return json_({ status: 'error', error: 'ESQUEMA_DESALINEADO',
+        msg: 'La app mandó ' + (Array.isArray(data.row) ? data.row.length : 0) +
+             ' columnas y la planilla espera ' + HEADERS_ESTRES.length +
+             '. Pegá de nuevo el código del script desde la app (⚙ Configurar planilla).' });
+    }
+    // getLastColumn() mira la fila más ancha, no el encabezado: se cuentan sólo
+    // las celdas con texto de la fila 1.
+    var cab = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    while (cab.length && String(cab[cab.length - 1]) === '') cab.pop();
+    if (cab.length !== HEADERS_ESTRES.length) {
+      return json_({ status: 'error', error: 'HOJA_SIN_MIGRAR',
+        msg: 'La hoja "' + nombre + '" tiene ' + cab.length + ' columnas y se esperan ' +
+             HEADERS_ESTRES.length + '. Revisá el encabezado de la hoja.' });
+    }
+
     // Upsert por ID: si la fila trae un id ya presente en la columna 'ID', se
     // reemplaza esa fila en vez de agregar otra. Así, reguardar un estudio
     // corregido deja en la planilla la versión final, no dos filas.
@@ -320,31 +362,39 @@ function doPost(e) {
       }
     }
 
+    var accion;
     if (destino) {
       sheet.getRange(destino, 1, 1, data.row.length).setValues([data.row]);
+      accion = 'reemplazada';
     } else {
       sheet.appendRow(data.row);
       destino = sheet.getLastRow();
+      accion = 'agregada';
     }
 
     COLUMNAS_NUMERICAS.forEach(function (col) {
       sheet.getRange(destino, col).setNumberFormat('0.00');
     });
+    SpreadsheetApp.flush(); // la respuesta ok sale recién con la fila escrita
 
-    return ContentService
-      .createTextOutput(JSON.stringify({ status: 'ok', fila: destino }))
-      .setMimeType(ContentService.MimeType.JSON);
+    return json_({ status: 'ok', hoja: nombre, fila: destino, accion: accion });
 
   } catch (err) {
-    return ContentService
-      .createTextOutput(JSON.stringify({ status: 'error', msg: err.toString() }))
-      .setMimeType(ContentService.MimeType.JSON);
+    return json_({ status: 'error', msg: String(err) });
+  } finally {
+    try { lock.releaseLock(); } catch (_) {}
   }
+}
+
+function json_(obj) {
+  return ContentService
+    .createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
 }
 
 function doGet(e) {
   return ContentService
-    .createTextOutput(JSON.stringify({ status: 'ok', message: 'Script activo ✓' }))
+    .createTextOutput(JSON.stringify({ status: 'ok', message: 'Script activo ✓ — Eco estrés' }))
     .setMimeType(ContentService.MimeType.JSON);
 }`;
     }

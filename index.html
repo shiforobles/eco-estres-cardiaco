@@ -1698,8 +1698,8 @@
             </summary>
             <p class="module-description" style="margin-top:0.75rem">
                 Cada estudio se agrega como una fila a una hoja de Google Sheets, con el informe completo en la última columna.
-                Se envía <strong>directo al Sheet</strong>, sin copia local. El navegador no permite leer la respuesta del script,
-                así que la app <em>no puede confirmar</em> la recepción: si alguna vez falla, lo vas a ver al revisar la planilla.
+                Se envía <strong>directo al Sheet</strong>, sin copia local, y la app <strong>espera la confirmación</strong> del script,
+                igual que eco Doppler convencional: si la fila no se escribió, te avisa.
                 Guardar dos veces el mismo estudio <strong>reemplaza la fila anterior</strong> por la versión nueva, no la duplica.
             </p>
             <div class="historial-acciones">
@@ -1788,8 +1788,8 @@
 <script src="pearls.js?v=2.3-estetica-1"></script>
 <script src="motility-groups.js?v=2.2"></script>
 <script src="report-templates.js?v=3.0-pronostico"></script>
-<script src="sheets-storage.js?v=2.7-motilidad"></script>
-<script src="app.js?v=3.0.2-sin-borrador"></script>
+<script src="sheets-storage.js?v=3.0.3-guardado"></script>
+<script src="app.js?v=3.0.3-guardado"></script>
 <script>
 // Control de versión: si el navegador sirvió una mezcla de archivos viejos y nuevos,
 // los botones fallan en silencio. Esto lo convierte en un aviso visible.

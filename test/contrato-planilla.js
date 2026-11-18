@@ -50,5 +50,13 @@ exigir(/ESQUEMA_DESALINEADO/.test(gs), 'el script no rechaza filas con otra cant
 exigir(/HOJA_SIN_MIGRAR/.test(gs), 'el script no detecta una hoja con el encabezado viejo');
 exigir(/function migrarEstresV1aV2/.test(gs), 'falta la migración de las filas existentes');
 
+// La planilla propia de eco estrés usa apps-script-eco-estres.gs: tiene que ser
+// exactamente el código que da la app en "Ver código del script".
+const propio = fs.readFileSync(path.join(__dirname, '..', 'apps-script-eco-estres.gs'), 'utf8');
+exigir(propio === S.codigoScript() + '\n',
+    'apps-script-eco-estres.gs no coincide con EstresSheets.codigoScript(): regeneralo');
+exigir(/LockService/.test(propio) && /SpreadsheetApp\.flush/.test(propio) && /accion/.test(propio),
+    'el script propio tiene que esperar turno, escribir antes de responder y devolver la acción');
+
 console.log(fallas ? `${fallas} FALLAS` : 'Sin fallas');
 process.exit(fallas ? 1 : 0);

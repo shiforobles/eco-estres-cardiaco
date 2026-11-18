@@ -53,6 +53,10 @@ Estas no se cambian sin consultar. Cada una está porque el error ya pasó.
 ## Contratos que no pueden separarse
 
 - `sheets-storage.js` ↔ `apps-script-unificado.gs`: mismo listado de columnas.
+- `apps-script-eco-estres.gs` es el script de la planilla propia de eco estrés
+  (Base de Datos Eco Estrés) y es **copia exacta** de `EstresSheets.codigoScript()`:
+  si cambia el código del script, se regenera el archivo. Lo vigila
+  `test/contrato-planilla.js`; el guardado confirmado, `test/guardado-confirmado.js`.
   Lo vigila `test/contrato-planilla.js`.
 - `vendor/doppler/` es copia byte a byte de la app de eco Doppler. **No se edita**:
   lo propio va en `motility-estres.js`. Lo vigila `test/drift-motores.js`.

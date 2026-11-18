@@ -6584,7 +6584,7 @@ function abrirConfigPlanilla() {
       <div class="modal-caja">
         <h3 class="section-title">Configurar la planilla</h3>
         <p class="firma-nota">Los estudios se agregan a una hoja de Google Sheets mediante un Apps Script.
-        Si ya tenés el script del Eco Doppler, podés usar <strong>el mismo documento</strong> con otro nombre de hoja.</p>
+        Eco estrés tiene <strong>su propia planilla</strong> (Base de Datos Eco Estrés), separada de la de eco Doppler convencional: no se comparte el script.</p>
         <div class="form-group" style="margin-top:0.75rem">
             <label for="cfg_url">URL del Apps Script (termina en /exec)</label>
             <input type="text" id="cfg_url" placeholder="https://script.google.com/macros/s/.../exec" value="${EstresSheets.getUrl()}">
@@ -6597,18 +6597,9 @@ function abrirConfigPlanilla() {
             <label for="cfg_sheet">URL del Sheet (opcional, para abrirlo rápido)</label>
             <input type="text" id="cfg_sheet" placeholder="https://docs.google.com/spreadsheets/..." value="${EstresSheets.getSheetUrl()}">
         </div>
-        ${EstresSheets.migrada() ? '' : `
-        <div class="info-banner info-banner-warning" style="margin-top:0.75rem">
-            <strong>La planilla pasó al esquema v5 (ECG).</strong> Se agregaron 7 columnas de ECG al
-            final de la hoja de Estrés. El envío usa <code>no-cors</code> y no puede leer la respuesta,
-            así que si la hoja no está migrada el guardado se rechaza en silencio. Pasos, una sola vez:
-            <ol style="margin:0.4rem 0 0.2rem 1.1rem; padding:0">
-                <li>En el Sheet: Extensiones → Apps Script. Pegá <strong>apps-script-unificado.gs</strong> (reemplazá todo) y volvé a <em>Implementar → Administrar implementaciones → editar → Nueva versión</em>.</li>
-                <li>Corré <strong>migrarEstres_simular()</strong> y leé el registro (no toca nada).</li>
-                <li>Hacé una copia de la hoja y corré <strong>migrarEstres()</strong>.</li>
-            </ol>
-            <button class="btn btn-secondary btn-sm" style="margin-top:0.5rem" onclick="marcarPlanillaMigrada()">Ya migré la planilla a v5</button>
-        </div>`}
+        <p class="firma-nota" style="margin-top:0.5rem">El script se copia con <strong>Ver código del script</strong>
+            y se pega en la planilla (Extensiones → Apps Script). Al guardar, la app espera la respuesta
+            y te confirma si la fila se escribió.</p>
         <div class="report-controls" style="margin-top:1rem">
             <button class="btn btn-primary btn-sm" onclick="guardarConfigPlanilla()">Guardar</button>
             <button class="btn btn-secondary btn-sm" onclick="verCodigoScript()">Ver código del script</button>
@@ -6618,12 +6609,6 @@ function abrirConfigPlanilla() {
       </div>`;
     document.body.appendChild(m);
     m.addEventListener('click', ev => { if (ev.target === m) m.remove(); });
-}
-
-function marcarPlanillaMigrada() {
-    EstresSheets.marcarMigrada();
-    document.getElementById('modal-planilla')?.remove();
-    showNotice('Anotado: la planilla está en el esquema v5. El guardado deja de avisar por la migración.', 'ok');
 }
 
 function guardarConfigPlanilla() {
@@ -7422,7 +7407,7 @@ function generarDesdeBotonera() {
 async function guardarEstudio() {
     const informe = informeParaGuardar();
     if (!informe) { alert('No se pudo generar el informe: revisá los datos del estudio.'); return; }
-    const hc = v('paciente_id') || '(sin ID)';
+    const hc = v('paciente_id') || v('paciente_nombre') || '(sin ID)';
     if (!estudioId) nuevoEstudioId();
     if (!window.EstresSheets || !EstresSheets.estaConfigurado()) {
         showNotice('⚠️ No se envió el estudio: falta la URL de Apps Script. Cargala en ⚙ Sincronizar. ' +
@@ -7435,17 +7420,14 @@ async function guardarEstudio() {
     const btn = document.getElementById('btn_save_study');
     if (btn) btn.disabled = true;
     try {
-        await EstresSheets.enviar(fila);
-        if (EstresSheets.migrada()) {
-            showNotice(`✅ Guardado en Google Sheets — ${hc}. Si lo volvés a guardar, reemplaza la fila.`, 'ok');
+        // Igual que eco Doppler convencional: se espera el acuse del script.
+        const r = await EstresSheets.enviar(fila) || {};
+        if (r.confirmed && r.accion === 'reemplazada') {
+            showNotice(`✅ Guardado confirmado en Google Sheets — ${hc}. Reemplazó la fila anterior de este estudio (no se duplicó).`, 'ok');
+        } else if (r.confirmed) {
+            showNotice(`✅ Guardado confirmado en Google Sheets — ${hc}`, 'ok');
         } else {
-            // El POST usa no-cors y no puede leer la respuesta. La planilla cambió al
-            // esquema v5 (7 columnas de ECG nuevas): si la hoja todavía tiene el
-            // encabezado viejo, el Apps Script RECHAZA la fila (HOJA_SIN_MIGRAR) y la app
-            // no se entera. Se avisa claro en vez de dar un falso "guardado".
-            showNotice(`Se envió — ${hc}. ⚠ La planilla cambió al esquema v5 (columnas de ECG nuevas). ` +
-                `Si todavía no migraste la hoja, el guardado se rechaza EN SILENCIO. Abrí “⚙ Planilla” para los pasos ` +
-                `(pegar el script, reimplementarlo, correr migrarEstres_simular() y migrarEstres()) y confirmá ahí que ya migraste.`, 'warn');
+            showNotice(`⚠️ Enviado, pero sin confirmación — ${hc}. Mirá la última fila de la planilla.`, 'warn');
         }
     } catch (e) {
         showNotice(`⚠️ Error al guardar: ${e.message}`, 'warn');
