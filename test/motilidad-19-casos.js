@@ -68,7 +68,7 @@ exigir(R[15].rama === 'positivaUnico' && /territorio Cx/.test(con(15)), '15: BCR
 exigir(R[16].rama === 'secuela' && !R[16].H.recuperaron.length && !/se normalizó|mejoró con/.test(esf(16) + con(16)), '16: disquinesia → aquinesia no es mejoría');
 exigir(R[17].rama === 'positivaUnico' && /territorio CD\./.test(con(17)) && /Alteración basal en territorio DA sin cambios/.test(con(17)),
     '17: positivo CD que nombra la secuela DA');
-exigir(/Aquinesia de las paredes anterior, septal e inferior en toda su extensión y del ápex/.test(rep(18)) && /Δ \+1 punto\)/.test(esf(18)), '18: extenso, por pared');
+exigir(/Aquinesia de las paredes anterior, septal e inferior en toda su extensión \(basal, medio y apical\) y del ápex/.test(rep(18)) && /Δ \+1 punto\)/.test(esf(18)), '18: extenso, por pared');
 exigir(/Nueva aquinesia de la pared anterior \(medio y apical\), con hipoquinesia leve de la pared anterior \(basal\)/.test(esf(19)) && /territorio DA/.test(con(19)), '19: grados mixtos');
 [3, 4, 5, 7, 9, 12, 16, 17, 18].forEach(k =>
     exigir((con(k).match(/La ausencia de mejoría con el esfuerzo no descarta miocardio viable\./g) || []).length === 1,

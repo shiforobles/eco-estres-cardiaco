@@ -53,7 +53,8 @@ Estas no se cambian sin consultar. Cada una está porque el error ya pasó.
   lo más leve; paredes con los mismos niveles juntas y el nivel una sola vez, entre
   paréntesis ("de las paredes anterior, septal e inferior (basal y medio)"); "pared
   septal" y "pared lateral" cuando sus dos subdivisiones coinciden; "en toda su
-  extensión" sólo con el segmento apical incluido. Vive en `motility-estres.js` (sólo
+  extensión (basal, medio y apical)" sólo con el segmento apical incluido; los cuatro apicales (13-16) son
+  "el casquete apical" (no "anillo"). Vive en `motility-estres.js` (sólo
   eco estrés; la app de Doppler sigue con su texto). Lo vigila
   `test/motilidad-prosa-ordenada.js`.
 - **"En relación con evento previo" sólo con la casilla Infarto previo.**

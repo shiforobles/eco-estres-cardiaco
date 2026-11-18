@@ -50,7 +50,7 @@ function mostrar(titulo, O) {
     exigir(/\nECG basal: /.test(O.reposo), '1: el ECG basal va en párrafo aparte');
     exigir(!/WMSI/.test(O.esfuerzo), '1: el cuadro de Esfuerzo no trae WMSI');
     exigir(!/La alteración basal se normalizó/.test(O.esfuerzo) &&
-           /La hipoquinesia leve de la pared anterior en toda su extensión se normalizó con el esfuerzo\./.test(O.esfuerzo),
+           /La hipoquinesia leve de la pared anterior en toda su extensión \(basal, medio y apical\) se normalizó con el esfuerzo\./.test(O.esfuerzo),
         '1: la mejoría dice qué alteración se normalizó');
     exigir(/Estudio diastólico de esfuerzo negativo: E\/e' 8,0 → 7,8, sin aumento de las presiones de llenado con el esfuerzo \(VRT no medible\)\./.test(O.esfuerzo)
         || /Estudio diastólico de esfuerzo negativo: E\/e' 8 → 7,8/.test(O.esfuerzo),

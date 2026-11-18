@@ -130,11 +130,12 @@
     // Con muchos segmentos el texto del motor se hacía difícil de leer. Formato
     // elegido: de lo más grave a lo más leve; en cada grado, las paredes que
     // comparten niveles van juntas y el nivel se dice una sola vez, entre
-    // paréntesis. "Aquinesia del anillo apical, con hipoquinesia leve de las paredes
+    // paréntesis. "Aquinesia del casquete apical, con hipoquinesia leve de las paredes
     // anterior, anteroseptal, inferoseptal e inferior (basal y medio)."
     //  · "en toda su extensión" sólo para las paredes que tienen segmento apical
     //    propio (anterior e inferior) o para el septum entero (2, 3, 8, 9 y 14).
-    //  · El anillo apical (13-16) se nombra entero; con el ápex, casquete apical.
+    //  · Los cuatro apicales (13-16) son "el casquete apical"; si el ápex tiene el
+    //    mismo grado, "del casquete apical y del ápex".
     //  · El apical septal (14) y el apical lateral (16) sueltos van por su nombre.
     const PAREDES_NIVEL = [
         { nombre: 'anterior',      b: 1, m: 7,  a: 13 },
@@ -145,6 +146,8 @@
         { nombre: 'anterolateral', b: 6, m: 12 },
     ];
     const ANILLO = [13, 14, 15, 16];
+    // Con los tres niveles a la vista (Lucas, 18/11/2026).
+    const TODA_EXTENSION = 'en toda su extensión (basal, medio y apical)';
 
     /** Dónde, sin el grado: "de las paredes anterior e inferior (basal y medio) y del ápex". */
     function ubicacionOrdenada(ids) {
@@ -152,8 +155,10 @@
         const usados = new Set();
         const piezas = [];
         if (ANILLO.every(id => S.has(id))) {
-            if (S.has(APEX)) { piezas.push('del casquete apical'); usados.add(APEX); }
-            else piezas.push('del anillo apical');
+            // "Casquete apical" (Lucas, 18/11/2026): 13-16. Con el ápex del mismo
+            // grado se lo nombra también, para no perder que está comprometido.
+            if (S.has(APEX)) { piezas.push('del casquete apical y del ápex'); usados.add(APEX); }
+            else piezas.push('del casquete apical');
             ANILLO.forEach(id => usados.add(id));
         }
         // Cada pared con sus niveles alterados.
@@ -184,7 +189,7 @@
                     const conApical = n1.length === 2 && S.has(apical) && !usados.has(apical);
                     [p.b, p.m, otra.b, otra.m].forEach(id => { if (S.has(id)) usados.add(id); });
                     if (conApical) usados.add(apical);
-                    unidades.push({ nombre: par[1], clave: conApical ? 'en toda su extensión' : `(${lista(n1)})` });
+                    unidades.push({ nombre: par[1], clave: conApical ? TODA_EXTENSION : `(${lista(n1)})` });
                     return;
                 }
             }
@@ -192,7 +197,7 @@
             if (!niveles.length) return;
             [p.b, p.m, p.a].forEach(id => { if (id && S.has(id)) usados.add(id); });
             unidades.push({ nombre: p.nombre,
-                clave: (p.a && niveles.length === 3) ? 'en toda su extensión' : `(${lista(niveles)})` });
+                clave: (p.a && niveles.length === 3) ? TODA_EXTENSION : `(${lista(niveles)})` });
         });
         // Paredes con el mismo conjunto de niveles van juntas.
         const grupos = [];
@@ -247,7 +252,9 @@
         } else if (!hayOtros && apexAnormal) {
             // Sólo el ápex: el motor diría "conservada" y sería falso.
             texto = mayuscula(`${NOMBRE_GRADO[st[APEX]]} del ápex.`);
-        } else if (anormales.length === 5 && APICALES.every(id => st[id] === st[APEX])) {
+        } else if (apexAnormal && anormales.length === 5 && APICALES.every(id => st[id] === st[APEX])) {
+            // (sin `apexAnormal`, cinco segmentos alterados FUERA del ápex con los cinco
+            // apicales normales entraban acá y salía "La undefined de la totalidad…")
             // (b) Los cinco apicales, mismo grado, nada más.
             texto = mayuscula(`${NOMBRE_GRADO[st[APEX]]} de la totalidad del casquete apical.`);
         } else if (!/global del ventrículo izquierdo/i.test(MotorA5.describe(sinApex))) {
