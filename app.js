@@ -457,16 +457,27 @@ const GEOMETRIA_PROSA = {
 };
 
 // ══════════════════════════════════════════════
-//  FUNCIÓN DIASTÓLICA EN REPOSO — ALGORITMO ASE/EACVI 2016
-//  Dos algoritmos encadenados. El primero decide SI hay disfunción; el segundo, de
-//  qué grado. Con FEy reducida se va derecho al segundo: ahí la disfunción se asume.
-//  Devuelve `indeterminada` cuando los criterios empatan, que no es una falla del
-//  algoritmo sino su respuesta: en esos casos la guía dice explícitamente que no se
-//  puede clasificar. Y devuelve null cuando faltan datos, que es distinto.
+//  FUNCIÓN DIASTÓLICA EN REPOSO — ASE 2025 (Nagueh et al., JASE 2025;38:537-69)
+//  Tres ejes: relajación (e'), E/e' y VRT. Con los tres normales, normal; con e'
+//  bajo sólo y E/A ≤0,8, grado I; con presión de AI elevada, grado II (E/A <2) o
+//  III (E/A ≥2). Cuando los ejes no concuerdan, deciden los complementarios (acá,
+//  el LAVi >34). Lo que la guía no puede decidir queda `indeterminada`.
+//  Criterio propio (Lucas, 18/11/2026): sin VRT se calcula con lo que hay. e' y E/e'
+//  normales → normal; e' bajo con E/e' elevado → presiones elevadas. Se declara en
+//  pantalla. Con FEy <50 % la relajación se da por alterada, y E/A ≥2 es grado III.
+//  null = faltan datos para empezar (E o e').
 // ══════════════════════════════════════════════
-const LAVI_ALTO = 34;      // mL/m²
-const VRT_ALTO  = 2.8;     // m/s
-const EE_ALTO   = 14;      // E/e' promedio
+const LAVI_ALTO = 34;      // mL/m², marcador complementario
+const VRT_ALTO  = 2.8;     // m/s (≥)
+const EE_ALTO   = 14;      // E/e' promedio (≥); septal ≥15, lateral ≥13
+
+// Cortes de e' reducido por edad (ASE 2025, tabla 6). Sin edad, los generales.
+function cortesEPrima(edad) {
+    if (edad >= 20 && edad < 40)  return { sep: 7, lat: 10, prom: 9,   estricto: true,  rotulo: '20-39 años' };
+    if (edad >= 40 && edad <= 65) return { sep: 6, lat: 8,  prom: 7,   estricto: true,  rotulo: '40-65 años' };
+    if (edad > 65)                return { sep: 6, lat: 7,  prom: 6.5, estricto: true,  rotulo: '>65 años' };
+    return { sep: 6, lat: 7, prom: 6.5, estricto: false, rotulo: 'sin edad' };
+}
 
 function datosDiastolicos() {
     const nn = id => { const x = num(id); return x > 0 ? x : null; };
@@ -480,20 +491,37 @@ function datosDiastolicos() {
     const bsa = (peso > 0 && altura > 0)
         ? 0.007184 * Math.pow(altura, 0.725) * Math.pow(peso, 0.425) : null;
     const lavi = (volAI !== null && bsa) ? volAI / bsa : null;
-    // E/e' promedio si están los dos; si sólo hay uno, ese
+    // E/e' promedio si están los dos; si sólo hay uno, ese (con su corte propio)
     const ePrima = (sep !== null && lat !== null) ? (sep + lat) / 2 : (sep !== null ? sep : lat);
+    const eeTipo = (sep !== null && lat !== null) ? 'prom' : (sep !== null ? 'sep' : 'lat');
     const ee = (E !== null && ePrima) ? E / ePrima : null;
     const ea = (E !== null && A !== null) ? E / A : null;
-    return { E, A, sep, lat, vrt, lavi, bsa, ee, ea, fey: nn('fevi_reposo') };
+    const edad = parseInt(v('edad')) || 0;
+    return { E, A, sep, lat, ePrima, vrt, lavi, bsa, ee, eeTipo, ea, edad, fey: nn('fevi_reposo') };
 }
 
-// Los tres criterios que comparten los dos algoritmos
-function criteriosPresionLlenado(D) {
-    const c = [];
-    if (D.ee !== null)   c.push({ nombre: `E/e' ${nProsa(D.ee, 1)}`, alto: D.ee > EE_ALTO, corte: `>${EE_ALTO}` });
-    if (D.vrt !== null)  c.push({ nombre: `VRT ${nProsa(D.vrt, 1)} m/s`, alto: D.vrt > VRT_ALTO, corte: `>${nProsa(VRT_ALTO, 1)} m/s` });
-    if (D.lavi !== null) c.push({ nombre: `LAVi ${nProsa(D.lavi, 0)} mL/m²`, alto: D.lavi > LAVI_ALTO, corte: `>${LAVI_ALTO} mL/m²` });
-    return c;
+const EE_CORTE = { prom: EE_ALTO, sep: 15, lat: 13 };
+
+// ¿E/e' elevado? null si no hay E/e'. Lo usa también el informe.
+function eeElevado(D) {
+    if (D.ee === null) return null;
+    return Math.round(D.ee * 10) / 10 >= EE_CORTE[D.eeTipo];
+}
+
+const coma = x => String(x).replace('.', ',');
+
+function criterioEPrima(D) {
+    if (D.sep === null && D.lat === null) return null;
+    const k = cortesEPrima(D.edad);
+    const bajo = (D.sep !== null && (k.estricto ? D.sep < k.sep : D.sep <= k.sep)) ||
+                 (D.lat !== null && (k.estricto ? D.lat < k.lat : D.lat <= k.lat)) ||
+                 (D.sep !== null && D.lat !== null && (k.estricto ? D.ePrima < k.prom : D.ePrima <= k.prom));
+    const op = k.estricto ? '<' : '≤';
+    const partes = [];
+    if (D.sep !== null) partes.push('septal ' + nProsa(D.sep, 1));
+    if (D.lat !== null) partes.push('lateral ' + nProsa(D.lat, 1));
+    return { nombre: `e' ${partes.join(' / ')} cm/s`, alto: bajo,
+             corte: `septal ${op}${coma(k.sep)}, lateral ${op}${coma(k.lat)} o promedio ${op}${coma(k.prom)} cm/s; ${k.rotulo}` };
 }
 
 function clasificarDiastolica() {
@@ -503,44 +531,61 @@ function clasificarDiastolica() {
     if (enFibrilacionAuricular()) return { grado: null, fa: true, criterios: [], faltan: [] };
     const feyReducida = D.fey !== null && D.fey < 50;
 
-    // ── Algoritmo 1: ¿hay disfunción? (sólo con FEy conservada)
-    if (!feyReducida) {
-        const c1 = [];
-        if (D.sep !== null || D.lat !== null) {
-            const bajo = (D.sep !== null && D.sep < 7) || (D.lat !== null && D.lat < 10);
-            c1.push({ nombre: `e' ${D.sep !== null ? 'septal ' + nProsa(D.sep, 1) : ''}${D.sep !== null && D.lat !== null ? ' / ' : ''}${D.lat !== null ? 'lateral ' + nProsa(D.lat, 1) : ''} cm/s`,
-                      alto: bajo, corte: 'septal <7 o lateral <10 cm/s' });
+    const criterios = [];
+    const cE = criterioEPrima(D);
+    if (cE) criterios.push(cE);
+    const eeAlto = eeElevado(D);
+    if (eeAlto !== null) criterios.push({ nombre: `E/e' ${D.eeTipo === 'prom' ? 'promedio' : D.eeTipo === 'sep' ? 'septal' : 'lateral'} ${nProsa(D.ee, 1)}`,
+                                          alto: eeAlto, corte: `≥${EE_CORTE[D.eeTipo]}` });
+    const vrtAlta = D.vrt !== null ? D.vrt >= VRT_ALTO : null;
+    if (vrtAlta !== null) criterios.push({ nombre: `VRT ${nProsa(D.vrt, 1)} m/s`, alto: vrtAlta, corte: `≥${nProsa(VRT_ALTO, 1)} m/s` });
+    const laviAlto = D.lavi !== null ? D.lavi > LAVI_ALTO : null;
+    if (laviAlto !== null) criterios.push({ nombre: `LAVi ${nProsa(D.lavi, 0)} mL/m² (complementario)`, alto: laviAlto, corte: `>${LAVI_ALTO} mL/m²` });
+
+    const base = { criterios, feyReducida, ea: D.ea, E: D.E, sinVRT: D.vrt === null };
+
+    // Para empezar hace falta la relajación (e', o FEy <50 %) y el E/e'.
+    if ((!cE && !feyReducida) || eeAlto === null) {
+        // Con FEy reducida y sin E/e' todavía se puede graduar por E/A en los extremos
+        if (feyReducida && D.ea !== null) {
+            if (D.ea <= 0.8) return { grado: 'g1', ...base, presiones: 'normales', via: 'FEy <50 % con E/A ≤0,8' };
+            if (D.ea >= 2)   return { grado: 'g3', ...base, presiones: 'elevadas', via: 'FEy <50 % con E/A ≥2' };
         }
-        criteriosPresionLlenado(D).forEach(c => c1.push(c));
-
-        // Con menos de tres criterios medidos la proporción no significa nada:
-        // se dice qué falta en vez de arriesgar una clasificación.
-        if (c1.length < 3) return { grado: null, criterios: c1, faltan: faltantesDiastolicos(D) };
-
-        const positivos = c1.filter(c => c.alto).length;
-        const mitad = c1.length / 2;
-        if (positivos < mitad)  return { grado: 'normal', criterios: c1, positivos, total: c1.length };
-        if (positivos === mitad) return { grado: 'indeterminada', criterios: c1, positivos, total: c1.length, empate: true };
-        // más de la mitad: hay disfunción, se pasa a graduarla
-    }
-
-    // ── Algoritmo 2: grado
-    const c2 = criteriosPresionLlenado(D);
-    const base = { criterios: c2, feyReducida, ea: D.ea, E: D.E };
-
-    if (D.ea === null) {
-        // Sin E/A no se puede entrar al algoritmo de graduación
-        if (!feyReducida) return { grado: 'indeterminada', ...base, faltan: ['la onda A (para el cociente E/A)'] };
         return { grado: null, ...base, faltan: faltantesDiastolicos(D) };
     }
-    if (D.ea <= 0.8 && D.E !== null && D.E <= 50) return { grado: 'g1', ...base, via: 'E/A ≤0,8 con E ≤50 cm/s' };
-    if (D.ea >= 2) return { grado: 'g3', ...base, via: 'E/A ≥2' };
 
-    // Zona intermedia: mandan los tres criterios de presión de llenado
-    if (c2.length < 2) return { grado: 'indeterminada', ...base, faltan: faltantesDiastolicos(D) };
-    const pos = c2.filter(c => c.alto).length;
-    if (c2.length === 2 && pos === 1) return { grado: 'indeterminada', ...base, empate: true };
-    return { grado: pos >= 2 ? 'g2' : 'g1', ...base, positivos: pos, total: c2.length };
+    const relajacionAlterada = feyReducida || cE.alto;
+    // Grado según E/A, una vez establecido que la presión de AI está elevada
+    const elevadas = (via) => {
+        if (D.ea === null) return { grado: 'indeterminada', ...base, presiones: 'elevadas', via, faltan: ['la onda A (para graduar por E/A)'] };
+        return { grado: D.ea >= 2 ? 'g3' : 'g2', ...base, presiones: 'elevadas', via };
+    };
+    const normales = (via) => relajacionAlterada
+        ? { grado: 'g1', ...base, presiones: 'normales', via }
+        : { grado: 'normal', ...base, presiones: 'normales', via };
+    // Ejes discordantes: decide el complementario; sin él, indeterminada
+    const complementario = (motivo) => {
+        if (laviAlto === true)  return elevadas(`${motivo}; LAVi >${LAVI_ALTO} mL/m²`);
+        if (laviAlto === false) return normales(`${motivo}; LAVi ≤${LAVI_ALTO} mL/m²`);
+        return { grado: 'indeterminada', ...base, presiones: eeAlto ? null : 'normales', empate: true, motivo };
+    };
+
+    // FEy reducida: E/A ≥2 es grado III (patrón restrictivo)
+    if (feyReducida && D.ea !== null && D.ea >= 2) return { grado: 'g3', ...base, presiones: 'elevadas', via: 'FEy <50 % con E/A ≥2' };
+
+    // ── Los tres ejes (o dos, sin VRT: criterio propio)
+    if (!relajacionAlterada) {
+        if (!eeAlto && vrtAlta !== true) return normales(D.vrt === null ? "e' y E/e' normales (sin VRT)" : "e', E/e' y VRT normales");
+        return complementario(eeAlto && vrtAlta ? "e' normal con E/e' y VRT elevados"
+                              : eeAlto ? "e' normal con E/e' elevado" : "e' normal con VRT elevada");
+    }
+    // Relajación alterada
+    if (eeAlto && vrtAlta !== false) return elevadas(D.vrt === null ? "e' bajo con E/e' elevado (sin VRT)" : "e' bajo con E/e' y VRT elevados");
+    if (eeAlto || vrtAlta) return complementario(eeAlto ? "E/e' elevado con VRT normal" : "VRT elevada con E/e' normal");
+    // e' bajo con E/e' (y VRT) normales
+    if (D.ea === null) return { grado: 'indeterminada', ...base, presiones: 'normales', faltan: ['la onda A (para el cociente E/A)'] };
+    if (D.ea <= 0.8) return normales("e' bajo con E/A ≤0,8");
+    return complementario("e' bajo con E/A >0,8 (puede ser pseudonormal)");
 }
 
 function faltantesDiastolicos(D) {
@@ -548,8 +593,6 @@ function faltantesDiastolicos(D) {
     if (D.E === null) f.push('la onda E');
     if (D.A === null) f.push('la onda A');
     if (D.sep === null && D.lat === null) f.push("el e' tisular");
-    if (D.vrt === null) f.push('la VRT');
-    if (D.lavi === null) f.push(D.bsa ? 'el volumen de la aurícula izquierda' : 'el peso y la altura (para indexar el volumen auricular)');
     return f;
 }
 
@@ -567,8 +610,21 @@ const DIAST_GRADO_PROSA = {
 function presionesLlenadoEnProsa(grado) {
     const T = NARRATIVA;
     if (grado === 'g2' || grado === 'g3') return T.presionesElevadas;
-    if (grado === 'indeterminada') return T.presionesNoClasificable;
+    if (grado === 'indeterminada') {
+        const p = presionesIndeterminada();
+        return p === 'normales' ? T.presionesNormales : p === 'elevadas' ? T.presionesElevadas : T.presionesNoClasificable;
+    }
     return T.presionesNormales;   // '', 'normal' y 'g1'
+}
+
+// Con la función diastólica indeterminada, las presiones se informan igual cuando el
+// cálculo las establece (Lucas, 18/11/2026): con E/e' normal, "presiones normales".
+// Sólo con E/e' elevado y sin nada que lo confirme queda "sin poder clasificar".
+function presionesIndeterminada() {
+    const R = clasificarDiastolica();
+    if (R.grado === 'indeterminada' && R.presiones) return R.presiones;
+    const alto = eeElevado(datosDiastolicos());
+    return alto === false ? 'normales' : null;
 }
 
 function autocompletarDiastolicaReposo() {
@@ -595,15 +651,16 @@ function notaDiastolica(R) {
         return R.faltan && R.faltan.length
             ? `Falta ${listarEnProsa(R.faltan)} para clasificar por ASE.`
             : 'Sin datos suficientes para clasificar.';
-    if (R.empate)
-        return 'Indeterminada por criterios de la ASE: los parámetros disponibles empatan. ' +
-               'No es un dato faltante, es que el algoritmo no permite decidir.';
-    if (R.feyReducida)
-        return 'FEy <50 %: por ASE se gradúa directamente, sin el paso previo. Podés corregirlo.';
-    if (R.via) return `Por ASE: ${R.via}. Podés corregirlo.`;
-    if (R.positivos !== undefined)
-        return `Por ASE: ${R.positivos} de ${R.total} criterios por encima del corte. Podés corregirlo.`;
-    return 'Deducido por el algoritmo ASE. Podés corregirlo.';
+    const propio = R.via && /sin VRT/.test(R.via)
+        ? " Criterio propio: sin VRT se clasifica con e' y E/e' (la ASE 2025 pide también la VRT)." : '';
+    if (R.grado === 'indeterminada') {
+        const pres = R.presiones === 'normales' ? ' Presiones de llenado normales por E/e\'.'
+                   : R.presiones === 'elevadas' ? ' Presiones de llenado elevadas.' : '';
+        if (R.empate) return `Indeterminada por ASE 2025: ${R.motivo}, sin LAVi que decida.${pres}`;
+        return `Indeterminada: falta ${listarEnProsa(R.faltan || [])}.${pres}`;
+    }
+    if (R.via) return `Por ASE 2025: ${R.via}.${propio} Podés corregirlo.`;
+    return 'Deducido por el algoritmo ASE 2025. Podés corregirlo.';
 }
 
 // ══════════════════════════════════════════════
@@ -878,6 +935,7 @@ function calcBSA() {
 function onEdadChange() {
     calcEjercicio();
     calcDobutamina();
+    calcDiastolico();   // los cortes de e' dependen de la edad (ASE 2025)
 }
 
 // ── PROTOCOLO TABS ────────────────────────────
@@ -5996,7 +6054,9 @@ function reposoOsecacEnProsa(H, datosReposo, datosConduccion, hayAsincronia) {
         oraciones.push(bloqueDiastolicaReposo(H));
     } else if (hayEE) {
         const pres = (H.diastGrado === 'g2' || H.diastGrado === 'g3') ? ', presiones de llenado elevadas'
-            : H.diastGrado === 'indeterminada' ? T.presionesNoClasificable
+            : H.diastGrado === 'indeterminada'
+                ? ({ normales: ', presiones de llenado normales', elevadas: ', presiones de llenado elevadas' }[presionesIndeterminada()]
+                   || T.presionesNoClasificable)
             : ', presiones de llenado normales';
         oraciones.push(`Relación E/e' ${nProsa(H.eeReposo)}${pres}`);
         if (['g1', 'g2', 'g3'].includes(H.diastGrado))

@@ -30,18 +30,48 @@ set(w, 'ddvi', 3);
 assert.equal(d.getElementById('geometria_vi').value, '');
 assert.equal(d.getElementById('imvi').value, '');
 
-// Estados basales del algoritmo vigente; no se fuerzan mediante el selector.
+// Estados basales del algoritmo vigente (ASE 2025); no se fuerzan mediante el selector.
+const DIAS = ['e_onda_rep','a_onda_rep','e_prima_rep','e_prima_lat_rep','vrt_rep','volvi_reposo','fevi_reposo','edad'];
 for (const [datos, esperado] of [
     [{e_onda_rep:80,a_onda_rep:80,e_prima_rep:10,e_prima_lat_rep:12,vrt_rep:2,volvi_reposo:40,fevi_reposo:60},'normal'],
-    [{e_onda_rep:40,a_onda_rep:80,fevi_reposo:40},'g1'],
-    [{e_onda_rep:120,a_onda_rep:60,fevi_reposo:40},'g3'],
+    [{e_onda_rep:40,a_onda_rep:80,e_prima_rep:10,e_prima_lat_rep:12,vrt_rep:2,fevi_reposo:40},'g1'],
+    [{e_onda_rep:120,a_onda_rep:60,e_prima_rep:10,e_prima_lat_rep:12,vrt_rep:2,fevi_reposo:40},'g3'],
     [{e_onda_rep:100,a_onda_rep:100,e_prima_rep:5,e_prima_lat_rep:5,vrt_rep:3,volvi_reposo:90,fevi_reposo:40},'g2'],
-    [{e_onda_rep:80,a_onda_rep:80,e_prima_rep:5,e_prima_lat_rep:5,vrt_rep:2,volvi_reposo:40,fevi_reposo:60},'indeterminada']
+    // e' bajo, E/e' alto, VRT normal: decide el LAVi (20 mL/m² → presiones normales, grado I)
+    [{e_onda_rep:80,a_onda_rep:80,e_prima_rep:5,e_prima_lat_rep:5,vrt_rep:2,volvi_reposo:40,fevi_reposo:60},'g1'],
+    // ...y sin LAVi no hay quien decida
+    [{e_onda_rep:80,a_onda_rep:80,e_prima_rep:5,e_prima_lat_rep:5,vrt_rep:2,fevi_reposo:60},'indeterminada'],
+    // Sin VRT ni volumen AI (criterio propio, 18/11/2026): con E, A y e' alcanza
+    [{e_onda_rep:70,a_onda_rep:60,e_prima_rep:8,e_prima_lat_rep:11,fevi_reposo:60,edad:50},'normal'],
+    // 70 años, lateral 8 y septal 7: normal por ASE 2025 (con 2016 era e' bajo)
+    [{e_onda_rep:60,a_onda_rep:70,e_prima_rep:7,e_prima_lat_rep:8,fevi_reposo:60,edad:70},'normal'],
+    [{e_onda_rep:50,a_onda_rep:80,e_prima_rep:5,e_prima_lat_rep:6,fevi_reposo:60,edad:70},'g1'],
+    [{e_onda_rep:90,a_onda_rep:80,e_prima_rep:5,e_prima_lat_rep:6,fevi_reposo:60,edad:70},'g2'],
+    [{e_onda_rep:110,a_onda_rep:50,e_prima_rep:5,e_prima_lat_rep:6,fevi_reposo:60,edad:70},'g3'],
+    // e' bajo, E/e' normal, E/A >0,8: puede ser pseudonormal, sin LAVi queda indeterminada
+    [{e_onda_rep:60,a_onda_rep:60,e_prima_rep:5,e_prima_lat_rep:6,fevi_reposo:60,edad:70},'indeterminada'],
+    // e' normal con E/e' alto (discordante): indeterminada
+    [{e_onda_rep:150,a_onda_rep:100,e_prima_rep:9,e_prima_lat_rep:10,fevi_reposo:60,edad:50},'indeterminada']
 ]) {
+    for (const id of DIAS) set(w, id, '');
     for (const [id, val] of Object.entries(datos)) set(w,id,val);
-    assert.equal(w.clasificarDiastolica().grado, esperado);
+    assert.equal(w.clasificarDiastolica().grado, esperado, JSON.stringify(datos));
     assert.equal(d.getElementById('diast_grado').value, esperado);
 }
+// Presiones con la diastólica indeterminada: E/e' normal → normales; E/e' alto → sin clasificar
+for (const id of DIAS) set(w, id, '');
+for (const [id, val] of Object.entries({e_onda_rep:60,a_onda_rep:60,e_prima_rep:5,e_prima_lat_rep:6,fevi_reposo:60,edad:70})) set(w,id,val);
+assert.equal(w.presionesIndeterminada(), 'normales');
+assert.match(d.body.textContent, /Presiones de llenado normales por E\/e'/);
+for (const id of DIAS) set(w, id, '');
+for (const [id, val] of Object.entries({e_onda_rep:150,a_onda_rep:100,e_prima_rep:9,e_prima_lat_rep:10,fevi_reposo:60,edad:50})) set(w,id,val);
+assert.equal(w.presionesIndeterminada(), null);
+// El criterio propio sin VRT se declara en pantalla
+for (const id of DIAS) set(w, id, '');
+for (const [id, val] of Object.entries({e_onda_rep:70,a_onda_rep:60,e_prima_rep:8,e_prima_lat_rep:11,fevi_reposo:60,edad:50})) set(w,id,val);
+assert.match(d.body.textContent, /Criterio propio: sin VRT/);
+for (const id of DIAS) set(w, id, '');
+set(w, 'fevi_reposo', 60);
 for (const id of ['e_onda_rep','a_onda_rep','e_prima_rep','e_prima_lat_rep','vrt_rep','volvi_reposo']) set(w,id,'');
 assert.equal(d.getElementById('diast_grado').value, '');
 assert.match(d.getElementById('diast_grado_calculo').textContent, /No clasificable/);
