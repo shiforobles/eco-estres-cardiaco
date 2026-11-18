@@ -1683,7 +1683,7 @@ body.con-panel { overflow: hidden; }
 .grid-paciente {
     display: grid;
     gap: var(--spacing-md);
-    grid-template-columns: minmax(140px, 1fr) minmax(220px, 2.2fr) minmax(150px, 1fr);
+    grid-template-columns: minmax(220px, 3fr) minmax(150px, 1fr);   /* nombre + fecha (HC/ID retirada) */
     margin-bottom: var(--spacing-md);
 }
 .grid-antropometria {
@@ -1922,3 +1922,28 @@ textarea.auto-alto { resize: none; overflow: hidden; min-height: 42px; line-heig
 
 /* Patrón de la alteración: lo elige el operador, debajo del resumen de motilidad */
 .patron-motilidad { margin-top: var(--spacing-md); max-width: 320px; }
+
+/* ── Barra de motilidad ordenada por pasos (18/11/2026) ───────────────
+   Fase → grado → pared → pintar. Sin notas: los botones de nivel cambian de
+   nombre con la pared elegida y "Todo normal" dice a qué fase escribe. */
+.mb-barra .mb-fila { align-items: center; gap: 0.4rem 0.6rem; margin-bottom: 0.5rem; }
+.mb-grupo { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.mb-rotulo { display: inline-flex; align-items: center; gap: 0.4rem; min-width: 5.6rem; }
+.mb-paso {
+    display: inline-grid; place-items: center;
+    width: 1.15rem; height: 1.15rem; border-radius: 50%;
+    background: var(--color-primary); color: var(--on-solid);
+    font-size: 0.65rem; font-weight: 700; letter-spacing: 0;
+}
+.mb-empuje { flex: 1 1 auto; }
+.mb-atajo { font-weight: 600; color: var(--color-primary); border-color: var(--color-primary); }
+.mb-atajo.mb-peligro { color: var(--color-error); border-color: var(--color-error); }
+.mb-atajo.mb-peligro:hover { background: var(--color-error-bg); }
+.mb-nivel { min-width: 7.5rem; }
+.mb-fila--vista { margin-top: 0.6rem; padding-top: 0.5rem; border-top: 1px dashed var(--color-border); opacity: 0.85; }
+.mb-fila--vista .mb-rotulo { font-weight: 500; }
+@media (max-width: 760px) {
+    .mb-empuje { display: none; }
+    .mb-nivel { min-width: 0; }
+}
+.form-group[hidden], .mb-btn[hidden] { display: none !important; }
