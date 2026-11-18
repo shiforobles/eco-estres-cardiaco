@@ -155,7 +155,7 @@
             // (b) Los cinco apicales, mismo grado, nada más.
             texto = mayuscula(`${NOMBRE_GRADO[st[APEX]]} de la totalidad del casquete apical.`);
         } else {
-            texto = limpiarNiveles(MotorA5.describe(sinApex));
+            texto = unirAdyacentes(limpiarNiveles(MotorA5.describe(sinApex)));
             if (ENUMERA_DEMASIADO.test(texto)) {
                 // (a) Extenso: por pared, con el ápex incluido en la misma redacción.
                 texto = describirPorPared(st);
@@ -167,8 +167,7 @@
                                    /apical/i.test(texto);
                 const global = /global del ventrículo izquierdo/i.test(texto);
                 if (apexAnormal && !apicalPuro && !global)
-                    texto = texto.replace(/\.\s*$/, '') +
-                        `, con ${NOMBRE_GRADO[st[APEX]]} del ápex.`;
+                    texto = sumarApex(texto, st[APEX]);
             }
         }
 
@@ -190,9 +189,40 @@
         for (let id = 1; id <= 17; id++) wm[id] = ids.includes(id) ? 3 : 1;
         return describirFase(wm, null).texto
             .replace(/\.\s*$/, '')
-            .replace(/, con hipoquinesia moderada del ápex$/i, ' y del ápex')
+            .replace(/, con hipoquinesia moderada del ápex$/i, ' y del ápex')   // compatibilidad: hoy sumarApex ya lo une
             .replace(/^hipoquinesia moderada\s+/i, '')
             .replace(/; hipoquinesia moderada /gi, '; ');
+    }
+
+    /** El motor encadena las extensiones adyacentes con «, con … , con …». A partir
+     *  de la segunda, «y»/«e»: «…, con hipoquinesia moderada del segmento X
+     *  adyacente e hipoquinesia leve de los segmentos Y adyacentes». */
+    function unirAdyacentes(texto) {
+        let n = 0;
+        return texto.replace(/, con (\S+)/g, (m, palabra) => {
+            n++;
+            if (n === 1) return m;
+            return (/^(i|hi(?!e))/i.test(palabra) ? ' e ' : ' y ') + palabra;
+        });
+    }
+
+    /** Agrega el ápex sin encadenar dos «con»: con el mismo grado se suma a la
+     *  ubicación («…con extensión al septum apical y al ápex», «…en toda su
+     *  extensión y del ápex»); con otro grado va en cláusula aparte, con «con» sólo
+     *  si la frase todavía no tiene uno. */
+    function sumarApex(texto, gradoApex) {
+        const base = texto.replace(/\.\s*$/, '');
+        const nombre = NOMBRE_GRADO[gradoApex];
+        const mismoGrado = base.toLowerCase().startsWith(nombre.toLowerCase()) && !base.includes(';');
+        // Sólo se une con «y» si la última cláusula no trae ya su propia «y»/«e»:
+        // «…septum apical e inferolateral a nivel basal y medio y al ápex» no se lee.
+        const ultima = base.split(',').pop();
+        if (mismoGrado && !/ (y|e) /.test(ultima)) {
+            if (/, con extensión a(l|\s)[^,;]*$/.test(base)) return `${base} y al ápex.`;
+            return `${base} y del ápex.`;
+        }
+        if (/, con /.test(base)) return `${base}; ${nombre} del ápex.`;
+        return `${base}, con ${nombre} del ápex.`;
     }
 
     function mayuscula(t) { return t ? t.charAt(0).toUpperCase() + t.slice(1) : t; }

@@ -64,7 +64,7 @@ Generado con `node test/motilidad-19-casos.js --ver` sobre la versión 2.7. FEy,
 
 **Esfuerzo.** No se objetivó incremento significativo de la motilidad parietal ni de la función sistólica global, sin evidencia de reserva contráctil. No refirió angina ni equivalentes anginosos. FEy post-esfuerzo 32 % (Δ +2 puntos).
 
-**Conclusión.** Test suficiente (95 % de la FCMT). Prueba de eco estrés con ejercicio sin isquemia inducible, en un ventrículo izquierdo con hipoquinesia global y función sistólica severamente deprimida, sin reserva contráctil con el esfuerzo. El patrón de compromiso no sigue una distribución coronaria, en relación con miocardiopatía dilatada. La capacidad funcional fue buena.
+**Conclusión.** Test suficiente (95 % de la FCMT). Prueba de eco estrés con ejercicio sin isquemia inducible, en un ventrículo izquierdo con hipoquinesia global y función sistólica severamente deprimida, sin reserva contráctil con el esfuerzo. El patrón de compromiso no sigue una distribución coronaria. La capacidad funcional fue buena.
 
 Merecen señalarse además dos hallazgos con valor pronóstico propio, independiente del resultado del estudio. El índice de motilidad parietal post-esfuerzo fue de 2,00, por encima de 1,7: ese estrato se asocia a una tasa de eventos cardíacos cercana al 5 % anual. La fracción de eyección en reposo (30 %) es por sí sola marcador de riesgo. Categorización: riesgo alto. Se sugiere correlación clínica.
 

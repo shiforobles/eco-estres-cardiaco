@@ -87,9 +87,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (el) el.addEventListener('change', calcEjercicio);
     });
 
-    // El patrón global (miocardiopatía dilatada) depende de la FEy: si se la carga
-    // DESPUÉS del bull's eye quedaba "segmentaria" y el informe hablaba de secuela en
-    // tres territorios. Se recalcula también al cambiar la FEy.
+    // Antes el patrón global se recalculaba al cambiar la FEy; hoy lo elige el
+    // operador (autocompletarPatron no hace nada) y esto sólo refresca lo deducido.
     ['input', 'change'].forEach(ev => document.getElementById('fevi_reposo')
         .addEventListener(ev, () => { autocompletarPatron(); refrescarDeducidos(); }));
 
@@ -233,8 +232,9 @@ function sugerir(id, valor, nota) {
 }
 
 // ── PATRÓN DE LA ALTERACIÓN ───────────────────
-// Global = hipoquinesia difusa sin distribución coronaria (miocardiopatía dilatada).
-// Criterio: ≥12 de 17 segmentos alterados en reposo, los tres territorios y FEy ≤40%.
+// Global = hipoquinesia difusa sin distribución coronaria. Lo marca el operador.
+// detectarPatronGlobal() sólo alimenta un aviso: ≥12 de 17 segmentos alterados en
+// reposo, los tres territorios y FEy ≤40 %.
 function marcarPatronManual() {
     marcarManual('patron_motilidad', 'Elegido a mano: la app ya no lo modifica.');
 }
@@ -248,12 +248,10 @@ function detectarPatronGlobal() {
     return fey > 0 && fey <= 40;
 }
 
-function autocompletarPatron() {
-    const global = detectarPatronGlobal();
-    sugerir('patron_motilidad', global ? 'global' : 'segmentaria', global
-        ? 'Propuesto global: ≥12 segmentos, los tres territorios y FEy ≤40 %. Podés corregirlo.'
-        : 'Se propone solo según extensión, territorios y FEy.');
-}
+// Lucas, 18/11/2026: el patrón global lo elige él, nunca la app. Arranca en
+// segmentario y sólo cambia con el selector; la función queda para no tocar a
+// quienes la llaman.
+function autocompletarPatron() {}
 
 // ── ESTUDIO DIASTÓLICO ────────────────────────
 function marcarDiastolicoManual() {
@@ -5494,7 +5492,8 @@ function construirNarrativa(H) {
         // "la alteración basal": el reposo ya la describió. Si fue sólo una parte, se
         // dice cuál.
         fijaSujeto: H.secuelas.length === H.anormalesReposo.length ? 'La alteración basal'
-            : mayuscula('la ' + describirSegmentos(H.secuelas, 'scoreReposo')) + ' basal',
+            // ", presente en reposo," y no " basal": "del segmento anterior basal basal"
+            : mayuscula('la ' + describirSegmentos(H.secuelas, 'scoreReposo')) + ', presente en reposo,',
         // "No se modificó" sólo si el puntaje quedó igual. De leve a moderada, o de
         // disquinesia a aquinesia, el grado cambió pero no de forma significativa.
         fijaVerbo: fijaVerboDe(H),
@@ -5502,7 +5501,7 @@ function construirNarrativa(H) {
         // formulario aparte y "la alteración basal" obligaba a volver al de Reposo.
         recuperaronSujeto: mayuscula('la ' + describirSegmentos(H.recuperaron, 'scoreReposo')),
         sinParSujeto: H.sinParReposo.length === H.anormalesReposo.length ? 'La alteración basal'
-            : mayuscula('la ' + describirSegmentos(H.sinParReposo, 'scoreReposo')) + ' basal',
+            : mayuscula('la ' + describirSegmentos(H.sinParReposo, 'scoreReposo')) + ', presente en reposo,',
         // Los segmentos basales anormales que mejoraron o que quedaron sin par:
         // antes se perdían del informe por completo.
         segmentosRecuperaron: segmentosEnProsa(H.recuperaron),
@@ -5878,7 +5877,12 @@ function reposoOsecacEnProsa(H, datosReposo, datosConduccion, hayAsincronia) {
             // "y" → "e" delante de i- / hi- (hipoquinesia, inferior…), como en eco Doppler.
             const primera = mot.trim().toLowerCase();
             const conj = /^(i|hi(?!e))/.test(primera) ? 'e' : 'y';
-            oraciones.push(`${vi} ${conj} ${primera}`);
+            // "dilatado (…) y aquinesia" une un adjetivo con un sustantivo: ahí va
+            // ", con", como en eco Doppler. La conjunción sólo detrás de un complemento.
+            const soloAdjetivo = !GEOMETRIA_OSECAC[H.geometriaVI] && H.geometriaVI !== 'normal';
+            // Si la motilidad ya trae su propio ", con", dos oraciones: tres "con" seguidos no se leen.
+            if (soloAdjetivo && /, con /.test(primera)) { oraciones.push(vi); oraciones.push(mot.trim()); }
+            else oraciones.push(soloAdjetivo ? `${vi}, con ${primera}` : `${vi} ${conj} ${primera}`);
         } else {
             if (vi) oraciones.push(vi);
             oraciones.push(mot || T.reposoMotilidadNormal);
@@ -6387,7 +6391,7 @@ function validarEstudio(rama) {
     if (patronEl.value === 'segmentaria' && detectarPatronGlobal())
         av.push({ nivel: 'warn', txt: 'El patrón cumple criterio de compromiso global (≥12 segmentos, tres territorios, FEy ≤40 %) pero está marcado como segmentario: la conclusión va a atribuir territorios coronarios.' });
     if (patronEl.value === 'global' && !detectarPatronGlobal())
-        av.push({ nivel: 'info', txt: 'Marcaste patrón global sin que se cumpla el criterio automático. El informe respeta tu criterio.' });
+        av.push({ nivel: 'info', txt: 'Marcaste patrón global sin que se cumpla el criterio de referencia (≥12 segmentos, tres territorios, FEy ≤40 %). El informe respeta tu criterio.' });
 
     const conduccion = document.getElementById('ecg_conduccion').value;
     if (CONDUCCION_LIMITA_SEPTUM.includes(conduccion)) {

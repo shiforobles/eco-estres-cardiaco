@@ -186,7 +186,7 @@ for (let i = 0; i < N; i++) {
     if (/en dicho territorio/.test(texto)) reportar('"en dicho territorio"', '');
     // Por pared, no segmento por segmento.
     (texto.match(/de los segmentos [^.;]*/g) || []).forEach(m => {
-        const listaSeg = m.replace(/^de los segmentos /, '').split(/, con |, en |, como |, atribuible |(?:,| y| e) (?:hipoquinesia|aquinesia|disquinesia)/)[0];
+        const listaSeg = m.replace(/^de los segmentos /, '').split(/, presente en reposo|, con |, en |, como |, atribuible |(?:,| y| e) (?:hipoquinesia|aquinesia|disquinesia)/)[0];
         if (listaSeg.split(/, | y | e /).length >= 4) reportar('enumera cuatro o más segmentos', m.slice(0, 200));
     });
     // "Evento previo" y "secuela de infarto" sólo con el infarto cargado.
