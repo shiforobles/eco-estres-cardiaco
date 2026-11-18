@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=2.8-espacios">
+    <link rel="stylesheet" href="styles.css?v=2.9.1-limpieza">
 </head>
 <body>
 <div class="container">
@@ -61,10 +61,10 @@
          ══════════════════════════════════════ -->
     <section class="card">
         <h2 class="section-title">Datos del Paciente</h2>
-        <!-- HC y nombre en el mismo renglón, pero en dos campos: a la planilla va
-             sólo la HC, nunca el nombre. -->
+        <!-- La HC/ID se retiró de la vista (18/11/2026: sólo se carga el nombre). El
+             campo queda oculto porque los borradores viejos y la planilla lo leen. -->
         <div class="grid-paciente">
-            <div class="form-group">
+            <div class="form-group" hidden>
                 <label for="paciente_id">HC / ID</label>
                 <input autocomplete="off" type="text" id="paciente_id" placeholder="Ej: JP-1234">
             </div>
@@ -913,90 +913,77 @@
     <section class="card">
         <h2 class="section-title">Motilidad Parietal Segmentaria — Modelo AHA 17 Segmentos</h2>
 
-        <div class="wall-motion-legend">
-            <span class="wm-dot wm-0">0</span>&nbsp;No evaluado &nbsp;
-            <span class="wm-dot wm-1">1</span>&nbsp;Normal &nbsp;
-            <span class="wm-dot wm-2">2</span>&nbsp;Hipoc. leve &nbsp;
-            <span class="wm-dot wm-3">3</span>&nbsp;Hipoc. mod/sev &nbsp;
-            <span class="wm-dot wm-4">4</span>&nbsp;Acinesia &nbsp;
-            <span class="wm-dot wm-5">5</span>&nbsp;Discinesia
-        </div>
-
-        <p style="font-size:0.78rem; color:var(--color-text-secondary); margin-bottom:1rem">
-            Hacé clic en cada segmento del diagrama para ir cambiando el puntaje. Los botones de abajo cargan todo de una vez.
-        </p>
-
         <div class="territory-ctrl-box">
-            <div class="tc-quick-btns">
-                <button class="tc-quick-btn" onclick="setAllNormal('reposo')">✓ Todo Normal — Reposo</button>
-                <button class="tc-quick-btn" onclick="setAllNormal('estres')">✓ Todo Normal — Estrés</button>
-                <button class="tc-quick-btn danger" onclick="resetAllScores()">✕ Limpiar todo</button>
-            </div>
-            <!-- Barra de carga: pincel de grado + grupos anatómicos, portada de la app
-                 de eco Doppler. Reemplaza la tabla plegada de 36 botones por territorio. -->
+            <!-- Barra de carga en el orden en que se toca: fase → grado → pared → nivel.
+                 Los botones de nivel cambian de nombre según la pared elegida, así dicen
+                 lo que van a pintar antes de tocarlos (sin textos de ayuda). -->
             <div class="mb-barra">
                 <div class="mb-fila">
-                    <span class="mb-rotulo">Fase</span>
-                    <button class="mb-btn mb-fase" data-fase="reposo" aria-pressed="true"  onclick="setFaseCarga('reposo')">Reposo</button>
-                    <button class="mb-btn mb-fase" data-fase="estres" aria-pressed="false" onclick="setFaseCarga('estres')">Estrés</button>
-                    <button class="mb-btn mb-fase" data-fase="ambas"  aria-pressed="false" onclick="setFaseCarga('ambas')">Ambas</button>
-                    <span class="mb-nota">A qué bull's eye escriben los botones de grupo. El clic directo va siempre al diagrama que tocás.</span>
+                    <span class="mb-rotulo"><span class="mb-paso">1</span>Fase</span>
+                    <div class="mb-grupo">
+                        <button class="mb-btn mb-fase" data-fase="reposo" aria-pressed="true"  onclick="setFaseCarga('reposo')">Reposo</button>
+                        <button class="mb-btn mb-fase" data-fase="estres" aria-pressed="false" onclick="setFaseCarga('estres')">Estrés</button>
+                        <button class="mb-btn mb-fase" data-fase="ambas"  aria-pressed="false" onclick="setFaseCarga('ambas')">Ambas</button>
+                    </div>
+                    <span class="mb-empuje"></span>
+                    <button class="mb-btn mb-atajo" id="mb-todo-normal" onclick="todoNormalFase()">✓ Todo normal · Reposo</button>
+                    <button class="mb-btn mb-atajo mb-peligro" onclick="resetAllScores()">✕ Limpiar</button>
                 </div>
 
                 <div class="mb-fila">
-                    <span class="mb-rotulo">Grado</span>
-                    <button class="mb-btn mb-grado" data-grado="0" aria-pressed="false" style="--mb-color:#9CA3AF" onclick="setGradoPincel(0)">— No eval.</button>
-                    <button class="mb-btn mb-grado" data-grado="1" aria-pressed="false" style="--mb-color:#22C55E" onclick="setGradoPincel(1)">1 Normal</button>
-                    <button class="mb-btn mb-grado" data-grado="2" aria-pressed="false" style="--mb-color:#FDE047" onclick="setGradoPincel(2)">2 Hipo leve</button>
-                    <button class="mb-btn mb-grado" data-grado="3" aria-pressed="false" style="--mb-color:#FB923C" onclick="setGradoPincel(3)">3 Hipo mod</button>
-                    <button class="mb-btn mb-grado" data-grado="4" aria-pressed="false" style="--mb-color:#EF4444" onclick="setGradoPincel(4)">4 Aquinesia</button>
-                    <button class="mb-btn mb-grado" data-grado="5" aria-pressed="false" style="--mb-color:#A855F7" onclick="setGradoPincel(5)">5 Disquinesia</button>
-                    <span class="mb-nota">Tocalo de nuevo para soltarlo. Sin pincel, el clic cicla y los grupos aplican hipoquinesia leve.</span>
-                </div>
-
-                <!-- Pared + nivel: se elige la pared y el nivel pinta sólo esa pared a esa
-                     altura ("anterior" + "basal" = anterior basal). Sin pared, el nivel pinta
-                     el anillo entero. -->
-                <div class="mb-fila">
-                    <span class="mb-rotulo">Pared</span>
-                    <button class="mb-btn mb-pared" data-pared="anterior" aria-pressed="false" onclick="elegirPared('anterior')">Anterior</button>
-                    <button class="mb-btn mb-pared" data-pared="anteroseptal" aria-pressed="false" onclick="elegirPared('anteroseptal')">Anteroseptal</button>
-                    <button class="mb-btn mb-pared" data-pared="inferoseptal" aria-pressed="false" onclick="elegirPared('inferoseptal')">Inferoseptal</button>
-                    <button class="mb-btn mb-pared" data-pared="inferior" aria-pressed="false" onclick="elegirPared('inferior')">Inferior</button>
-                    <button class="mb-btn mb-pared" data-pared="inferolateral" aria-pressed="false" onclick="elegirPared('inferolateral')">Inferolateral</button>
-                    <button class="mb-btn mb-pared" data-pared="anterolateral" aria-pressed="false" onclick="elegirPared('anterolateral')">Anterolateral</button>
+                    <span class="mb-rotulo"><span class="mb-paso">2</span>Grado</span>
+                    <div class="mb-grupo">
+                        <button class="mb-btn mb-grado" data-grado="1" aria-pressed="false" style="--mb-color:#22C55E" onclick="setGradoPincel(1)">Normal</button>
+                        <button class="mb-btn mb-grado" data-grado="2" aria-pressed="false" style="--mb-color:#FDE047" onclick="setGradoPincel(2)">Hipo leve</button>
+                        <button class="mb-btn mb-grado" data-grado="3" aria-pressed="false" style="--mb-color:#FB923C" onclick="setGradoPincel(3)">Hipo mod</button>
+                        <button class="mb-btn mb-grado" data-grado="4" aria-pressed="false" style="--mb-color:#EF4444" onclick="setGradoPincel(4)">Aquinesia</button>
+                        <button class="mb-btn mb-grado" data-grado="5" aria-pressed="false" style="--mb-color:#A855F7" onclick="setGradoPincel(5)">Disquinesia</button>
+                        <button class="mb-btn mb-grado" data-grado="0" aria-pressed="false" style="--mb-color:#9CA3AF" onclick="setGradoPincel(0)" title="No evaluado">No eval.</button>
+                    </div>
                 </div>
 
                 <div class="mb-fila">
-                    <span class="mb-rotulo">Nivel</span>
-                    <button class="mb-btn" onclick="aplicarNivelMotilidad('basal')">Basal</button>
-                    <button class="mb-btn" onclick="aplicarNivelMotilidad('medio')">Medio</button>
-                    <button class="mb-btn" onclick="aplicarNivelMotilidad('apical')">Apical</button>
-                    <button class="mb-btn" onclick="aplicarNivelMotilidad('toda')">Toda la pared</button>
-                    <span class="mb-nota" id="mb-nota-nivel">Sin pared elegida, el nivel pinta el anillo entero.</span>
+                    <span class="mb-rotulo"><span class="mb-paso">3</span>Pared</span>
+                    <div class="mb-grupo">
+                        <button class="mb-btn mb-pared" data-pared="anterior" aria-pressed="false" onclick="elegirPared('anterior')">Anterior</button>
+                        <button class="mb-btn mb-pared" data-pared="anteroseptal" aria-pressed="false" onclick="elegirPared('anteroseptal')">Anteroseptal</button>
+                        <button class="mb-btn mb-pared" data-pared="inferoseptal" aria-pressed="false" onclick="elegirPared('inferoseptal')">Inferoseptal</button>
+                        <button class="mb-btn mb-pared" data-pared="inferior" aria-pressed="false" onclick="elegirPared('inferior')">Inferior</button>
+                        <button class="mb-btn mb-pared" data-pared="inferolateral" aria-pressed="false" onclick="elegirPared('inferolateral')">Inferolateral</button>
+                        <button class="mb-btn mb-pared" data-pared="anterolateral" aria-pressed="false" onclick="elegirPared('anterolateral')">Anterolateral</button>
+                    </div>
                 </div>
 
                 <div class="mb-fila">
-                    <span class="mb-rotulo">Territorio</span>
-                    <button class="mb-btn" onclick="aplicarGrupoMotilidad('territorios.DA')"><span class="badge-da">DA</span></button>
-                    <button class="mb-btn" onclick="aplicarGrupoMotilidad('territorios.CD')"><span class="badge-cd">CD</span></button>
-                    <button class="mb-btn" onclick="aplicarGrupoMotilidad('territorios.Cx')"><span class="badge-cx">Cx</span></button>
-                    <button class="mb-btn" onclick="aplicarGrupoMotilidad('territorios.global')">Global</button>
+                    <span class="mb-rotulo"><span class="mb-paso">4</span>Pintar</span>
+                    <div class="mb-grupo">
+                        <button class="mb-btn mb-nivel" data-nivel="basal"  onclick="aplicarNivelMotilidad('basal')">Anillo basal</button>
+                        <button class="mb-btn mb-nivel" data-nivel="medio"  onclick="aplicarNivelMotilidad('medio')">Anillo medio</button>
+                        <button class="mb-btn mb-nivel" data-nivel="apical" onclick="aplicarNivelMotilidad('apical')">Anillo apical</button>
+                        <button class="mb-btn mb-nivel" data-nivel="toda"   onclick="aplicarNivelMotilidad('toda')" hidden>Toda la pared</button>
+                    </div>
                     <span class="mb-sep"></span>
+                    <div class="mb-grupo">
+                        <button class="mb-btn" onclick="aplicarGrupoMotilidad('territorios.DA')" title="Todo el territorio de la DA"><span class="badge-da">DA</span></button>
+                        <button class="mb-btn" onclick="aplicarGrupoMotilidad('territorios.CD')" title="Todo el territorio de la CD"><span class="badge-cd">CD</span></button>
+                        <button class="mb-btn" onclick="aplicarGrupoMotilidad('territorios.Cx')" title="Todo el territorio de la Cx"><span class="badge-cx">Cx</span></button>
+                        <button class="mb-btn" onclick="aplicarGrupoMotilidad('territorios.global')" title="Los 17 segmentos">Global</button>
+                    </div>
+                </div>
+
+                <div class="mb-fila mb-fila--vista">
                     <span class="mb-rotulo">Vista</span>
-                    <button class="mb-btn mb-vista" data-vista="A4C" aria-pressed="false" onclick="setVistaMotilidad('A4C')">A4C</button>
-                    <button class="mb-btn mb-vista" data-vista="A2C" aria-pressed="false" onclick="setVistaMotilidad('A2C')">A2C</button>
-                    <button class="mb-btn mb-vista" data-vista="A3C" aria-pressed="false" onclick="setVistaMotilidad('A3C')">A3C</button>
-                    <span class="mb-nota">La vista atenúa lo que no se ve en ese corte. No pinta nada.</span>
+                    <div class="mb-grupo">
+                        <button class="mb-btn mb-vista" data-vista="A4C" aria-pressed="false" onclick="setVistaMotilidad('A4C')" title="Atenúa lo que no se ve en A4C">A4C</button>
+                        <button class="mb-btn mb-vista" data-vista="A2C" aria-pressed="false" onclick="setVistaMotilidad('A2C')" title="Atenúa lo que no se ve en A2C">A2C</button>
+                        <button class="mb-btn mb-vista" data-vista="A3C" aria-pressed="false" onclick="setVistaMotilidad('A3C')" title="Atenúa lo que no se ve en A3C">A3C</button>
+                    </div>
                 </div>
 
                 <!-- Quedó un solo motor de texto (el de eco Doppler). El campo se conserva
                      oculto y fijo: tiene columna en la planilla. -->
                 <input type="hidden" id="motor_texto" value="doppler">
 
-                <div class="mb-fila mb-ayuda">
-                    Elegí el grado y la pared, y después el nivel: «Hipo leve» → «Anterior» → «Basal» pinta sólo el anterior basal. Cada nivel que tocás se suma y el mismo botón lo apaga. Sin pared elegida, el nivel pinta el anillo entero. Los territorios pintan el vaso completo; el ápex sólo entra con «Apical» sin pared.
-                </div>
             </div>
         </div>
 
@@ -1480,7 +1467,7 @@
         <div id="resultado-banner" class="resultado-banner" hidden></div>
         <!-- Lo completa la app sola desde el bull's eye, el ECG y la hemodinamia.
              Se pliega: está para agregar o corregir, no para cargar. -->
-        <details class="plegable-tecnica ajustes-informe" id="ajustes-informe">
+        <details class="plegable-tecnica ajustes-informe" id="ajustes-informe" hidden>
         <summary class="firma-nota" style="cursor:pointer">Agregar texto libre o corregir el resultado deducido</summary>
         <div class="form-group" style="margin-top:0.6rem">
             <label for="conclusion_libre">Conclusión clínica (texto libre)</label>
@@ -1800,7 +1787,7 @@
 <script src="motility-groups.js?v=2.2"></script>
 <script src="report-templates.js?v=2.9-cuadros"></script>
 <script src="sheets-storage.js?v=2.7-motilidad"></script>
-<script src="app.js?v=2.9-cuadros"></script>
+<script src="app.js?v=2.9.1-limpieza"></script>
 <script>
 // Control de versión: si el navegador sirvió una mezcla de archivos viejos y nuevos,
 // los botones fallan en silencio. Esto lo convierte en un aviso visible.

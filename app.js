@@ -2987,10 +2987,28 @@ function sincronizarBarraMotilidad() {
     marcar('[data-grado]', b => parseInt(b.dataset.grado) === GRADO_PINCEL);
     marcar('[data-vista]', b => b.dataset.vista === VISTA_ACTIVA);
     marcar('[data-pared]', b => b.dataset.pared === PARED_ELEGIDA);
-    const nota = document.getElementById('mb-nota-nivel');
-    if (nota) nota.textContent = PARED_ELEGIDA
-        ? `El nivel pinta sólo la pared ${PARED_ELEGIDA}. Tocá la pared de nuevo para soltarla.`
-        : 'Sin pared elegida, el nivel pinta el anillo entero.';
+    // Los botones de nivel dicen lo que van a pintar: "Anillo basal" sin pared,
+    // "Anterior basal" con la pared anterior elegida.
+    const PARED_TXT = { anterior: 'Anterior', anteroseptal: 'Anteroseptal', inferoseptal: 'Inferoseptal',
+                        inferior: 'Inferior', inferolateral: 'Inferolateral', anterolateral: 'Anterolateral' };
+    const NIVEL_TXT = { basal: 'basal', medio: 'medio', apical: 'apical' };
+    document.querySelectorAll('.mb-nivel[data-nivel]').forEach(btn => {
+        const n = btn.dataset.nivel;
+        if (n === 'toda') {
+            btn.hidden = !PARED_ELEGIDA;
+            btn.textContent = PARED_ELEGIDA ? `${PARED_TXT[PARED_ELEGIDA]} completa` : 'Toda la pared';
+        } else {
+            btn.textContent = PARED_ELEGIDA ? `${PARED_TXT[PARED_ELEGIDA]} ${NIVEL_TXT[n]}` : `Anillo ${NIVEL_TXT[n]}`;
+        }
+    });
+    const todo = document.getElementById('mb-todo-normal');
+    if (todo) todo.textContent = '✓ Todo normal · ' +
+        ({ reposo: 'Reposo', estres: 'Estrés', ambas: 'Ambas' })[FASE_CARGA];
+}
+
+/** "Todo normal" escribe en la fase elegida arriba (o en las dos con "Ambas"). */
+function todoNormalFase() {
+    fasesDeCarga().forEach(f => setAllNormal(f));
 }
 
 function setTerritoryScore(stateKey, territory, score) {
@@ -3218,7 +3236,7 @@ ${v('nc_descripcion') ? 'Descripción: ' + v('nc_descripcion') : ''}`;
         if (document.getElementById(id).checked) hals.push(lbl);
     });
 
-    const conclusion = v('conclusion_libre');
+    const conclusion = '';   // conclusión libre retirada (18/11/2026)
 
     // Armar reporte
     const sep = '─'.repeat(64);
@@ -3997,7 +4015,7 @@ function recolectarHallazgos() {
     H.indicacionAclaracion = normalizarTexto((v('indicacion_aclaracion') || '').replace(/\s+/g, ' ').trim());
     H.indicacionLibre = normalizarTexto(v('indicacion_libre'));
     H.contraste = document.getElementById('contraste_usado').value;
-    H.conclusionLibre = normalizarTexto(v('conclusion_libre'));
+    H.conclusionLibre = '';   // conclusión libre retirada (18/11/2026): sólo desarrollo automático
 
     // Hemodinamia
     H.fcBasal = num('esf_basal_fc');
@@ -6290,7 +6308,7 @@ function validarEstudio(rama) {
     const fcPico = num('esf_max_fc');
     const resultado = document.getElementById('resultado_estudio').value;
 
-    if (!v('paciente_id') && !v('paciente_nombre')) av.push({ nivel: 'warn', txt: 'Falta identificar al paciente (HC/ID o nombre).' });
+    if (!v('paciente_id') && !v('paciente_nombre')) av.push({ nivel: 'warn', txt: 'Falta el nombre del paciente.' });
     if (!edad) av.push({ nivel: 'error', txt: 'Falta la edad: sin ella no se calcula la FC máxima predicha ni la adecuación del estudio.' });
     if (!document.getElementById('indicacion').value) av.push({ nivel: 'warn', txt: 'Falta la indicación del estudio.' });
     if (!v('fevi_reposo')) av.push({ nivel: 'warn', txt: 'Falta la FEy en reposo.' });
